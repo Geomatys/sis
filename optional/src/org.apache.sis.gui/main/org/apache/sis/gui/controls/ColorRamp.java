@@ -75,7 +75,15 @@ public final class ColorRamp {
         DEFAULT,
         GRAYSCALE,
         new ColorRamp(0xFF0000FF, 0xFF00FFFF, 0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000),  // Blue – Cyan – White – Yellow – Red.
-        new ColorRamp(0xFF0000FF, 0xFFFF00FF, 0xFFFF0000)                           // Blue – Magenta – Red.
+        new ColorRamp(0xFF0000FF, 0xFFFF00FF, 0xFFFF0000),                          // Blue – Magenta – Red.
+        new ColorRamp(0xFF0000BF, 0xFF0000FF, 0xFF003FFF, 0xFF007FFF, 0xFF00BFFF,
+                      0xFF00FFFF, 0xFF3FFFFF, 0xFF7FFFBF, 0xFFBFFF7F, 0xFFFFFF3F,
+                      0xFFFFFF00, 0xFFFFBF00, 0xFFFF7F00, 0xFFFF3F00, 0xFFFF0000),
+        new ColorRamp(
+            0xFF042333, 0xFF052943, 0xFF082E54, 0xFF0E3167, 0xFF19337C, 0xFF273491, 0xFF39339E, 0xFF49369F,
+            0xFF563B9C, 0xFF624198, 0xFF6D4694, 0xFF784B91, 0xFF83508F, 0xFF8E548C, 0xFF995889, 0xFFA55C86,
+            0xFFB15F82, 0xFFBD637C, 0xFFC96775, 0xFFD46B6D, 0xFFDF7064, 0xFFE8775A, 0xFFF07F50, 0xFFF68848,
+            0xFFF99341, 0xFFFB9F3D, 0xFFFCAC3C, 0xFFFBB93E, 0xFFF9C641, 0xFFF6D347, 0xFFF2E14D, 0xFFEDEE54)
     };
 
     /**
