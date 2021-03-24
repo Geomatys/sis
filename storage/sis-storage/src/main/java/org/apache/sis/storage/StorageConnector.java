@@ -292,19 +292,21 @@ public class StorageConnector implements AutoCloseable {
     }
 
     /**
-     * Please use a safe alternative instead, like {@link #useAs(Class, StorageOperatingFunction)}.
-     * Only call this if safe methods do not support the storage type you require.
-     *
+     * @deprecated Please use a safe alternative instead, like {@link #useAs(Class, StorageOperatingFunction)}.
+     * If safe methods do not support the storage type you require, use {@code unsafe().getStorageAs() } to ease tracing
+     * of unsafe calls.
      * @return A connector that does not provides control over resource usage. It does not automatically rewind
      * automatically used resources. That means that resource lifecycle becomes <em>entirely</em> caller responsability.
      */
+    @Deprecated
     public <T> T getStorageAs(final Class<T> type) throws IllegalArgumentException, DataStoreException {
         return storage.getStorageAs(type);
     }
 
     /**
-     * Please use a safe alternative instead, like {@link #useAs(Class, StorageOperatingFunction)}.
-     * Only call this if safe methods do not support the storage type you require.
+     * @deprecated Please use a safe alternative instead, like {@link #useAs(Class, StorageOperatingFunction)}.
+     * If safe methods do not support the storage type you require, use {@code unsafe().getStorage() } to ease tracing
+     * of unsafe calls.
      *
      * @return A connector that does not provides control over resource usage. It does not automatically rewind
      * automatically used resources. That means that resource lifecycle becomes <em>entirely</em> caller responsability.
