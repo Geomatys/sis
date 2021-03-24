@@ -65,27 +65,27 @@ public final strictfp class StorageConnectorTest extends TestCase {
     /**
      * Name of the test file, in the same directory than this {@code StorageConnectorTest} file.
      */
-    private static final String FILENAME = "Any.txt";
+    static final String FILENAME = "Any.txt";
 
     /**
      * Beginning of the first sentence in {@value #FILENAME}.
      */
-    private static final String FIRST_SENTENCE = "The purpose of this file";
+    static final String FIRST_SENTENCE = "The purpose of this file";
 
     /**
      * The 4 first characters of {@link #FIRST_SENTENCE}, encoded as an integer.
      */
-    private static final int MAGIC_NUMBER = ('T' << 24) | ('h' << 16) | ('e' << 8) | ' ';
+    static final int MAGIC_NUMBER = ('T' << 24) | ('h' << 16) | ('e' << 8) | ' ';
 
     /**
      * Creates the instance to test. This method uses the {@code "test.txt"} ASCII file as
      * the resource to test. The resource can be provided either as a URL or as a stream.
      */
-    private static StorageConnector create(final boolean asStream) {
+    static UnsafeConnector create(final boolean asStream) {
         final Class<?> c = StorageConnectorTest.class;
         final Object storage = asStream ? c.getResourceAsStream(FILENAME) : c.getResource(FILENAME);
         assertNotNull(storage);
-        final StorageConnector connector = new StorageConnector(storage);
+        final UnsafeConnector connector = new UnsafeConnector(storage);
         connector.setOption(OptionKey.ENCODING, StandardCharsets.US_ASCII);
         connector.setOption(OptionKey.URL_ENCODING, "UTF-8");
         return connector;
@@ -96,7 +96,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      */
     @Test
     public void testGetStorageName() {
-        final StorageConnector c = create(false);
+        final UnsafeConnector c = create(false);
         assertEquals(FILENAME, c.getStorageName());
     }
 
@@ -105,7 +105,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      */
     @Test
     public void testGetExtension() {
-        final StorageConnector c = create(false);
+        final UnsafeConnector c = create(false);
         assertEquals("txt", c.getFileExtension());
     }
 
@@ -117,7 +117,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      */
     @Test
     public void testGetAsString() throws DataStoreException, IOException {
-        final StorageConnector c = create(false);
+        final UnsafeConnector c = create(false);
         assertTrue(c.getStorageAs(String.class).endsWith("org/apache/sis/storage/" + FILENAME));
     }
 
@@ -149,7 +149,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      * Implementation of {@link #testGetAsDataInputFromURL()} and {@link #testGetAsDataInputFromStream()}.
      */
     private void testGetAsDataInput(final boolean asStream) throws DataStoreException, IOException {
-        final StorageConnector connection = create(asStream);
+        final UnsafeConnector connection = create(asStream);
         final DataInput input = connection.getStorageAs(DataInput.class);
         assertSame("Value shall be cached.", input, connection.getStorageAs(DataInput.class));
         assertInstanceOf("Needs the SIS implementation.", ChannelImageInputStream.class, input);
@@ -175,7 +175,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod("testGetAsDataInputFromURL")
     public void testGetAsImageInputStream() throws DataStoreException, IOException {
-        final StorageConnector connection = create(false);
+        final UnsafeConnector connection = create(false);
         final ImageInputStream in = connection.getStorageAs(ImageInputStream.class);
         assertSame(connection.getStorageAs(DataInput.class), in);
         connection.closeAllExcept(null);
@@ -191,7 +191,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod("testGetAsImageInputStream")
     public void testGetOriginalInputStream() throws DataStoreException, IOException {
-        final StorageConnector connection = create(true);
+        final UnsafeConnector connection = create(true);
         final InputStream in = connection.getStorageAs(InputStream.class);
         assertSame("The InputStream shall be the one specified to the constructor.", connection.getStorage(), in);
         /*
@@ -226,7 +226,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod("testGetAsImageInputStream")
     public void testGetAsInputStream() throws DataStoreException, IOException {
-        final StorageConnector connection = create(false);
+        final UnsafeConnector connection = create(false);
         final InputStream in = connection.getStorageAs(InputStream.class);
         assertNotSame(connection.getStorage(), in);
         assertSame("Expected cached value.", in, connection.getStorageAs(InputStream.class));
@@ -251,7 +251,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod({"testGetAsInputStream", "testGetAsDataInputFromStream"})
     public void testGetAsReader() throws DataStoreException, IOException {
-        final StorageConnector connection = create(true);
+        final UnsafeConnector connection = create(true);
         final Reader in = connection.getStorageAs(Reader.class);
         final char[] expected = FIRST_SENTENCE.toCharArray();
         final char[] actual = new char[expected.length];
@@ -291,7 +291,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      */
     @Test
     public void testGetAsChannelDataInput() throws DataStoreException, IOException {
-        final StorageConnector connection = create(true);
+        final UnsafeConnector connection = create(true);
         final ChannelDataInput input = connection.getStorageAs(ChannelDataInput.class);
         assertFalse(input instanceof ChannelImageInputStream);
         assertEquals(MAGIC_NUMBER, input.buffer.getInt());
@@ -317,10 +317,10 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod("testGetAsDataInputFromURL")
     public void testGetAsByteBuffer() throws DataStoreException, IOException {
-        final StorageConnector connection = create(false);
+        final UnsafeConnector connection = create(false);
         final ByteBuffer buffer = connection.getStorageAs(ByteBuffer.class);
         assertNotNull("getStorageAs(ByteBuffer.class)", buffer);
-        assertEquals(StorageConnector.DEFAULT_BUFFER_SIZE, buffer.capacity());
+        assertEquals(UnsafeConnector.DEFAULT_BUFFER_SIZE, buffer.capacity());
         assertEquals(MAGIC_NUMBER, buffer.getInt());
         connection.closeAllExcept(null);
     }
@@ -337,15 +337,15 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod("testGetAsDataInputFromStream")
     public void testGetAsTemporaryByteBuffer() throws DataStoreException, IOException {
-        StorageConnector connection = create(true);
+        UnsafeConnector connection = create(true);
         final DataInput in = ImageIO.createImageInputStream(connection.getStorage());
         assertNotNull("ImageIO.createImageInputStream(InputStream)", in);                   // Sanity check.
-        connection = new StorageConnector(in);
+        connection = new UnsafeConnector(in);
         assertSame(in, connection.getStorageAs(DataInput.class));
 
         final ByteBuffer buffer = connection.getStorageAs(ByteBuffer.class);
         assertNotNull("getStorageAs(ByteBuffer.class)", buffer);
-        assertEquals(StorageConnector.MINIMAL_BUFFER_SIZE, buffer.capacity());
+        assertEquals(UnsafeConnector.MINIMAL_BUFFER_SIZE, buffer.capacity());
         assertEquals(MAGIC_NUMBER, buffer.getInt());
         connection.closeAllExcept(null);
     }
@@ -357,7 +357,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      * @throws IOException should never happen since we do not open any file.
      */
     public void testGetAsConnection() throws DataStoreException, IOException {
-        final StorageConnector connection = create(false);
+        final UnsafeConnector connection = create(false);
         assertNull(connection.getStorageAs(Connection.class));
         connection.closeAllExcept(null);
     }
@@ -370,7 +370,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
      */
     @Test
     public void testGetInvalidObject() throws DataStoreException {
-        final StorageConnector connection = create(true);
+        final UnsafeConnector connection = create(true);
         assertNotNull("getStorageAs(InputStream.class)", connection.getStorageAs(InputStream.class));
         assertNull   ("getStorageAs(URI.class)",         connection.getStorageAs(URI.class));
         assertNull   ("getStorageAs(String.class)",      connection.getStorageAs(String.class));
@@ -393,7 +393,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
     @Test
     @DependsOnMethod("testGetAsDataInputFromStream")
     public void testCloseAllExcept() throws DataStoreException, IOException {
-        final StorageConnector connection = create(true);
+        final UnsafeConnector connection = create(true);
         final DataInput input = connection.getStorageAs(DataInput.class);
         final ReadableByteChannel channel = ((ChannelImageInputStream) input).channel;
         assertTrue("channel.isOpen()", channel.isOpen());
@@ -404,7 +404,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
 
     @Test
     public void getting_buffer_should_not_change_underlying_stream_position() throws Exception {
-        final StorageConnector con = create(false);
+        final UnsafeConnector con = create(false);
 
         final ImageInputStream stream = con.getStorageAs(ImageInputStream.class);
 
@@ -421,7 +421,7 @@ public final strictfp class StorageConnectorTest extends TestCase {
     public void moving_stream_should_not_impact_buffer() throws Exception {
         final byte[] data = new byte[(int) Math.pow(2, 16)];
         new Random().nextBytes(data);
-        final StorageConnector connector = new StorageConnector(new ByteArrayInputStream(data));
+        final UnsafeConnector connector = new UnsafeConnector(new ByteArrayInputStream(data));
         final ByteBuffer buffer = connector.getStorageAs(ByteBuffer.class);
         final int blockSize = buffer.remaining();
         final byte[] ctrl = new byte[blockSize];

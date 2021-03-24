@@ -3,19 +3,16 @@ package org.apache.sis.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import org.apache.sis.setup.OptionKey;
-import org.apache.sis.storage.StrictStorageConnector.StorageControlException;
+import org.apache.sis.storage.StorageConnector.StorageControlException;
 import org.apache.sis.test.DependsOn;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -30,15 +27,8 @@ public class StrictStorageConnectorTest {
      * Creates the instance to test. This method uses the {@code "test.txt"} ASCII file as
      * the resource to test. The resource can be provided either as a URL or as a stream.
      */
-    private static StrictStorageConnector create(final boolean asStream) {
-        final Class<?> c = StorageConnectorTest.class;
-        final Object storage = asStream ? c.getResourceAsStream(FILENAME) : c.getResource(FILENAME);
-        assertNotNull(storage);
-        final StorageConnector unsafeConnector = new StorageConnector(storage);
-        unsafeConnector.setOption(OptionKey.ENCODING, StandardCharsets.US_ASCII);
-        unsafeConnector.setOption(OptionKey.URL_ENCODING, "UTF-8");
-        final StrictStorageConnector connector = new StrictStorageConnector(unsafeConnector);
-        return connector;
+    private static StorageConnector create(final boolean asStream) {
+        return new StorageConnector(StorageConnectorTest.create(asStream));
     }
 
     private static byte[] getFileBytes() throws URISyntaxException, IOException {
@@ -48,7 +38,7 @@ public class StrictStorageConnectorTest {
 
     @Test
     public void acquiring_path_works() {
-        final StrictStorageConnector connector = create(false);
+        final StorageConnector connector = create(false);
         assertTrue(connector.getPath().isPresent());
         assertTrue(connector.getURI().isPresent());
         assertTrue(connector.getPathAsString().isPresent());
@@ -57,7 +47,7 @@ public class StrictStorageConnectorTest {
 
     @Test
     public void stream_based_connector_return_empty_path() {
-        final StrictStorageConnector connector = create(true);
+        final StorageConnector connector = create(true);
         assertFalse(connector.getPath().isPresent());
         assertFalse(connector.getURI().isPresent());
         assertFalse(connector.getPathAsString().isPresent());
@@ -67,7 +57,7 @@ public class StrictStorageConnectorTest {
     @Test
     public void byte_buffer_is_rewind_after_use() throws Exception {
         final byte[] ctrl = getFileBytes();
-        try (final StrictStorageConnector connector = create(false)) {
+        try (final StorageConnector connector = create(false)) {
             // Mess with internal buffer
             connector.useAsBuffer(buffer -> {
                 // mess with it
@@ -86,7 +76,7 @@ public class StrictStorageConnectorTest {
 
     @Test
     public void fail_fast_when_user_corrupts_stream_mark() throws IOException, DataStoreException {
-        try (final StrictStorageConnector c = create(false)) {
+        try (final StorageConnector c = create(false)) {
             try {
                 c.useAsImageInputStream(stream -> {
                     stream.skipBytes(1);
@@ -102,7 +92,7 @@ public class StrictStorageConnectorTest {
 
     @Test
     public void no_concurrency_allowed() throws Exception {
-        try (final StrictStorageConnector c = create(false)) {
+        try (final StorageConnector c = create(false)) {
             synchronized (c) {
             new Thread(() -> {
                 try {
@@ -142,7 +132,7 @@ public class StrictStorageConnectorTest {
     @Test
     public void commit_close_all_resources_but_chosen() throws Exception {
         final InputStream is;
-        try (final StrictStorageConnector c = create(false)) {
+        try (final StorageConnector c = create(false)) {
 
             is = c.commit(InputStream.class);
 
@@ -168,7 +158,7 @@ public class StrictStorageConnectorTest {
 
     @Test
     public void closing_multiple_times_causes_no_error() throws Exception {
-        try ( StrictStorageConnector c = create(true) ) {
+        try ( StorageConnector c = create(true) ) {
 
             c.commit(InputStream.class);
             c.closeAllExcept(null);

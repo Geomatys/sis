@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
-import org.apache.sis.storage.StrictStorageConnector;
+import org.apache.sis.storage.StorageConnector;
 import org.apache.sis.storage.UnsupportedStorageException;
 import org.opengis.parameter.ParameterDescriptorGroup;
 import org.apache.sis.internal.netcdf.Decoder;
@@ -44,7 +44,6 @@ import org.apache.sis.setup.GeometryLibrary;
 import org.apache.sis.setup.OptionKey;
 import org.apache.sis.storage.DataStore;
 import org.apache.sis.storage.DataStoreProvider;
-import org.apache.sis.storage.StorageConnector;
 import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.GridCoverageResource;
 import org.apache.sis.storage.FeatureSet;
@@ -182,10 +181,6 @@ public class NetcdfStoreProvider extends DataStoreProvider {
      */
     @Override
     public ProbeResult probeContent(final StorageConnector connector) throws DataStoreException {
-        return probeContentStrict(new StrictStorageConnector(connector));
-    }
-
-    private ProbeResult probeContentStrict(final StrictStorageConnector connector) throws DataStoreException {
         int     version     = 0;
         boolean hasVersion  = false;
         boolean isSupported = false;
@@ -292,12 +287,6 @@ public class NetcdfStoreProvider extends DataStoreProvider {
      * @throws DataStoreException if a logical error (other than I/O) occurred.
      */
     static Decoder decoder(final StoreListeners listeners, final StorageConnector connector) throws IOException, DataStoreException {
-        return decoder(listeners, new StrictStorageConnector(connector));
-    }
-
-    static Decoder decoder(final StoreListeners listeners, final StrictStorageConnector connector)
-            throws IOException, DataStoreException
-    {
         final GeometryLibrary geomlib = connector.getOption(OptionKey.GEOMETRY_LIBRARY);
         Decoder decoder;
         Class<?> viewType;
