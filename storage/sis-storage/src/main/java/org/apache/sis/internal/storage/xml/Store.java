@@ -87,20 +87,12 @@ final class Store extends URIDataStore implements Filter {
      */
     public Store(final StoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
-        final InputStream in = connector.getStorageAs(InputStream.class);
-        if (in != null) {
+        try {
+            final InputStream in = connector.commit(InputStream.class);
             source = new StreamSource(in);
-        } else {
-            final Reader reader = connector.getStorageAs(Reader.class);
-            if (reader != null) {
-                source = new StreamSource(reader);
-            }
-        }
-        final Closeable c = input(source);
-        connector.closeAllExcept(c);
-        if (c == null) {
-            throw new UnsupportedStorageException(super.getLocale(), StoreProvider.NAME,
-                    connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
+        } catch (UnsupportedStorageException e) {
+            final Reader reader = connector.commit(Reader.class);
+            source = new StreamSource(reader);
         }
     }
 

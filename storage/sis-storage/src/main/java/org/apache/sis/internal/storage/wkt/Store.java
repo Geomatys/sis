@@ -85,12 +85,7 @@ final class Store extends URIDataStore {
     public Store(final StoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
         objects = new ArrayList<>();
-        source  = connector.getStorageAs(Reader.class);
-        connector.closeAllExcept(source);
-        if (source == null) {
-            throw new UnsupportedStorageException(super.getLocale(), StoreProvider.NAME,
-                    connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
-        }
+        source  = connector.commit(Reader.class);
         library = connector.getOption(OptionKey.GEOMETRY_LIBRARY);
     }
 

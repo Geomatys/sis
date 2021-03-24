@@ -103,16 +103,15 @@ public class NetcdfStore extends DataStore implements Aggregate {
      */
     public NetcdfStore(final NetcdfStoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
-        location = connector.getStorageAs(URI.class);
-        final Path path = connector.getStorageAs(Path.class);
+        location = connector.getURI().orElse(null);
+        final Path path = connector.getPath().orElse(null);
         try {
             decoder = NetcdfStoreProvider.decoder(listeners, connector);
         } catch (IOException | ArithmeticException e) {
             throw new DataStoreException(e);
         }
         if (decoder == null) {
-            throw new UnsupportedStorageException(super.getLocale(), NetcdfStoreProvider.NAME,
-                    connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
+            throw connector.unsupported(super.getLocale(), NetcdfStoreProvider.NAME);
         }
         decoder.location = path;
         String id = Strings.trimOrNull(decoder.stringValue(ACDD.id));

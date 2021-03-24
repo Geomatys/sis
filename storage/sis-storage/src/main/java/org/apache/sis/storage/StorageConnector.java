@@ -3,11 +3,13 @@ package org.apache.sis.storage;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
@@ -179,7 +181,7 @@ public class StorageConnector implements AutoCloseable {
 
     private <I, O> O use(Class<I> storageType, ControlStrategy<I> control, StorageOperatingFunction<? super I, ? extends O> action) throws IOException, DataStoreException {
         return doUnderControl(() -> {
-            final I rawInput = getOrFail(storageType);
+            final I rawInput = getOrFail(storageType, null, null);
             final ControlOperator<I> op = control.init(rawInput);
             try ( Closeable controlAfterUse = op::postControl ) {
                 return action.apply(op.getStorage());
@@ -237,22 +239,29 @@ public class StorageConnector implements AutoCloseable {
      * @param <T> Type of the wanted storage connection.
      * @return Underlying storage in the requested form. Never null.
      *
-     * @throws IOException If anything goes wrong while initializing storage access.
      * @throws DataStoreException If this connector is used concurrently, or if any problem occurs while initializing view.
      * @throws IllegalStateException If this connector is already closed.
      */
-    public <T> T commit(Class<T> target) throws IOException, DataStoreException {
-        return doUnderControl(() -> {
-            final T result = getOrFail(target);
-            concurrentFlag = -1; //close flag
-            storage.closeAllExcept(result);
-            return result;
-        });
+    public <T> T commit(Class<T> target) throws DataStoreException {
+        return commit(target, null, null);
     }
 
-    private <T> T getOrFail(Class<T> target) throws DataStoreException {
+    public <T> T commit(Class<T> target, String caller, Locale errorLocale) throws DataStoreException {
+        try {
+            return doUnderControl(() -> {
+                final T result = getOrFail(target, caller, errorLocale);
+                concurrentFlag = -1; //close flag
+                storage.closeAllExcept(result);
+                return result;
+            });
+        } catch (IOException e) {
+            throw new DataStoreException(e); // TODO: define a better handling
+        }
+    }
+
+    private <T> T getOrFail(Class<T> target, String caller, Locale errorLocale) throws DataStoreException {
         T view = storage.getStorageAs(target);
-        if (view == null) throw new UnsupportedStorageException();
+        if (view == null) throw unsupported(target, errorLocale, caller);
         return view;
     }
 
@@ -314,6 +323,19 @@ public class StorageConnector implements AutoCloseable {
     @Deprecated
     public Object getStorage() throws DataStoreException {
         return storage.getStorage();
+    }
+
+    public UnsupportedStorageException unsupported(final Locale errorLocale, final String caller) {
+        return unsupported(unsafe().type(), errorLocale, caller);
+    }
+
+    UnsupportedStorageException unsupported(final Object storage, final Locale errorLocale, final String caller) {
+        return new UnsupportedStorageException(
+                errorLocale == null ? Locale.ROOT : errorLocale,
+                caller == null ? "Unidentified caller" : caller,
+                storage,
+                getOption(OptionKey.OPEN_OPTIONS)
+        );
     }
 
     /**

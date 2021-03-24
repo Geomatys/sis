@@ -105,13 +105,8 @@ public class LandsatStore extends DataStore {
      */
     public LandsatStore(final LandsatStoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
-        location = connector.getStorageAs(URI.class);
-        source = connector.getStorageAs(Reader.class);
-        connector.closeAllExcept(source);
-        if (source == null) {
-            throw new UnsupportedStorageException(super.getLocale(), LandsatStoreProvider.NAME,
-                    connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
-        }
+        location = connector.getURI().orElse(null);
+        source = connector.commit(Reader.class, LandsatStoreProvider.NAME, super.getLocale());
     }
 
     /**

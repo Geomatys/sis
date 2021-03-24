@@ -113,8 +113,10 @@ public class UnsupportedStorageException extends IllegalOpenParameterException {
      * ("Relax constraint on placement of this()/super() call in constructors").
      */
     @Workaround(library="JDK", version="10")
-    private static Object type(final Object storage) {
-        if ((storage instanceof File && ((File) storage).isDirectory()) ||
+    static Object type(final Object storage) {
+        if (storage instanceof Class) {
+            return storage;
+        } else if ((storage instanceof File && ((File) storage).isDirectory()) ||
             (storage instanceof Path && Files.isDirectory((Path) storage)))
         {
             return "Directory";

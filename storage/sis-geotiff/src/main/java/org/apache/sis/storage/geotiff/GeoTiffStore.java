@@ -122,13 +122,8 @@ public class GeoTiffStore extends DataStore implements Aggregate {
         super(provider, connector);
         final Charset encoding = connector.getOption(OptionKey.ENCODING);
         this.encoding = (encoding != null) ? encoding : StandardCharsets.US_ASCII;
-        final ChannelDataInput input = connector.getStorageAs(ChannelDataInput.class);
-        if (input == null) {
-            throw new UnsupportedStorageException(super.getLocale(), Constants.GEOTIFF,
-                    connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
-        }
-        location = connector.getStorageAs(URI.class);
-        connector.closeAllExcept(input);
+        final ChannelDataInput input = connector.commit(ChannelDataInput.class, Constants.GEOTIFF, super.getLocale());
+        location = connector.getURI().orElse(null);
         try {
             reader = new Reader(this, input);
         } catch (IOException e) {

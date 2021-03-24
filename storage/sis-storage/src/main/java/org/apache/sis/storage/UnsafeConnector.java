@@ -1391,4 +1391,8 @@ public class UnsafeConnector implements Serializable {
         }
         return table.toString();
     }
+
+    Object type() {
+        return UnsupportedStorageException.type(storage);
+    }
 }

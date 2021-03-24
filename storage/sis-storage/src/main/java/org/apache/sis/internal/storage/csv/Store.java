@@ -235,12 +235,7 @@ final class Store extends URIDataStore implements FeatureSet {
      */
     public Store(final StoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
-        final Reader r = connector.getStorageAs(Reader.class);
-        connector.closeAllExcept(r);
-        if (r == null) {
-            throw new UnsupportedStorageException(super.getLocale(), StoreProvider.NAME,
-                    connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
-        }
+        final Reader r = connector.commit(Reader.class);
         source     = (r instanceof BufferedReader) ? (BufferedReader) r : new LineNumberReader(r);
         geometries = Geometries.implementation(connector.getOption(OptionKey.GEOMETRY_LIBRARY));
         dissociate = FoliationRepresentation.FRAGMENTED.equals(connector.getOption(DataOptionKey.FOLIATION_REPRESENTATION));
