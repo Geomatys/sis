@@ -267,13 +267,55 @@ public class StrictStorageConnector implements AutoCloseable {
         return storage.getOption(key);
     }
 
+    public <T> void setOption(final OptionKey<T> key, final T value) {
+        storage.setOption(key, value);
+    }
+
+    public String getStorageName() {
+        return storage.getStorageName();
+    }
+
+    public String getFileExtension() {
+        return storage.getFileExtension();
+    }
+
     /**
+     * Please use a safe alternative instead, like {@link #useAs(Class, StorageOperatingFunction)}.
+     * Only call this if safe methods do not support the storage type you require.
+     *
+     * @return A connector that does not provides control over resource usage. It does not automatically rewind
+     * automatically used resources. That means that resource lifecycle becomes <em>entirely</em> caller responsability.
+     */
+    public <T> T getStorageAs(final Class<T> type) throws IllegalArgumentException, DataStoreException {
+        return storage.getStorageAs(type);
+    }
+
+    /**
+     * Please use a safe alternative instead, like {@link #useAs(Class, StorageOperatingFunction)}.
+     * Only call this if safe methods do not support the storage type you require.
+     *
+     * @return A connector that does not provides control over resource usage. It does not automatically rewind
+     * automatically used resources. That means that resource lifecycle becomes <em>entirely</em> caller responsability.
+     */
+    @Deprecated
+    public Object getStorage() throws DataStoreException {
+        return storage.getStorage();
+    }
+
+    /**
+     * Please try to use {@link #useAs(Class, StorageOperatingFunction)} instead. Only call this if safe methods do not
+     * support the storage type you require.
      *
      * @return A connector that does not provides control over resource usage. It does not automatically rewind
      * automatically used resources. That means that resource lifecycle becomes <em>entirely</em> caller responsability.
      */
     public StorageConnector unsafe() {
         return storage;
+    }
+
+    @Override
+    public String toString() {
+        return storage.toString();
     }
 
     private interface StorageCallable<V> extends Callable<V> {
