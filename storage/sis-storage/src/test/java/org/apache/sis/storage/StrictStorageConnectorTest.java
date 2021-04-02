@@ -75,10 +75,10 @@ public class StrictStorageConnectorTest {
     }
 
     @Test
-    public void fail_fast_when_user_corrupts_stream_mark() throws IOException, DataStoreException {
+    public void fail_fast_when_user_corrupts_stream_mark() throws DataStoreException {
         try (final StorageConnector c = create(false)) {
             try {
-                c.useAsImageInputStream(stream -> {
+                c.tryUseAsImageInputStream(stream -> {
                     stream.skipBytes(1);
                     stream.mark();
                     return 0;
@@ -108,7 +108,7 @@ public class StrictStorageConnectorTest {
                         return null;
                     });
 
-                } catch (IOException | DataStoreException e) {
+                } catch (DataStoreException e) {
                     // Do not matter here.
                 }
             }).start();

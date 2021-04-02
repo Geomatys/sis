@@ -190,7 +190,7 @@ public class SQLStoreProvider extends DataStoreProvider {
      */
     @Override
     public ProbeResult probeContent(final StorageConnector connector) throws DataStoreException {
-        final DataSource ds = connector.getStorageAs(DataSource.class);
+        final DataSource ds = connector.getSQLDatasource().orElse(null);
         if (ds != null) {
             try (Connection c = ds.getConnection()) {
                 return ProbeResult.SUPPORTED;

@@ -16,7 +16,6 @@
  */
 package org.apache.sis.storage.geotiff;
 
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.opengis.parameter.ParameterDescriptorGroup;
 import org.apache.sis.util.Version;
@@ -106,8 +105,7 @@ public class GeoTiffStoreProvider extends DataStoreProvider {
      */
     @Override
     public ProbeResult probeContent(StorageConnector connector) throws DataStoreException {
-        final ByteBuffer buffer = connector.getStorageAs(ByteBuffer.class);
-        if (buffer != null) {
+        return connector.tryUseAsBuffer(buffer -> {
             if (buffer.remaining() < 2 * Short.BYTES) {
                 return ProbeResult.INSUFFICIENT_BYTES;
             }
@@ -115,19 +113,14 @@ public class GeoTiffStoreProvider extends DataStoreProvider {
             final short order = buffer.getShort(p);
             final boolean isBigEndian = (order == GeoTIFF.BIG_ENDIAN);
             if (isBigEndian || order == GeoTIFF.LITTLE_ENDIAN) {
-                final ByteOrder old = buffer.order();
-                try {
-                    buffer.order(isBigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
-                    switch (buffer.getShort(p + Short.BYTES)) {
-                        case GeoTIFF.CLASSIC:
-                        case GeoTIFF.BIG_TIFF: return new ProbeResult(true, MIME_TYPE, VERSION);
-                    }
-                } finally {
-                    buffer.order(old);
+                buffer.order(isBigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
+                switch (buffer.getShort(p + Short.BYTES)) {
+                    case GeoTIFF.CLASSIC:
+                    case GeoTIFF.BIG_TIFF: return new ProbeResult(true, MIME_TYPE, VERSION);
                 }
             }
-        }
-        return ProbeResult.UNSUPPORTED_STORAGE;
+            return ProbeResult.UNSUPPORTED_STORAGE;
+        }).orElse(ProbeResult.UNSUPPORTED_STORAGE);
     }
 
     /**

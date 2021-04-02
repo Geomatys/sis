@@ -34,6 +34,8 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.XMLStreamWriter;
 import javax.xml.stream.XMLStreamException;
+import org.apache.sis.storage.UnsafeConnector;
+import org.apache.sis.storage.event.StoreListeners;
 import org.apache.sis.xml.XML;
 import org.apache.sis.setup.OptionKey;
 import org.apache.sis.storage.DataStore;
@@ -202,7 +204,8 @@ public abstract class StaxDataStore extends URIDataStore {
     protected StaxDataStore(final StaxDataStoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
         final Integer indent;
-        storage         = connector.getStorage();
+        final UnsafeConnector unsafeConnector = connector.unsafe();
+        storage         = unsafeConnector.getStorage();
         locale          = connector.getOption(OptionKey.LOCALE);
         timezone        = connector.getOption(OptionKey.TIMEZONE);
         encoding        = connector.getOption(OptionKey.ENCODING);
@@ -224,12 +227,12 @@ public abstract class StaxDataStore extends URIDataStore {
              * a ChannelDataInput if possible, which will allow us to create a ChannelDataOutput later
              * if needed (and if the underlying channel is writable).
              */
-            stream = connector.getStorageAs(InputStream.class);
+            stream = unsafeConnector.getStorageAs(InputStream.class);
         }
         if (stream == null && storage instanceof AutoCloseable) {
             stream = (AutoCloseable) storage;
         }
-        channelFactory = connector.getStorageAs(ChannelFactory.class);  // Must be last before 'closeAllExcept'.
+        channelFactory = unsafeConnector.getStorageAs(ChannelFactory.class);  // Must be last before 'closeAllExcept'.
         connector.closeAllExcept(stream);
         /*
          * If possible, remember the position where data begin in the stream in order to allow reading

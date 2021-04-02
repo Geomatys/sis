@@ -66,7 +66,7 @@ public abstract class URIDataStore extends DataStore implements StoreResource, R
      */
     protected URIDataStore(final DataStoreProvider provider, final StorageConnector connector) throws DataStoreException {
         super(provider, connector);
-        location = connector.getStorageAs(URI.class);
+        location = connector.getURI().orElse(null);
     }
 
     /**

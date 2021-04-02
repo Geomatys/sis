@@ -185,12 +185,12 @@ public class NetcdfStoreProvider extends DataStoreProvider {
         boolean hasVersion  = false;
         boolean isSupported = false;
         try {
-            Integer header = connector.useAsBuffer(buffer -> {
+            Integer header = connector.tryUseAsBuffer(buffer -> {
                 if (buffer.remaining() < Integer.BYTES) {
                     return null;
                 }
                 return buffer.getInt(buffer.position());
-            });
+            }).getOrThrow();
 
             if (header == null)  return ProbeResult.INSUFFICIENT_BYTES;
             else if ((header & 0xFFFFFF00) == ChannelDecoder.MAGIC_NUMBER) {
@@ -200,8 +200,6 @@ public class NetcdfStoreProvider extends DataStoreProvider {
             }
         } catch (UnsupportedStorageException e) {
             // Can happen on special inputs, in which case we'll fallback on UCAR driver
-        } catch (IOException e) {
-            throw new DataStoreException("Storage usage error", e);
         }
 
         /*

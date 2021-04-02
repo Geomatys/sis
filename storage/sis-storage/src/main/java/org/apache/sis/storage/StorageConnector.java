@@ -1,9 +1,7 @@
 package org.apache.sis.storage;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -13,6 +11,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.imageio.stream.ImageInputStream;
 import javax.sql.DataSource;
 import org.apache.sis.internal.storage.io.ChannelDataInput;
@@ -110,17 +109,24 @@ public class StorageConnector implements AutoCloseable {
      * @param <T> Type of result produced by user operator.
      * @return The value computed by input operator.
      * @throws UnsupportedStorageException If queried storage type cannot be accessed in current context.
-     * @throws IOException If given operator throws IOException on execution.
      * @throws DataStoreException If an error occurs while fetching queried storage.
      */
-    public <T> T useAsBuffer(StorageOperatingFunction<? super ByteBuffer, T> operator) throws DataStoreException, IOException {
+    public <T> T useAsBuffer(StorageOperatingFunction<? super ByteBuffer, T> operator) throws DataStoreException {
+        return tryUseAsBuffer(operator).getOrThrow();
+    }
+
+    public <T> Result<T> tryUseAsBuffer(StorageOperatingFunction<? super ByteBuffer, ? extends T> operator) throws DataStoreException {
         return use(ByteBuffer.class, new ByteBufferControl(), operator);
     }
 
     /**
      * Specialization of {@link #useAs(Class, StorageOperatingFunction)} for {@link ImageInputStream ImageIO API}.
      */
-    public <T> T useAsImageInputStream(StorageOperatingFunction<? super ImageInputStream, T> operator) throws IOException, DataStoreException {
+    public <T> T useAsImageInputStream(StorageOperatingFunction<? super ImageInputStream, T> operator) throws DataStoreException {
+        return tryUseAsImageInputStream(operator).getOrThrow();
+    }
+
+    public <T> Result<T> tryUseAsImageInputStream(StorageOperatingFunction<? super ImageInputStream, T> operator) throws DataStoreException {
         return use(ImageInputStream.class, new StreamControl<>(ImageInputStream.class, IISAdapter::new), operator);
     }
 
@@ -146,12 +152,18 @@ public class StorageConnector implements AutoCloseable {
      * @return The value computed by user operator.
      * @throws UnsupportedStorageException If queried storage type cannot be accessed in current context.
      * @throws StorageControlException If connector has detected storage corruption after operator usage.
-     * @throws IOException If given operator throws IOException on execution.
      * @throws DataStoreException If an error occurs while fetching queried storage.
      */
-    public <S, T> T useAs(Class<S> storageType, StorageOperatingFunction<? super S, ? extends T> operator) throws IOException, DataStoreException {
-        if (ByteBuffer.class.isAssignableFrom(storageType)) {
-            return useAsBuffer((StorageOperatingFunction<? super ByteBuffer, T>) operator);
+    public <S, T> T useAs(Class<S> storageType, StorageOperatingFunction<? super S, ? extends T> operator) throws DataStoreException {
+        final Result<T> r = tryUseAs(storageType, operator);
+        if (r instanceof Failure) throw new UnsupportedStorageException("Queried storage type is not supported yet: "+storageType);
+        else return r.getOrThrow();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <I, O> Result<O> tryUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) throws DataStoreException {
+        if (ByteBuffer.class.equals(storageType)) {
+            return use(ByteBuffer.class, new ByteBufferControl(), (StorageOperatingFunction<? super ByteBuffer, ? extends O>) operator);
         } else if (ImageInputStream.class.isAssignableFrom(storageType)) {
             return use(storageType, new StreamControl<>(storageType, stream -> new IISAdapter((ImageInputStream) stream)), operator);
         } else if (ChannelDataInput.class.isAssignableFrom(storageType)) {
@@ -160,10 +172,10 @@ public class StorageConnector implements AutoCloseable {
             return use(storageType, new StreamControl<>(storageType, stream -> new SBCAdapter((SeekableByteChannel) stream)), operator);
         } else if (URI.class.isAssignableFrom(storageType)) {
             final URI input = getURI().orElseThrow(() -> new UnsupportedStorageException("Cannot acquire an URI"));
-            return ((StorageOperatingFunction<? super URI, T>) operator).apply(input);
+            return new Success<>(((StorageOperatingFunction<? super URI, O>) operator).applyCatchingIO(input));
         } else if (Path.class.isAssignableFrom(storageType)) {
             final Path input = getPath().orElseThrow(() -> new UnsupportedStorageException("Cannot acquire a path"));
-            return ((StorageOperatingFunction<? super Path, T>) operator).apply(input);
+            return new Success<>(((StorageOperatingFunction<? super Path, O>) operator).applyCatchingIO(input));
         }
         else if (File.class.isAssignableFrom(storageType)) {
             final Path input = getPath().orElseThrow(() -> new UnsupportedStorageException("Cannot acquire a path"));
@@ -173,23 +185,42 @@ public class StorageConnector implements AutoCloseable {
             } catch (UnsupportedOperationException e) {
                 throw new UnsupportedStorageException("Storage is not a local path (not a file on default file-system).", e);
             }
-            return ((StorageOperatingFunction<? super File, T>) operator).apply(inputFile);
+            return new Success<>(((StorageOperatingFunction<? super File, O>) operator).applyCatchingIO(inputFile));
         }
 
         throw new UnsupportedStorageException("Queried storage type is not supported yet: "+storageType);
     }
 
-    private <I, O> O use(Class<I> storageType, ControlStrategy<I> control, StorageOperatingFunction<? super I, ? extends O> action) throws IOException, DataStoreException {
-        return doUnderControl(() -> {
-            final I rawInput = getOrFail(storageType, null, null);
-            final ControlOperator<I> op = control.init(rawInput);
-            try ( Closeable controlAfterUse = op::postControl ) {
-                return action.apply(op.getStorage());
-            } catch (StorageControlException e) {
-                concurrentFlag = -1;
-                throw e;
-            }
-        });
+
+    private <I, O> Result<O> use(Class<I> storageType, ControlStrategy<I> control, StorageOperatingFunction<? super I, ? extends O> action) throws DataStoreException {
+        try {
+            return doUnderControl(() -> {
+                final I rawInput = getOrFail(storageType, null, null);
+                final ControlOperator<I> op = control.init(rawInput);
+                try {
+                    return new Success<>(action.apply(op.getStorage()));
+                } catch (DataStoreException | IOException | RuntimeException e) {
+                    // Priorize errors that denote a corruption of the storage over any other exception thrown by the operator.
+                    try {
+                        op.postControl();
+                        throw e;
+                    } catch (StorageControlException ctrlError) {
+                        concurrentFlag = -1;
+                        ctrlError.addSuppressed(e);
+                        throw ctrlError;
+                    }
+                } finally {
+                    try {
+                        op.postControl();
+                    } catch (StorageControlException ctrlError) {
+                        concurrentFlag = -1;
+                        throw ctrlError;
+                    }
+                }
+            });
+        } catch (IOException e) {
+            throw new DataStoreException("Error while accessing storage", e);
+        }
     }
 
     /**
@@ -225,7 +256,7 @@ public class StorageConnector implements AutoCloseable {
 
     final boolean prefetch() throws DataStoreException {
         try {
-            return doUnderControl(() -> storage.prefetch());
+            return doUnderControl(storage::prefetch);
         } catch (IOException e) {
             throw new DataStoreException("IO error while trying to fetch more content", e);
         }
@@ -280,7 +311,7 @@ public class StorageConnector implements AutoCloseable {
     }
 
     @Override
-    public void close() throws IOException, DataStoreException {
+    public void close() throws DataStoreException {
         closeAllExcept(committedStorage == null ? null : committedStorage.get());
     }
 
@@ -362,6 +393,14 @@ public class StorageConnector implements AutoCloseable {
     @FunctionalInterface
     public interface StorageOperatingFunction<I, O> {
         O apply(I storage) throws IOException, DataStoreException;
+
+        default O applyCatchingIO(I storage) throws DataStoreException {
+            try {
+                return apply(storage);
+            } catch (IOException e) {
+                throw new DataStoreException(e);
+            }
+        }
     }
 
     /**
@@ -497,7 +536,7 @@ public class StorageConnector implements AutoCloseable {
         }
 
         @Override
-        public long mark() throws IOException {
+        public long mark() {
             source.mark();
             return source.getStreamPosition();
         }
@@ -528,6 +567,98 @@ public class StorageConnector implements AutoCloseable {
         @Override
         public void reset() throws IOException {
             if (mark >= 0) source.position(mark);
+        }
+    }
+
+    public interface Result<O> {
+
+        <I> Result<O> orTryUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) throws DataStoreException;
+
+        <I> O orUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) throws DataStoreException;
+
+        O orElse(O value);
+
+        default O getOrThrow() throws UnsupportedStorageException {
+            return getOrThrow(null, "Unidentified");
+        }
+
+        O getOrThrow(Locale errorLocale, String caller) throws UnsupportedStorageException;
+
+        <T extends Throwable> O getOrThrow(Supplier<T> errorSupplier) throws T;
+    }
+
+    private static final class Success<O> implements Result<O> {
+
+        private final O value;
+
+        private Success(O value) {
+            this.value = value;
+        }
+
+        @Override
+        public <I> Result<O> orTryUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) {
+            return this;
+        }
+
+        @Override
+        public <I> O orUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) {
+            return value;
+        }
+
+        @Override
+        public O orElse(O value) {
+            return this.value;
+        }
+
+        @Override
+        public O getOrThrow(Locale errorLocale, String caller) {
+            return value;
+        }
+
+        @Override
+        public <T extends Throwable> O getOrThrow(Supplier<T> errorSupplier) {
+            return value;
+        }
+    }
+
+    private class Failure<O> implements Result<O> {
+
+        private final String optMessage;
+
+        private Failure() { this(null); }
+        private Failure(String optMessage) {
+            this.optMessage = optMessage;
+        }
+
+        @Override
+        public <I> Result<O> orTryUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) throws DataStoreException {
+            return tryUseAs(storageType, operator);
+        }
+
+        @Override
+        public <I> O orUseAs(Class<I> storageType, StorageOperatingFunction<? super I, ? extends O> operator) throws DataStoreException {
+            return useAs(storageType, operator);
+        }
+
+        @Override
+        public O orElse(O value) {
+            return value;
+        }
+
+        @Override
+        public O getOrThrow() throws UnsupportedStorageException {
+            if (optMessage != null) throw new UnsupportedStorageException(optMessage);
+            else return getOrThrow(null, "Unidentified");
+        }
+
+        @Override
+        public O getOrThrow(Locale errorLocale, String caller) throws UnsupportedStorageException {
+            throw unsupported(errorLocale, caller);
+        }
+
+        @Override
+        public <T extends Throwable> O getOrThrow(Supplier<T> errorSupplier) throws T {
+            throw errorSupplier.get();
         }
     }
 }

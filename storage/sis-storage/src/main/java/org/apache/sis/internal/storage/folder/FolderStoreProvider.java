@@ -158,7 +158,7 @@ public final class FolderStoreProvider extends DataStoreProvider {
     @Override
     public ProbeResult probeContent(StorageConnector connector) throws DataStoreException {
         try {
-            final Path path = connector.getStorageAs(Path.class);
+            final Path path = connector.getPath().orElse(null);
             if (path != null && Files.isDirectory(path)) {
                 return ProbeResult.SUPPORTED;
             }
@@ -210,7 +210,8 @@ public final class FolderStoreProvider extends DataStoreProvider {
             componentProvider = null;
             options.clear();                // Can not write if we don't know the components format.
         }
-        final Path path = connector.getStorageAs(Path.class);
+        final Path path = connector.getPath()
+                .orElseThrow(() -> connector.unsupported(null, NAME));
         final Store store;
         try {
             /*
@@ -250,7 +251,7 @@ public final class FolderStoreProvider extends DataStoreProvider {
             int isDirectory = 0;
             final short errorKey;
             if (e instanceof FileAlreadyExistsException) {
-                if (path != null && Files.isDirectory(path)) {
+                if (Files.isDirectory(path)) {
                     isDirectory = 1;
                 }
                 errorKey = Resources.Keys.FileAlreadyExists_2;
@@ -259,8 +260,7 @@ public final class FolderStoreProvider extends DataStoreProvider {
             } else {
                 errorKey = Resources.Keys.CanNotCreateFolderStore_1;
             }
-            throw new DataStoreException(Resources.format(errorKey,
-                    (path != null) ? path : connector.getStorageName(), isDirectory), e);
+            throw new DataStoreException(Resources.format(errorKey, path, isDirectory, e));
         }
         return store;
     }

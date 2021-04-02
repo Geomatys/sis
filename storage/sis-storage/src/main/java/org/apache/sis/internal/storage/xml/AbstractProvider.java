@@ -108,60 +108,58 @@ public abstract class AbstractProvider extends DocumentedStoreProvider {
      */
     @Override
     public ProbeResult probeContent(final StorageConnector connector) throws DataStoreException {
-        /*
-         * Usual case. This includes InputStream, DataInput, File, Path, URL, URI.
-         */
-        final ByteBuffer buffer = connector.getStorageAs(ByteBuffer.class);
-        if (buffer != null) {
-            if (buffer.remaining() < HEADER.length) {
-                return ProbeResult.INSUFFICIENT_BYTES;
+        return connector.tryUseAsBuffer(this::probeBuffer)
+                /*
+                 * We should enter in this block only if the user gave us explicitly a Reader.
+                 * A common case is a StringReader wrapping a String object.
+                 * TODO: That will fail because strict connector does not have control over readers yet.
+                 */
+                .orTryUseAs(Reader.class, this::probeReader)
+                .orElse(ProbeResult.UNSUPPORTED_STORAGE);
+    }
+
+    private ProbeResult probeReader(Reader reader) throws IOException, DataStoreException {
+        // Quick check for "<?xml " header.
+        reader.mark(HEADER.length + READ_AHEAD_LIMIT);
+        for (int i=0; i<HEADER.length; i++) {
+            if (reader.read() != HEADER[i]) {
+                reader.reset();
+                return ProbeResult.UNSUPPORTED_STORAGE;
             }
-            // Quick check for "<?xml " header.
-            for (int i=0; i<HEADER.length; i++) {
-                if (buffer.get(i) != HEADER[i]) {
-                    return ProbeResult.UNSUPPORTED_STORAGE;
-                }
-            }
-            // Now check for a more accurate MIME type.
-            buffer.position(HEADER.length);
-            final ProbeResult result = new MimeTypeDetector(mimeForNameSpaces, mimeForRootElements) {
-                @Override int read() {
-                    if (buffer.hasRemaining()) {
-                        return buffer.get();
-                    }
-                    insufficientBytes = (buffer.limit() != buffer.capacity());
-                    return -1;
-                }
-            }.probeContent();
-            buffer.position(0);
-            return result;
         }
-        /*
-         * We should enter in this block only if the user gave us explicitly a Reader.
-         * A common case is a StringReader wrapping a String object.
-         */
-        final Reader reader = connector.getStorageAs(Reader.class);
-        if (reader != null) try {
-            // Quick check for "<?xml " header.
-            reader.mark(HEADER.length + READ_AHEAD_LIMIT);
-            for (int i=0; i<HEADER.length; i++) {
-                if (reader.read() != HEADER[i]) {
-                    reader.reset();
-                    return ProbeResult.UNSUPPORTED_STORAGE;
-                }
+        // Now check for a more accurate MIME type.
+        final ProbeResult result = new MimeTypeDetector(mimeForNameSpaces, mimeForRootElements) {
+            private int remaining = READ_AHEAD_LIMIT;
+            @Override int read() throws IOException {
+                return (--remaining >= 0) ? IOUtilities.readCodePoint(reader) : -1;
             }
-            // Now check for a more accurate MIME type.
-            final ProbeResult result = new MimeTypeDetector(mimeForNameSpaces, mimeForRootElements) {
-                private int remaining = READ_AHEAD_LIMIT;
-                @Override int read() throws IOException {
-                    return (--remaining >= 0) ? IOUtilities.readCodePoint(reader) : -1;
-                }
-            }.probeContent();
-            reader.reset();
-            return result;
-        } catch (IOException e) {
-            throw new DataStoreException(e);
+        }.probeContent();
+        reader.reset();
+        return result;
+    }
+
+    private ProbeResult probeBuffer(ByteBuffer buffer) throws DataStoreException {
+        if (buffer.remaining() < HEADER.length) {
+            return ProbeResult.INSUFFICIENT_BYTES;
         }
-        return ProbeResult.UNSUPPORTED_STORAGE;
+        // Quick check for "<?xml " header.
+        for (int i=0; i<HEADER.length; i++) {
+            if (buffer.get(i) != HEADER[i]) {
+                return ProbeResult.UNSUPPORTED_STORAGE;
+            }
+        }
+        // Now check for a more accurate MIME type.
+        buffer.position(HEADER.length);
+        final ProbeResult result = new MimeTypeDetector(mimeForNameSpaces, mimeForRootElements) {
+            @Override int read() {
+                if (buffer.hasRemaining()) {
+                    return buffer.get();
+                }
+                insufficientBytes = (buffer.limit() != buffer.capacity());
+                return -1;
+            }
+        }.probeContent();
+        buffer.position(0);
+        return result;
     }
 }

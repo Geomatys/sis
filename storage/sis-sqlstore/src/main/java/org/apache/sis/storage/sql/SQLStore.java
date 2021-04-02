@@ -116,7 +116,9 @@ public class SQLStore extends DataStore implements Aggregate {
             throws DataStoreException
     {
         super(provider, connector);
-        source = connector.getStorageAs(DataSource.class);
+        // Note: do not manage single connection delegation for now, because it requires non trivial logic for multi-thread environment
+        source = connector.getSQLDatasource()
+            .orElseThrow(() -> connector.unsupported(super.getLocale(), SQLStoreProvider.NAME));
         ArgumentChecks.ensureNonNull("tableNames", tableNames);
         tableNames = tableNames.clone();
         for (int i=0; i<tableNames.length; i++) {
@@ -154,7 +156,7 @@ public class SQLStore extends DataStore implements Aggregate {
      * @return empty.
      */
     @Override
-    public Optional<GenericName> getIdentifier() throws DataStoreException {
+    public Optional<GenericName> getIdentifier() {
         return Optional.empty();
     }
 

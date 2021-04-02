@@ -190,7 +190,7 @@ class Store extends DataStore implements StoreResource, Aggregate, DirectoryStre
     private Store(final Store parent, final StorageConnector connector, final NameFactory nameFactory) throws DataStoreException {
         super(parent, connector);
         originator        = parent;
-        location          = connector.getStorageAs(Path.class);
+        location          = connector.getPath().orElseThrow(() -> connector.unsupported(super.getLocale(), FolderStoreProvider.NAME));
         locale            = connector.getOption(OptionKey.LOCALE);
         timezone          = connector.getOption(OptionKey.TIMEZONE);
         encoding          = connector.getOption(OptionKey.ENCODING);
