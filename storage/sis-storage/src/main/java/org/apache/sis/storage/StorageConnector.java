@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.imageio.stream.ImageInputStream;
@@ -43,6 +44,15 @@ import org.apache.sis.util.collection.BackingStoreException;
  *             <li>If above statement is not possible, an error will be immediately propagated, and the connector will be marked as closed.</li>
  *         </ul>
  *     </li>
+ *     <li>
+ *         Thread-safety: This object is <em>not</em> thread-safe.
+ *         However, controls are done upon usage to ensure that at most one operation is going on it at any time.
+ *         Note that there is two consequences for this:
+ *         <ol>
+ *             <li>This object is <em>not reentrant, even in single-thread context</em>. That means that you cannot nest calls to useAs.</li>
+ *             <li>Any attempt to use this storage concurrently will result in a {@link ConcurrentReadException}.</li>
+ *         </li>
+ *     </li>
  * </ul>
  *
  * Typical usage:
@@ -75,7 +85,16 @@ public class StorageConnector implements AutoCloseable {
     private final UnsafeConnector storage;
 
     private WeakReference<Object> committedStorage;
-    private volatile int concurrentFlag;
+
+    /**
+     * Indicates usage status of the connector:
+     * <ul>
+     *     <li><em>-1</em>: The connector is closed. Resources it has allocated have been disposed, and it cannot be used anymore.</li>
+     *     <li><em>0</em>: Connector is usable, no processing by any thread for the moment</li>
+     *     <li><em>1</em>: The connector is being used by a thread. In this case, any other attempt to use it is bound to fail.</li>
+     * </ul>
+     */
+    private final AtomicInteger stateFlag = new AtomicInteger();
 
     public StorageConnector(Object storage) {
         this(storage instanceof UnsafeConnector ? (UnsafeConnector) storage : new UnsafeConnector(storage));
@@ -87,10 +106,10 @@ public class StorageConnector implements AutoCloseable {
 
     public void closeAllExcept(Object view) throws DataStoreException {
         // Closing multiple times is OK. However, if the view is not null, we will let control raise an error.
-        if (concurrentFlag < 0 && view == null) return;
+        if (stateFlag.get() < 0 && view == null) return;
         try {
             doUnderControl(() -> {
-                concurrentFlag = -1;
+                stateFlag.set(-1);
                 storage.closeAllExcept(view);
                 committedStorage = (view == null ? null : new WeakReference<>(view));
                 return null;
@@ -205,7 +224,7 @@ public class StorageConnector implements AutoCloseable {
                         op.postControl();
                         throw e;
                     } catch (StorageControlException ctrlError) {
-                        concurrentFlag = -1;
+                        stateFlag.set(-1);
                         ctrlError.addSuppressed(e);
                         throw ctrlError;
                     }
@@ -213,7 +232,7 @@ public class StorageConnector implements AutoCloseable {
                     try {
                         op.postControl();
                     } catch (StorageControlException ctrlError) {
-                        concurrentFlag = -1;
+                        stateFlag.set(-1);
                         throw ctrlError;
                     }
                 }
@@ -236,13 +255,21 @@ public class StorageConnector implements AutoCloseable {
      * @throws IllegalStateException If this connector is already closed.
      */
     protected <V> V doUnderControl(StorageCallable<? extends V> operator) throws IOException, DataStoreException {
-        if (concurrentFlag < 0) throw new IllegalStateException("...");
-        if (concurrentFlag != 0) throw new ConcurrentReadException("...");
-        concurrentFlag++;
-        try {
-            return operator.call();
-        } finally {
-            concurrentFlag--;
+        if (stateFlag.compareAndSet(0, 1)) {
+            try {
+                return operator.call();
+            } finally {
+                /* It is possible that the operation has closed this storage connector. In such case, we must not
+                 * reset value. In case something really bad happened, and the value has grown over 1, the storage
+                 * connector becomes invalid, and any further attempt to use it will fail (see else clause below).
+                 */
+                stateFlag.compareAndSet(1, 0);
+            }
+        } else {
+            final int state = stateFlag.get();
+            if (state < 0) throw new IllegalStateException("Storage is closed. No more operation can be initiated.");
+            else if (state > 0) throw new ConcurrentReadException("Another context is already using this storage connector");
+            else throw new IllegalStateException("Storage connector is in an unexpected state. There's a bug in concurrency control");
         }
     }
 
@@ -281,7 +308,7 @@ public class StorageConnector implements AutoCloseable {
         try {
             return doUnderControl(() -> {
                 final T result = getOrFail(target, caller, errorLocale);
-                concurrentFlag = -1; //close flag
+                stateFlag.set(-1); //close flag
                 storage.closeAllExcept(result);
                 return result;
             });
