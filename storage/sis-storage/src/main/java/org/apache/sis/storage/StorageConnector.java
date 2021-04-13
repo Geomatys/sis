@@ -51,7 +51,7 @@ import org.apache.sis.util.collection.BackingStoreException;
  *         <ol>
  *             <li>This object is <em>not reentrant, even in single-thread context</em>. That means that you cannot nest calls to useAs.</li>
  *             <li>Any attempt to use this storage concurrently will result in a {@link ConcurrentReadException}.</li>
- *         </li>
+ *         </ol>
  *     </li>
  * </ul>
  *
@@ -648,7 +648,7 @@ public class StorageConnector implements AutoCloseable {
         }
     }
 
-    private class Failure<O> implements Result<O> {
+    private final class Failure<O> implements Result<O> {
 
         private final String optMessage;
 
