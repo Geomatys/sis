@@ -99,15 +99,30 @@ import org.apache.sis.xml.NilReason;
  *   <li>An {@linkplain #isConversionLinear indication of whether conversion for some axes is linear or not}.</li>
  * </ul>
  *
- * The first three properties should be mandatory, but are allowed to be temporarily absent during
- * grid coverage construction. Temporarily absent properties are allowed because they may be inferred
- * from a wider context. For example a grid geometry know nothing about {@link RenderedImage},
- * but {@code GridCoverage2D} does and may use that information for providing a missing grid extent.
+ * The first three properties should be mandatory,
+ * but are allowed to be temporarily absent during grid coverage construction.
+ * Temporarily absent properties are allowed because they may be inferred from a wider context.
+ * For example a {@code GridGeometry} knows nothing about {@link RenderedImage},
+ * but {@code GridCoverage2D} has this information and may use it for providing a missing grid extent.
  * By default, any request for an undefined property will throw an {@link IncompleteGridGeometryException}.
  * In order to check if a property is defined, use {@link #isDefined(int)}.
  *
- * <p>{@code GridGeometry} instances are immutable and thread-safe.
- * The same instance can be shared by different {@link GridCoverage} instances.</p>
+ * <h2>Non-linear referencing</h2>
+ * A key property is the {@linkplain #getGridToCRS(PixelInCell) "grid to CRS"} conversion,
+ * which defines how to map pixel coordinates to "real world" coordinates such as latitudes and longitudes.
+ * This relationship is often linear (an affine transform), but {@linkplain #isConversionLinear not necessarily};
+ * {@code GridGeometry} accepts non-linear conversions as well. Non-linear conversions may occur with images
+ * using {@linkplain org.apache.sis.referencing.operation.builder.LocalizationGridBuilder localization grids},
+ * but non-linear conversions should not be used for expressing map projections (projections should be specified
+ * in the {@linkplain #getCoordinateReferenceSystem() Coordinate Reference System} (CRS) instead).
+ *
+ * <p>Some applications can not handle non-linear "grid to CRS" conversions.
+ * For example encoding an image in a GeoTIFF file is much simpler if the "grid to CRS" conversion is linear.
+ * The {@link DomainLinearizer} class can be used for replacing non-linear conversions by linear approximations.</p>
+ *
+ * <h2>Multi-threading</h2>
+ * {@code GridGeometry} instances are immutable and thread-safe.
+ * The same instance can be shared by different {@link GridCoverage} instances.
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @version 1.1
@@ -659,7 +674,8 @@ public class GridGeometry implements LenientComparable, Serializable {
         } else {
             this.envelope = target;
             if (extent != null) {
-                if (orientation != null && orientation.canReorderGridAxis) {
+                // A non-null `sourceDimensions` implies non-null `orientation`.
+                if (sourceDimensions != null && orientation.canReorderGridAxis) {
                     if (!ArraysExt.isRange(0, sourceDimensions)) {
                         extent = extent.reorder(sourceDimensions);
                     }
@@ -943,7 +959,7 @@ public class GridGeometry implements LenientComparable, Serializable {
         Instant[] times = timeRange;
         if (times == null) {
             final TemporalAccessor t = TemporalAccessor.of(getCoordinateReferenceSystem(envelope), 0);
-            times = (t != null) ? t.getTimeRange(envelope) : TemporalAccessor.EMPTY;
+            times = (t != null) ? t.getTimeBounds(envelope) : TemporalAccessor.EMPTY;
             timeRange = times;
         }
         return times;

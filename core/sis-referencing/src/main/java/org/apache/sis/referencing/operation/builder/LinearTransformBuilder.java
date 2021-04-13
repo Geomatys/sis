@@ -36,6 +36,7 @@ import org.opengis.geometry.coordinate.Position;
 import org.opengis.referencing.operation.Matrix;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.MathTransformFactory;
+import org.opengis.referencing.operation.TransformException;
 import org.apache.sis.geometry.GeneralEnvelope;
 import org.apache.sis.io.TableAppender;
 import org.apache.sis.math.Line;
@@ -227,7 +228,7 @@ public class LinearTransformBuilder extends TransformBuilder {
      * @since 0.8
      */
     public LinearTransformBuilder(int... gridSize) {
-        ArgumentChecks.ensureNonNull("gridSize", gridSize);
+        ArgumentChecks.ensureNonEmpty("gridSize", gridSize, 1, Integer.MAX_VALUE, false);
         if (gridSize.length == 0) {
             this.gridSize = null;
             this.gridLength = 0;
@@ -244,6 +245,32 @@ public class LinearTransformBuilder extends TransformBuilder {
             }
             this.gridSize = gridSize;
             gridLength = (int) length;
+        }
+    }
+
+    /**
+     * Returns a linear approximation of the given transform for the specified domain.
+     * The source positions are integer coordinates included in the given envelope.
+     * The target positions are the results of transforming source coordinates with
+     * the given {@code gridToCRS} transform.
+     *
+     * @param  gridToCRS  the transform from source coordinates (grid indices) to target coordinates.
+     * @param  domain  domain of integer source coordinates for which to get a linear approximation.
+     * @return a linear approximation of given transform for the specified domain.
+     * @throws FactoryException if the transform approximation can not be computed.
+     *
+     * @see #setControlPoints(MathTransform)
+     * @see org.apache.sis.coverage.grid.DomainLinearizer
+     *
+     * @since 1.1
+     */
+    public static LinearTransform approximate(final MathTransform gridToCRS, final Envelope domain) throws FactoryException {
+        ArgumentChecks.ensureNonNull("gridToCRS", gridToCRS);
+        ArgumentChecks.ensureNonNull("domain",    domain);
+        try {
+            return (LinearTransform) Linearizer.approximate(gridToCRS, domain);
+        } catch (TransformException e) {
+            throw new FactoryException(e);
         }
     }
 
@@ -529,6 +556,59 @@ search: for (int j=numPoints; --j >= 0;) {
      */
     private static DirectPosition position(final Position p) {
         return (p != null) ? p.getDirectPosition() : null;
+    }
+
+    /**
+     * Sets all control point (source, target) pairs, overwriting any previous setting.
+     * The source positions are all integer coordinates in a rectangle from (0, 0, …) inclusive
+     * to {@code gridSize} exclusive where {@code gridSize} is an {@code int[]} array specified
+     * {@linkplain #LinearTransformBuilder(int...) at construction time}. The target positions are
+     * the results of transforming all source coordinates with the given {@code gridToCRS} transform.
+     *
+     * @param  gridToCRS  the transform from source coordinates (grid indices) to target coordinates.
+     * @throws TransformException if a coordinate value can not be transformed.
+     *
+     * @see #approximate(MathTransform, Envelope)
+     *
+     * @since 1.1
+     */
+    public void setControlPoints(final MathTransform gridToCRS) throws TransformException {
+        ArgumentChecks.ensureNonNull("gridToCRS", gridToCRS);
+        if (gridSize == null) {
+            throw new IllegalStateException(Resources.format(Resources.Keys.PointsAreNotOnRegularGrid));
+        }
+        final int srcDim = gridToCRS.getSourceDimensions();
+        if (srcDim != gridSize.length) {
+            throw new MismatchedDimensionException(Errors.format(
+                    Errors.Keys.MismatchedTransformDimension_4, "gridToCRS", 0, gridSize.length, srcDim));
+        }
+        final int tgtDim = gridToCRS.getTargetDimensions();
+        allocate(tgtDim);
+        final int width       = gridSize[0];        // We will transform points by chunks of 1 line.
+        final int widthTarget = width * tgtDim;
+        final double[] buffer = new double[Math.max(srcDim, tgtDim) * width];
+        final double[] point  = new double[srcDim];
+        for (int j=0; j<gridLength; j += width) {
+            // Prepare one row of coordinates with only x varying: (0,y,z), (1,y,z), (2,y,z), (3,y,z), etc.
+            for (int i=0; i<width; i++) {
+                point[0] = i;
+                System.arraycopy(point, 0, buffer, i*srcDim, srcDim);
+            }
+            // Transform and store the result in the target arrays.
+            gridToCRS.transform(buffer, 0, buffer, 0, width);
+            for (int dim=0; dim<tgtDim; dim++) {
+                final double[] target = targets[dim];
+                int i = j;
+                for (int t=dim; t < widthTarget; t += tgtDim) {
+                    target[i++] = buffer[t];
+                }
+            }
+            // Increment y coordinaate, then z (if any) if needed.
+            for (int i=1; i<gridSize.length; i++) {
+                if (point[i]++ < gridSize[i]) break;
+                point[i] = 0;
+            }
+        }
     }
 
     /**
@@ -1542,6 +1622,14 @@ search:         for (int j=domain(); --j >= 0;) {
      */
     public double[] correlation() {
         return (correlations != null) ? correlations.clone() : null;
+    }
+
+    /**
+     * Returns the transform computed by {@link #create(MathTransformFactory)},
+     * of {@code null} if that method has not yet been invoked.
+     */
+    final LinearTransform transform() {
+        return transform;
     }
 
     /**
