@@ -27,6 +27,7 @@ import org.apache.sis.storage.StorageConnector;
 import org.apache.sis.storage.ProbeResult;
 import org.apache.sis.internal.storage.io.IOUtilities;
 import org.apache.sis.internal.storage.DocumentedStoreProvider;
+import org.apache.sis.storage.UnsupportedStorageException;
 
 
 /**
@@ -108,34 +109,44 @@ public abstract class AbstractProvider extends DocumentedStoreProvider {
      */
     @Override
     public ProbeResult probeContent(final StorageConnector connector) throws DataStoreException {
-        return connector.tryUseAsBuffer(this::probeBuffer)
-                /*
-                 * We should enter in this block only if the user gave us explicitly a Reader.
-                 * A common case is a StringReader wrapping a String object.
-                 * TODO: That will fail because strict connector does not have control over readers yet.
-                 */
-                .orTryUseAs(Reader.class, this::probeReader)
-                .orElse(ProbeResult.UNSUPPORTED_STORAGE);
+        try {
+            return connector.useAsBuffer(this::probeBuffer);
+        } catch (UnsupportedStorageException e) {
+            /*
+             * We should enter in this block only if the user gave us explicitly a Reader.
+             * A common case is a StringReader wrapping a String object.
+             */
+            final Reader reader = connector.unsafe().getStorageAs(Reader.class);
+            if (reader == null) return ProbeResult.UNSUPPORTED_STORAGE;
+            try {
+                return probeReader(reader);
+            } catch (IOException bis) {
+                throw new DataStoreException(bis);
+            }
+        }
     }
 
     private ProbeResult probeReader(Reader reader) throws IOException, DataStoreException {
         // Quick check for "<?xml " header.
         reader.mark(HEADER.length + READ_AHEAD_LIMIT);
-        for (int i=0; i<HEADER.length; i++) {
-            if (reader.read() != HEADER[i]) {
-                reader.reset();
-                return ProbeResult.UNSUPPORTED_STORAGE;
+        try {
+            for (int i = 0; i < HEADER.length; i++) {
+                if (reader.read() != HEADER[i]) {
+                    return ProbeResult.UNSUPPORTED_STORAGE;
+                }
             }
+            // Now check for a more accurate MIME type.
+            return new MimeTypeDetector(mimeForNameSpaces, mimeForRootElements) {
+                private int remaining = READ_AHEAD_LIMIT;
+
+                @Override
+                int read() throws IOException {
+                    return (--remaining >= 0) ? IOUtilities.readCodePoint(reader) : -1;
+                }
+            }.probeContent();
+        } finally {
+            reader.reset();
         }
-        // Now check for a more accurate MIME type.
-        final ProbeResult result = new MimeTypeDetector(mimeForNameSpaces, mimeForRootElements) {
-            private int remaining = READ_AHEAD_LIMIT;
-            @Override int read() throws IOException {
-                return (--remaining >= 0) ? IOUtilities.readCodePoint(reader) : -1;
-            }
-        }.probeContent();
-        reader.reset();
-        return result;
     }
 
     private ProbeResult probeBuffer(ByteBuffer buffer) throws DataStoreException {
