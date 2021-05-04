@@ -33,18 +33,18 @@ import org.opengis.util.GenericName;
 import org.opengis.util.InternationalString;
 import org.apache.sis.internal.geotiff.Resources;
 import org.apache.sis.internal.storage.MetadataBuilder;
-import org.apache.sis.internal.storage.AbstractGridResource;
 import org.apache.sis.internal.storage.io.ChannelDataInput;
 import org.apache.sis.internal.util.UnmodifiableArrayList;
 import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.DataStoreContentException;
-import org.apache.sis.coverage.grid.GridCoverage;
 import org.apache.sis.coverage.grid.GridGeometry;
 import org.apache.sis.coverage.grid.GridExtent;
 import org.apache.sis.coverage.SampleDimension;
 import org.apache.sis.util.resources.Vocabulary;
+import org.apache.sis.util.resources.Errors;
 import org.apache.sis.math.Vector;
 import org.apache.sis.measure.Units;
+import org.apache.sis.image.DataType;
 
 
 /**
@@ -55,14 +55,14 @@ import org.apache.sis.measure.Units;
  * @author  Johann Sorel (Geomatys)
  * @author  Thi Phuong Hao Nguyen (VNSC)
  * @author  Martin Desruisseaux (Geomatys)
- * @version 1.0
+ * @version 1.1
  *
  * @see <a href="http://www.awaresystems.be/imaging/tiff/tifftags.html">TIFF Tag Reference</a>
  *
  * @since 0.8
  * @module
  */
-final class ImageFileDirectory extends AbstractGridResource {
+final class ImageFileDirectory extends DataCube {
     /**
      * Possible value for the {@link #tileTagFamily} field. That field tells whether image tiling
      * was specified using the {@code Tile*} family of TIFF tags or the {@code Strip*} family.
@@ -75,12 +75,6 @@ final class ImageFileDirectory extends AbstractGridResource {
      * Default value is {@link #UNSIGNED}.
      */
     private static final byte SIGNED = 1, UNSIGNED = 0, FLOAT = 3;
-
-    /**
-     * The GeoTIFF reader which contain this {@code ImageFileDirectory}.
-     * Used for fetching information like the input channel and where to report warnings.
-     */
-    private final Reader reader;
 
     /**
      * The identifier as a sequence number in the namespace of the {@link GeoTiffStore}.
@@ -140,7 +134,7 @@ final class ImageFileDirectory extends AbstractGridResource {
      * The offset is specified with respect to the beginning of the TIFF file.
      * Each tile has a location independent of the locations of other tiles
      *
-     * <p>Offsets are ordered left-to-right and top-to-bottom. if {@link #isPlanar} is {@code true}
+     * <p>Offsets are ordered left-to-right and top-to-bottom. If {@link #isPlanar} is {@code true}
      * (i.e. components are stored in separate “component planes”), then the offsets for the first
      * component plane are stored first, followed by all the offsets for the second component plane,
      * and so on.</p>
@@ -364,9 +358,8 @@ final class ImageFileDirectory extends AbstractGridResource {
      * @param index   the image index as a sequence number starting with 0 for the first image.
      */
     ImageFileDirectory(final Reader reader, final int index) {
-        super(reader.owner.listeners());
-        this.reader = reader;
-        identifier = reader.nameFactory.createLocalName(reader.owner.identifier, String.valueOf(index + 1));
+        super(reader);
+        identifier = reader.nameFactory.createLocalName(reader.store.identifier, String.valueOf(index + 1));
     }
 
     /**
@@ -379,15 +372,8 @@ final class ImageFileDirectory extends AbstractGridResource {
     /**
      * Shortcut for a frequently requested information.
      */
-    private String filename() {
-        return input().filename;
-    }
-
-    /**
-     * Shortcut for a frequently requested information.
-     */
     private Charset encoding() {
-        return reader.owner.encoding;
+        return reader.store.encoding;
     }
 
     /**
@@ -573,9 +559,9 @@ final class ImageFileDirectory extends AbstractGridResource {
             case Tags.BitsPerSample: {
                 final Vector values = type.readVector(input(), count);
                 /*
-                 * The current implementation requires that all 'bitsPerSample' elements have the same value.
+                 * The current implementation requires that all `bitsPerSample` elements have the same value.
                  * This restriction may be revisited in future Apache SIS versions.
-                 * Note: 'count' is never zero when this method is invoked, so we do not need to check bounds.
+                 * Note: `count` is never zero when this method is invoked, so we do not need to check bounds.
                  */
                 bitsPerSample = values.shortValue(0);
                 final int length = values.size();
@@ -706,7 +692,7 @@ final class ImageFileDirectory extends AbstractGridResource {
                 break;
             }
             /*
-             * Stores all of the 'double' valued GeoKeys, referenced by the GeoKeyDirectory.
+             * Stores all of the `double` valued GeoKeys, referenced by the GeoKeyDirectory.
              */
             case Tags.GeoDoubleParams: {
                 referencing().numericParameters = type.readVector(input(), count);
@@ -777,7 +763,7 @@ final class ImageFileDirectory extends AbstractGridResource {
             ////                                                                                        ////
             ////    Metadata for discovery purposes, conditions of use, etc.                            ////
             ////    Those metadata are not "critical" information for reading the image.                ////
-            ////    Should not write anything under 'metadata/contentInfo' node.                        ////
+            ////    Should not write anything under `metadata/contentInfo` node.                        ////
             ////                                                                                        ////
             ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -973,7 +959,7 @@ final class ImageFileDirectory extends AbstractGridResource {
                 i = s;
                 final Vector t = a; a = b; b = t;
             }
-            while (--i >= 0) {                      // At this point, 'b' shall be the longest vector.
+            while (--i >= 0) {                      // At this point, `b` shall be the longest vector.
                 final double va = a.doubleValue(i);
                 final double vb = b.doubleValue(i);
                 if (Double.isNaN(vb) || (max ? va > vb : va < vb)) {
@@ -1091,7 +1077,7 @@ final class ImageFileDirectory extends AbstractGridResource {
         /*
          * All of tile width, height and length information should be provided. But if only one of them is missing,
          * we can compute it provided that the file does not use any compression method. If there is a compression,
-         * then we set a bit for preventing the 'switch' block to perform a calculation but we let the code performs
+         * then we set a bit for preventing the `switch` block to perform a calculation but we let the code performs
          * the other checks in order to get an exception to be thrown with a good message.
          */
         int missing = !isPlanar && compression.equals(Compression.NONE) ? 0 : 0b1000;
@@ -1113,7 +1099,7 @@ final class ImageFileDirectory extends AbstractGridResource {
                 missingTag(Tags.TileLength, tileHeight, true);
                 break;
             }
-            case 0b0100: {          // Compute missing tile byte count.
+            case 0b0100: {          // Compute missing tile byte count in uncompressed case.
                 final long tileByteCount = pixelToByteCount(Math.multiplyExact(tileWidth, tileHeight));
                 final long[] tileByteCountArray = new long[tileOffsets.size()];
                 Arrays.fill(tileByteCountArray, tileByteCount);
@@ -1242,19 +1228,24 @@ final class ImageFileDirectory extends AbstractGridResource {
 
     /**
      * Returns an object containing the image size, the CRS and the conversion from pixel indices to CRS coordinates.
+     * The grid geometry has 2 or 3 dimensions, depending on whether the CRS declares a vertical axis or not.
+     *
+     * @see #getTileSize()
      */
     @Override
     public GridGeometry getGridGeometry() throws DataStoreContentException {
-        if (referencing != null) {
-            GridGeometry gridGeometry = referencing.gridGeometry;
-            if (gridGeometry == null) try {
-                gridGeometry = referencing.build(imageWidth, imageHeight);
-            } catch (FactoryException e) {
-                throw new DataStoreContentException(reader.resources().getString(Resources.Keys.CanNotComputeGridGeometry_1, filename()), e);
+        synchronized (reader.store) {
+            if (referencing != null) {
+                GridGeometry gridGeometry = referencing.gridGeometry;
+                if (gridGeometry == null) try {
+                    gridGeometry = referencing.build(imageWidth, imageHeight);
+                } catch (FactoryException e) {
+                    throw new DataStoreContentException(reader.resources().getString(Resources.Keys.CanNotComputeGridGeometry_1, filename()), e);
+                }
+                return gridGeometry;
+            } else {
+                return new GridGeometry(new GridExtent(imageWidth, imageHeight), null, null);
             }
-            return gridGeometry;
-        } else {
-            return new GridGeometry(new GridExtent(imageWidth, imageHeight), null, null);
         }
     }
 
@@ -1264,32 +1255,93 @@ final class ImageFileDirectory extends AbstractGridResource {
     @Override
     @SuppressWarnings("ReturnOfCollectionOrArrayField")
     public List<SampleDimension> getSampleDimensions() throws DataStoreContentException {
-        if (sampleDimensions == null) {
-            final SampleDimension[] dimensions = new SampleDimension[samplesPerPixel];
-            final SampleDimension.Builder builder = new SampleDimension.Builder();
-            final InternationalString name = Vocabulary.formatInternational(Vocabulary.Keys.Value);
-            for (int band = 0; band < samplesPerPixel;) {
-                builder.addQualitative(name, minValues.get(Math.min(band, minValues.size()-1)),
-                                             maxValues.get(Math.min(band, maxValues.size()-1)));
-                dimensions[band] = builder.setName(++band).build();
-                builder.clear();
+        synchronized (reader.store) {
+            if (sampleDimensions == null) {
+                final SampleDimension[] dimensions = new SampleDimension[samplesPerPixel];
+                final SampleDimension.Builder builder = new SampleDimension.Builder();
+                final InternationalString name = Vocabulary.formatInternational(Vocabulary.Keys.Value);
+                for (int band = 0; band < samplesPerPixel;) {
+                    builder.addQualitative(name, minValues.get(Math.min(band, minValues.size()-1)),
+                                                 maxValues.get(Math.min(band, maxValues.size()-1)));
+                    dimensions[band] = builder.setName(++band).build();
+                    builder.clear();
+                }
+                sampleDimensions = UnmodifiableArrayList.wrap(dimensions);
             }
-            sampleDimensions = UnmodifiableArrayList.wrap(dimensions);
+            return sampleDimensions;        // Safe because unmodifiable.
         }
-        return sampleDimensions;        // Safe because unmodifiable.
     }
 
     /**
-     * Loads a subset of the grid coverage represented by this resource.
+     * Returns the type of raster data. The enumeration values are restricted to types compatible with Java2D,
+     * at the cost of using more bits than {@link #bitsPerSample} if there is no exact match.
      *
-     * @param  domain  desired grid extent and resolution, or {@code null} for reading the whole domain.
-     * @param  range   0-based index of sample dimensions to read, or an empty sequence for reading all ranges.
-     * @return the grid coverage for the specified domain and range.
-     * @throws DataStoreException if an error occurred while reading the grid coverage data.
+     * @throws DataStoreContentException if the type is not recognized.
+     */
+    private DataType getDataType() throws DataStoreContentException {
+        final String format;
+        switch (sampleFormat) {
+            case SIGNED: {
+                if (bitsPerSample <  Byte   .SIZE) return DataType.BYTE;
+                if (bitsPerSample <= Short  .SIZE) return DataType.SHORT;
+                if (bitsPerSample <= Integer.SIZE) return DataType.INT;
+                format = "int";
+                break;
+            }
+            case UNSIGNED: {
+                if (bitsPerSample <= Byte   .SIZE) return DataType.BYTE;
+                if (bitsPerSample <= Short  .SIZE) return DataType.USHORT;
+                if (bitsPerSample <= Integer.SIZE) return DataType.INT;
+                format = "unsigned";
+                break;
+            }
+            case FLOAT: {
+                if (bitsPerSample == Float  .SIZE) return DataType.FLOAT;
+                if (bitsPerSample == Double .SIZE) return DataType.DOUBLE;
+                format = "float";
+                break;
+            }
+            default: {
+                format = "?";
+                break;
+            }
+        }
+        throw new DataStoreContentException(Errors.format(
+                Errors.Keys.UnsupportedFormat_1, format + ' ' + bitsPerSample + " bits"));
+    }
+
+    /**
+     * Returns the type to use for storing raster data, together with the number of bits per sample.
+     * The type should be the one used in the GeoTIFF file as much as possible, but may sometime be wider.
+     *
+     * @throws DataStoreContentException if the type is not recognized.
      */
     @Override
-    public GridCoverage read(final GridGeometry domain, final int... range) throws DataStoreException {
-        throw new DataStoreException("Not yet implemented.");   // TODO
+    protected Layout getLayout() throws DataStoreContentException {
+        return new Layout(getDataType(), bitsPerSample, isPlanar);
+    }
+
+    /**
+     * Returns the size in pixels of all tiles in this data cube.
+     * The array length is exactly 2 for this class.
+     *
+     * @see #getGridGeometry()
+     */
+    @Override
+    protected int[] getTileSize() {
+        return new int[] {tileWidth, tileHeight};
+    }
+
+    /**
+     * Gets the stream position or the length in bytes of compressed tile arrays in the GeoTIFF file.
+     * Values in the returned vector are {@code long} primitive type.
+     *
+     * @param  length  {@code false} for {@code tileOffsets} or {@code true} for {@code tileByteCounts}.
+     * @return stream position (relative to file beginning) or length of compressed tile arrays, in bytes.
+     */
+    @Override
+    Vector getTileArrayInfo(boolean length) {
+        return length ? tileByteCounts : tileOffsets;
     }
 
     /**
@@ -1301,7 +1353,7 @@ final class ImageFileDirectory extends AbstractGridResource {
      */
     private void warning(final Level level, final short key, final Object... parameters) {
         final LogRecord r = reader.resources().getLogRecord(level, key, parameters);
-        reader.owner.warning(r);
+        reader.store.warning(r);
     }
 
     /**
