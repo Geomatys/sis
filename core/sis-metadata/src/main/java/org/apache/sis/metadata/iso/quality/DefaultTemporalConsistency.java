@@ -39,13 +39,14 @@ import org.opengis.metadata.quality.TemporalConsistency;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
 @XmlType(name = "DQ_TemporalConsistency_Type")
 @XmlRootElement(name = "DQ_TemporalConsistency")
-public class DefaultTemporalConsistency extends AbstractTemporalAccuracy implements TemporalConsistency {
+public class DefaultTemporalConsistency extends AbstractTemporalQuality implements TemporalConsistency {
     /**
      * Serial number for inter-operability with different versions.
      */

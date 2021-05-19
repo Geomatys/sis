@@ -17,16 +17,18 @@
 package org.apache.sis.metadata.iso.quality;
 
 import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
+import org.opengis.util.InternationalString;
+import org.opengis.metadata.quality.IndirectEvaluation;
 
 
 /**
- * Correctness of the temporal references of an item (reporting of error in time measurement).
- * The following property is mandatory in a well-formed metadata according ISO 19115:
+ * Indirect evaluation.
+ * The following properties are mandatory in a well-formed metadata according ISO 19115:
  *
- * <div class="preformat">{@code DQ_AccuracyOfATimeMeasurement}
- * {@code   └─result……………} Value obtained from applying a data quality measure.</div>
+ * <div class="preformat">{@code DQ_IndirectEvaluation}
+ * {@code   └─deductiveSource……………} Information on which data are used as sources in deductive evaluation method.</div>
  *
  * <p><b>Limitations:</b></p>
  * <ul>
@@ -37,27 +39,40 @@ import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
  *       same version of Apache SIS. For long term storage, use {@link org.apache.sis.xml.XML} instead.</li>
  * </ul>
  *
- * @author  Martin Desruisseaux (IRD, Geomatys)
- * @author  Touraïvane (IRD)
  * @author  Alexis Gaillard (Geomatys)
+ * @author  Martin Desruisseaux (Geomatys)
  * @version 1.1
- * @since   0.3
+ * @since   1.1
  * @module
  */
-@XmlType(name = "DQ_AccuracyOfATimeMeasurement_Type")
-@XmlRootElement(name = "DQ_AccuracyOfATimeMeasurement")
-public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
-        implements AccuracyOfATimeMeasurement
-{
+@XmlType(name = "DQ_IndirectEvaluation_Type", propOrder = {
+    "deductiveSource"
+})
+@XmlRootElement(name = "DQ_IndirectEvaluation")
+public class DefaultIndirectEvaluation extends AbstractDataEvaluation implements IndirectEvaluation {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 2248263966450664491L;
+    private static final long serialVersionUID = 5634950981839012526L;
+    /**
+     * Information on which data are used as sources in deductive evaluation method.
+     */
+    private InternationalString deductiveSource;
 
     /**
-     * Constructs an initially empty accuracy of a time measurement.
+     * Constructs an initially empty descriptive result.
      */
-    public DefaultAccuracyOfATimeMeasurement() {
+    public DefaultIndirectEvaluation() {
+    }
+
+    /**
+     * Creates a conformance result initialized to the given values.
+     *
+     * @param deductiveSource  statement against which data is being evaluated, or {@code null}.
+     */
+    public DefaultIndirectEvaluation(final InternationalString deductiveSource)
+    {
+        this.deductiveSource = deductiveSource;
     }
 
     /**
@@ -67,10 +82,13 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      *
      * @param  object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(AccuracyOfATimeMeasurement)
+     * @see #castOrCopy(IndirectEvaluation)
      */
-    public DefaultAccuracyOfATimeMeasurement(final AccuracyOfATimeMeasurement object) {
+    public DefaultIndirectEvaluation(final IndirectEvaluation object) {
         super(object);
+        if (object != null) {
+            deductiveSource = object.getDeductiveSource();
+        }
     }
 
     /**
@@ -80,9 +98,9 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
      *   <li>Otherwise if the given object is already an instance of
-     *       {@code DefaultAccuracyOfATimeMeasurement}, then it is returned unchanged.</li>
-     *   <li>Otherwise a new {@code DefaultAccuracyOfATimeMeasurement} instance is created using the
-     *       {@linkplain #DefaultAccuracyOfATimeMeasurement(AccuracyOfATimeMeasurement) copy constructor}
+     *       {@code DefaultIndirectEvaluation}, then it is returned unchanged.</li>
+     *   <li>Otherwise a new {@code DefaultIndirectEvaluation} instance is created using the
+     *       {@linkplain #DefaultIndirectEvaluation(IndirectEvaluation) copy constructor}
      *       and returned. Note that this is a <cite>shallow</cite> copy operation, since the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -91,10 +109,31 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static DefaultAccuracyOfATimeMeasurement castOrCopy(final AccuracyOfATimeMeasurement object) {
-        if (object == null || object instanceof DefaultAccuracyOfATimeMeasurement) {
-            return (DefaultAccuracyOfATimeMeasurement) object;
+    public static DefaultIndirectEvaluation castOrCopy(final IndirectEvaluation object) {
+        if (object == null || object instanceof DefaultIndirectEvaluation) {
+            return (DefaultIndirectEvaluation) object;
         }
-        return new DefaultAccuracyOfATimeMeasurement(object);
+        return new DefaultIndirectEvaluation(object);
+    }
+
+    /**
+     * Returns the information on which data are used as sources in deductive evaluation method.
+     *
+     * @return returns the information on which data are used.
+     */
+    @Override
+    @XmlElement(name = "deductiveSource", required = true)
+    public InternationalString getDeductiveSource() {
+        return deductiveSource;
+    }
+
+    /**
+     * Sets the information on which data are used as sources in deductive evaluation method.
+     *
+     * @param  newValue  the new information.
+     */
+    public void setDeductiveSource(final InternationalString newValue) {
+        checkWritePermission(deductiveSource);
+        deductiveSource = newValue;
     }
 }

@@ -28,7 +28,7 @@ import org.opengis.metadata.quality.ConceptualConsistency;
 
 /**
  * Degree of adherence to logical rules of data structure, attribution and relationships.
- * Data structure can be conceptual, logical or physical.
+ * (data structure can be conceptual, logical or physical).
  * The following property is mandatory in a well-formed metadata according ISO 19115:
  *
  * <div class="preformat">{@code DQ_LogicalConsistency}
@@ -45,7 +45,7 @@ import org.opengis.metadata.quality.ConceptualConsistency;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @version 1.1
  * @since   0.3
  * @module
  */
@@ -70,7 +70,8 @@ public class AbstractLogicalConsistency extends AbstractElement implements Logic
     }
 
     /**
-     * Constructs a new instance initialized with the values from the specified metadata object.
+     * Degree of adherence to logical rules of data structure, attribution and relationships
+     * (data structure can be conceptual, logical or physical).
      * This is a <cite>shallow</cite> copy constructor, since the other metadata contained in the
      * given object are not recursively copied.
      *

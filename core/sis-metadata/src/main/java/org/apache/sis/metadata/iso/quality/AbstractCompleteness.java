@@ -42,7 +42,8 @@ import org.opengis.metadata.quality.CompletenessCommission;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
@@ -65,7 +66,7 @@ public class AbstractCompleteness extends AbstractElement implements Completenes
     }
 
     /**
-     * Constructs a new instance initialized with the values from the specified metadata object.
+     * Presence and absence of features, their attributes and their relationships.
      * This is a <cite>shallow</cite> copy constructor, since the other metadata contained in the
      * given object are not recursively copied.
      *

@@ -23,6 +23,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.opengis.metadata.lineage.Lineage;
 import org.opengis.metadata.quality.DataQuality;
 import org.opengis.metadata.quality.Element;
+import org.opengis.metadata.quality.StandaloneQualityReportInformation;
 import org.opengis.metadata.maintenance.Scope;
 import org.opengis.metadata.maintenance.ScopeCode;
 import org.apache.sis.metadata.iso.ISOMetadata;
@@ -37,7 +38,7 @@ import org.apache.sis.internal.xml.LegacyNamespaces;
  *
  * <div class="preformat">{@code DQ_DataQuality}
  * {@code   └─scope………………} The specific data to which the data quality information applies.
- * {@code       └─level……} Hierarchical level of the data specified by the scope.</div>
+ * {@code   └─report………………} Quantitative quality information for the data specified by the scope.</div>
  *
  * In addition, ISO requires that at least one of {@linkplain #getLineage() lineage}
  * and {@linkplain #getReports() reports} is provided. Those properties are declared
@@ -54,14 +55,16 @@ import org.apache.sis.internal.xml.LegacyNamespaces;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
 @XmlType(name = "DQ_DataQuality_Type", propOrder = {
     "scope",
     "reports",
-    "lineage"
+    "lineage",
+    "standaloneQualityReport"
 })
 @XmlRootElement(name = "DQ_DataQuality")
 public class DefaultDataQuality extends ISOMetadata implements DataQuality {
@@ -77,17 +80,21 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
 
     /**
      * Quantitative quality information for the data specified by the scope.
-     * Should be provided only if {@linkplain Scope#getLevel scope level} is
-     * {@linkplain org.opengis.metadata.maintenance.ScopeCode#DATASET dataset}.
      */
-    private Collection<Element> reports;
+    private Collection<Element> report;
 
     /**
      * Non-quantitative quality information about the lineage of the data specified by the scope.
-     * Should be provided only if {@linkplain Scope#getLevel scope level} is
-     * {@linkplain org.opengis.metadata.maintenance.ScopeCode#DATASET dataset}.
+     *
+     * @deprecated Removed from ISO_19157
      */
+    @Deprecated
     private Lineage lineage;
+
+    /**
+     * Gives the quality of the reported information.
+     */
+    private StandaloneQualityReportInformation standaloneQualityReport;
 
     /**
      * Constructs an initially empty data quality.
@@ -130,9 +137,10 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
     public DefaultDataQuality(final DataQuality object) {
         super(object);
         if (object != null) {
-            scope   = object.getScope();
-            reports = copyCollection(object.getReports(), Element.class);
-            lineage = object.getLineage();
+            scope                   = object.getScope();
+            report                  = copyCollection(object.getReports(), Element.class);
+            lineage                 = object.getLineage();
+            standaloneQualityReport = object.getStandaloneQualityReport();
         }
     }
 
@@ -190,7 +198,7 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
     @Override
     @XmlElement(name = "report", required = true)
     public Collection<Element> getReports() {
-        return reports = nonNullCollection(reports, Element.class);
+        return report = nonNullCollection(report, Element.class);
     }
 
     /**
@@ -199,7 +207,7 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
      * @param  newValues  the new reports.
      */
     public void setReports(final Collection<? extends Element> newValues) {
-        reports = writeCollection(newValues, reports, Element.class);
+        report = writeCollection(newValues, report, Element.class);
     }
 
     /**
@@ -223,5 +231,27 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
     public void setLineage(final Lineage newValue) {
         checkWritePermission(lineage);
         lineage = newValue;
+    }
+
+    /**
+     * Returns the quality of the reported information.
+     *
+     * @return the quality of the reported information, or {@code null}.
+     *
+     * @since 1.1
+     */
+    @XmlElement(name = "standaloneQualityReport")
+    public StandaloneQualityReportInformation getStandaloneQualityReport() {
+        return FilterByVersion.CURRENT_METADATA.accept() ? standaloneQualityReport : null;
+    }
+
+    /**
+     * Sets the the quality of the reported information.
+     *
+     * @param  newValue  the new quality information.
+     */
+    public void setStandaloneQualityReport(final StandaloneQualityReportInformation newValue) {
+        checkWritePermission(standaloneQualityReport);
+        standaloneQualityReport = newValue;
     }
 }

@@ -19,9 +19,9 @@ package org.apache.sis.metadata.iso.quality;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import org.opengis.util.InternationalString;
 import org.opengis.metadata.citation.Citation;
 import org.opengis.metadata.quality.ConformanceResult;
+import org.opengis.util.InternationalString;
 import org.apache.sis.util.iso.Types;
 
 
@@ -32,9 +32,6 @@ import org.apache.sis.util.iso.Types;
  *
  * <div class="preformat">{@code DQ_ConformanceResult}
  * {@code   ├─specification……………} Citation of product specification or user requirement against which data is being evaluated.
- * {@code   │   ├─title………………………} Name by which the cited resource is known.
- * {@code   │   └─date…………………………} Reference date for the cited resource.
- * {@code   ├─explanation…………………} Explanation of the meaning of conformance for this result.
  * {@code   └─pass……………………………………} Indication of the conformance result.</div>
  *
  * <p><b>Limitations:</b></p>
@@ -49,7 +46,8 @@ import org.apache.sis.util.iso.Types;
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
  * @author  Guilhem Legal (Geomatys)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
@@ -76,7 +74,7 @@ public class DefaultConformanceResult extends AbstractResult implements Conforma
     private InternationalString explanation;
 
     /**
-     * Indication of the conformance result.
+     * Indication of the conformance result where 0 = fail and 1 = pass.
      *
      * <p>The field is directly annotated here, because the getter method is called {@link #pass()},
      * and JAXB does not recognize it. The method should have been called getPass() or isPass().</p>
@@ -192,7 +190,7 @@ public class DefaultConformanceResult extends AbstractResult implements Conforma
     }
 
     /**
-     * Returns an indication of the conformance result.
+     * Returns an indication of the conformance result where 0 = fail and 1 = pass.
      *
      * @return indication of the conformance result, or {@code null}.
      */
@@ -202,7 +200,7 @@ public class DefaultConformanceResult extends AbstractResult implements Conforma
     }
 
     /**
-     * Sets the indication of the conformance result.
+     * Sets the indication of the conformance result where 0 = fail and 1 = pass.
      *
      * @param newValue {@code true} if the test pass.
      */

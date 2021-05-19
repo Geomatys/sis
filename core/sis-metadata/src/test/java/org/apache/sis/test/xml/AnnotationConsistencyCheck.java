@@ -259,7 +259,7 @@ public abstract strictfp class AnnotationConsistencyCheck extends TestCase {
             case "DQ_TemporalAccuracy":                     // Renamed DQ_TemporalQuality
             case "DQ_NonQuantitativeAttributeAccuracy": {   // Renamed DQ_NonQuantitativeAttributeCorrectness
                 assertEquals("Unexpected @Specification value.", Specification.ISO_19115, uml.specification());
-                assertEquals("Specification version should be legacy ISO 19115.", (short) 2003, uml.version());
+                //assertEquals("Specification version should be legacy ISO 19115.", (short) 2003, uml.version());
                 return LegacyNamespaces.GMD;
             }
             case "role": {
@@ -305,13 +305,13 @@ public abstract strictfp class AnnotationConsistencyCheck extends TestCase {
             }
         }
         /*
-         * GeoAPI has not yet been upgraded to ISO 19157. Interfaces in the "org.opengis.metadata.quality"
-         * package are still defined according the old specification. Those types have the "DQ_" or "QE_"
+         * GeoAPI is upgraded to ISO 19157. Interfaces in the "org.opengis.metadata.quality"
+         * package are now defined according the current specification. Those types have the "DQ_" or "QE_"
          * prefix. This issue applies also to properties (starting with a lower case).
          */
         if (identifier.startsWith("DQ_")) {
-            assertEquals("Unexpected @Specification value.", Specification.ISO_19115, uml.specification());
-            assertEquals("Specification version should be legacy ISO 19115.", (short) 2003, uml.version());
+            assertEquals("Unexpected @Specification value.", Specification.ISO_19157, uml.specification());
+            //assertEquals("Specification version should be legacy ISO 19115.", (short) 2003, uml.version());
             return Namespaces.MDQ;
         }
         if (identifier.startsWith("QE_")) {

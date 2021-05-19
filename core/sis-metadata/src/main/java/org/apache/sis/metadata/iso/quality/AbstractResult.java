@@ -16,6 +16,8 @@
  */
 package org.apache.sis.metadata.iso.quality;
 
+import java.util.Date;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.XmlSeeAlso;
 import javax.xml.bind.annotation.XmlRootElement;
@@ -23,11 +25,18 @@ import org.opengis.metadata.quality.Result;
 import org.opengis.metadata.quality.CoverageResult;
 import org.opengis.metadata.quality.ConformanceResult;
 import org.opengis.metadata.quality.QuantitativeResult;
+import org.opengis.metadata.quality.DescriptiveResult;
+import org.opengis.metadata.maintenance.Scope;
 import org.apache.sis.metadata.iso.ISOMetadata;
 
 
 /**
- * Type of test applied to the data specified by a data quality scope.
+ * Generalization of more specific result classes.
+ * The following properties are mandatory in a well-formed metadata according ISO 19115:
+ *
+ * <div class="preformat">{@code DQ_QuantitativeResult}
+ * {@code   └─resultScope………………………………} Scope of the result.
+ * {@code   ├─dateTime……………………} Date when the result was generated.</div>
  *
  * <p><b>Limitations:</b></p>
  * <ul>
@@ -40,22 +49,37 @@ import org.apache.sis.metadata.iso.ISOMetadata;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
-@XmlType(name = "AbstractDQ_Result_Type")
+@XmlType(name = "AbstractDQ_Result_Type", propOrder = {
+    "resultScope",
+    "dateTime"
+})
 @XmlRootElement(name = "AbstractDQ_Result")
 @XmlSeeAlso({
     DefaultConformanceResult.class,
     DefaultQuantitativeResult.class,
-    DefaultCoverageResult.class
+    DefaultCoverageResult.class,
+    DefaultDescriptiveResult.class
 })
 public class AbstractResult extends ISOMetadata implements Result {
     /**
      * Serial number for inter-operability with different versions.
      */
     private static final long serialVersionUID = 3510023908820052467L;
+
+    /**
+     * Scope of the result.
+     */
+    private Scope resultScope;
+
+    /**
+     * Date when the result was generated.
+     */
+    private Date dateTime;
 
     /**
      * Constructs an initially empty result.
@@ -74,6 +98,10 @@ public class AbstractResult extends ISOMetadata implements Result {
      */
     public AbstractResult(final Result object) {
         super(object);
+        if (object != null) {
+            resultScope        = object.getResultScope();
+            dateTime           = object.getDateTime();
+        }
     }
 
     /**
@@ -83,7 +111,7 @@ public class AbstractResult extends ISOMetadata implements Result {
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
      *   <li>Otherwise if the given object is an instance of {@link ConformanceResult},
-     *       {@link QuantitativeResult}or {@link CoverageResult}, then this method delegates to
+     *       {@link QuantitativeResult} or {@link DescriptiveResult}, then this method delegates to
      *       the {@code castOrCopy(…)} method of the corresponding SIS subclass.
      *       Note that if the given object implements more than one of the above-cited interfaces,
      *       then the {@code castOrCopy(…)} method to be used is unspecified.</li>
@@ -109,10 +137,63 @@ public class AbstractResult extends ISOMetadata implements Result {
         if (object instanceof ConformanceResult) {
             return DefaultConformanceResult.castOrCopy((ConformanceResult) object);
         }
+        if (object instanceof DescriptiveResult) {
+            return DefaultDescriptiveResult.castOrCopy((DescriptiveResult) object);
+        }
         // Intentionally tested after the sub-interfaces.
         if (object == null || object instanceof AbstractResult) {
             return (AbstractResult) object;
         }
         return new AbstractResult(object);
+    }
+
+    /**
+     * Returns the scope of the result.
+     *
+     * @return returns scope of the result.
+     *
+     * @see <a href="https://issues.apache.org/jira/browse/SIS-394">Issue SIS-394</a>
+     *
+     * @since 1.1
+     */
+    @Override
+    @XmlElement(name = "resultScope")
+    public Scope getResultScope() {
+        return resultScope;
+    }
+
+    /**
+     * Sets the scope of the result.
+     *
+     * @param  newValue  the new evaluation procedure.
+     */
+    public void setResultScope(final Scope newValue) {
+        resultScope = newValue;
+    }
+
+    /**
+     * Returns the date or range of dates on which a data quality measure was applied.
+     * The collection size is 1 for a single date, or 2 for a range.
+     * Returns an empty collection if this information is not available.
+     *
+     * @return date or range of dates on which a data quality measure was applied.
+     *
+     * @since 1.1
+     */
+    @Override
+    @XmlElement(name = "dateTime")
+    @SuppressWarnings("ReturnOfCollectionOrArrayField")
+    public Date getDateTime() {
+        return dateTime;
+    }
+
+    /**
+     * Sets the date or range of dates on which a data quality measure was applied.
+     * The collection size is 1 for a single date, or 2 for a range.
+     *
+     * @param  newValues  the new dates, or {@code null}.
+     */
+    public void setDateTime(final Date newValues) {
+        dateTime = newValues;
     }
 }

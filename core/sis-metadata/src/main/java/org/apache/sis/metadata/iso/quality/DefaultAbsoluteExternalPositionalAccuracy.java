@@ -40,14 +40,14 @@ import org.opengis.metadata.quality.AbsoluteExternalPositionalAccuracy;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @version 1.1
  * @since   0.3
  * @module
  */
 @XmlType(name = "DQ_AbsoluteExternalPositionalAccuracy_Type")
 @XmlRootElement(name = "DQ_AbsoluteExternalPositionalAccuracy")
 public class DefaultAbsoluteExternalPositionalAccuracy extends AbstractPositionalAccuracy
-       implements AbsoluteExternalPositionalAccuracy
+        implements AbsoluteExternalPositionalAccuracy
 {
     /**
      * Serial number for inter-operability with different versions.

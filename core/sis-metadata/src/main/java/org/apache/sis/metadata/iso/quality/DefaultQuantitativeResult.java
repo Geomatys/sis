@@ -30,11 +30,10 @@ import org.apache.sis.internal.xml.LegacyNamespaces;
 
 
 /**
- * Information about the value (or set of values) obtained from applying a data quality measure.
+ * The values or information about the value(s) (or set of values) obtained from applying a data quality measure.
  * The following properties are mandatory in a well-formed metadata according ISO 19115:
  *
  * <div class="preformat">{@code DQ_QuantitativeResult}
- * {@code   ├─valueUnit……………………} Value unit for reporting a data quality result.
  * {@code   └─value………………………………} Quantitative value or values, content determined by the evaluation procedure used.</div>
  *
  * <p><b>Limitations:</b></p>
@@ -49,14 +48,16 @@ import org.apache.sis.internal.xml.LegacyNamespaces;
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
  * @author  Cullen Rombach (Image Matters)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
 @XmlType(name = "DQ_QuantitativeResult_Type", propOrder = {
     "values",
-    "valueType",
+    "valueRecordType",
     "valueUnit",
+    "valueType",
     "errorStatistic"
 })
 @XmlRootElement(name = "DQ_QuantitativeResult")
@@ -64,25 +65,30 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
     /**
      * Serial number for compatibility with different versions.
      */
-    private static final long serialVersionUID = -403671810118461829L;
+    private static final long serialVersionUID = 4141325549328862266L;
 
     /**
-     * Quantitative value or values, content determined by the evaluation procedure used.
+     * Quantitative value or values, content determined by the evaluation procedure used,
+     * accordingly with the value type and valueStructure defined for the measure.
      */
-    private List<Record> values;
+    private List<Record> value;
 
     /**
-     * Value type for reporting a data quality result, or {@code null} if none.
-     */
-    private RecordType valueType;
-
-    /**
-     * Value unit for reporting a data quality result, or {@code null} if none.
+     * Value unit for reporting a data quality result.
      */
     private Unit<?> valueUnit;
 
     /**
+     * Value type for reporting a data quality result, depends of the implementation.
+     *
+     * Remplacing variable valueType in ISO_19157.
+     */
+    private RecordType valueRecordType;
+
+    /**
      * Statistical method used to determine the value, or {@code null} if none.
+     *
+     * @deprecated Removed from ISO_19157.
      */
     private InternationalString errorStatistic;
 
@@ -104,10 +110,10 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
     public DefaultQuantitativeResult(final QuantitativeResult object) {
         super(object);
         if (object != null) {
-            valueType      = object.getValueType();
-            valueUnit      = object.getValueUnit();
-            errorStatistic = object.getErrorStatistic();
-            values         = copyList(object.getValues(), Record.class);
+            value          = copyList(object.getValues(), Record.class);
+            valueUnit       = object.getValueUnit();
+            valueRecordType = object.getValueRecordType();
+            errorStatistic  = object.getErrorStatistic();
         }
     }
 
@@ -141,10 +147,9 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
      *
      * @return Quantitative value or values.
      */
-    @Override
     @XmlElement(name = "value", required = true)
     public List<Record> getValues() {
-        return values = nonNullList(values, Record.class);
+        return value = nonNullList(value, Record.class);
     }
 
     /**
@@ -153,24 +158,28 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
      * @param  newValues  the new values.
      */
     public void setValues(final List<? extends Record> newValues) {
-        values = writeList(newValues, values, Record.class);
+        value = writeList(newValues, value, Record.class);
     }
 
     /**
-     * Return the value type for reporting a data quality result.
+     * Return the value type for reporting a data quality result, depends of the implementation.
      *
      * <h4>Default value</h4>
      * If no type has been set but all {@linkplain #getValues() values} are of the same type,
      * then this method defaults to that type. Otherwise this method returns {@code null}.
      *
      * @return value type for reporting a data quality result, or {@code null}.
+     *
+     * Remplacing method getValueType() in ISO_19115.
+     *
+     * @since 1.1
      */
     @Override
     @XmlElement(name = "valueRecordType")
-    public RecordType getValueType()  {
-        RecordType type = valueType;
-        if (type == null && values != null) {
-            for (final Record value : values) {
+    public RecordType getValueRecordType()  {
+        RecordType type = valueRecordType;
+        if (type == null && value != null) {
+            for (final Record value : value) {
                 if (value != null) {
                     final RecordType t = value.getRecordType();
                     if (t == null) {
@@ -187,12 +196,55 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
     }
 
     /**
+     * Sets the value type for reporting a data quality result, depends of the implementation.
+     * A {@code null} value restores the default value documented in {@link #getValueType()}.
+     *
+     * @param  newValue  the new value type.
+     *
+     * Remplacing method setValueType() in ISO_19115.
+     */
+    public void setValueRecordType(final RecordType newValue) {
+        checkWritePermission(valueRecordType);
+        valueRecordType = newValue;
+    }
+
+    /**
+     * Return the value type for reporting a data quality result.
+     *
+     * <h4>Default value</h4>
+     * If no type has been set but all {@linkplain #getValues() values} are of the same type,
+     * then this method defaults to that type. Otherwise this method returns {@code null}.
+     *
+     * @return value type for reporting a data quality result, or {@code null}.
+     *
+     * @deprecated Removed from ISO_19157.
+     */
+    @XmlElement(name = "valueRecordType")
+    public RecordType getValueType()  {
+        if (valueRecordType == null) {
+            return null;
+        } else {
+        RecordType valueType = getValueRecordType();
+        return FilterByVersion.LEGACY_METADATA.accept() ? valueType : null;
+        }
+    }
+
+    /**
      * Sets the value type for reporting a data quality result.
      * A {@code null} value restores the default value documented in {@link #getValueType()}.
      *
      * @param  newValue  the new value type.
+     *
+     * @deprecated Removed from ISO_19157.
      */
+    @Deprecated
     public void setValueType(final RecordType newValue) {
+        if (valueRecordType == null) {
+            if (newValue == null) {
+                return;
+            }
+        }
+        RecordType valueType = getValueRecordType();
         checkWritePermission(valueType);
         valueType = newValue;
     }
@@ -224,7 +276,10 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
      * @return statistical method used to determine the value, or {@code null}.
      *
      * @see <a href="https://issues.apache.org/jira/browse/SIS-394">Issue SIS-394</a>
+     *
+     * @deprecated Removed from ISO_19157:2013.
      */
+    @Deprecated
     @Override
     @XmlElement(name = "errorStatistic", namespace = LegacyNamespaces.GMD)
     public InternationalString getErrorStatistic()  {
@@ -235,7 +290,10 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
      * Sets the statistical method used to determine the value, or {@code null} if none.
      *
      * @param  newValue  the new error statistic.
+     *
+     * @deprecated Removed ISO_19157:2013.
      */
+    @Deprecated
     public void setErrorStatistic(final InternationalString newValue) {
         checkWritePermission(errorStatistic);
         errorStatistic = newValue;

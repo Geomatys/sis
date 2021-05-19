@@ -18,15 +18,12 @@ package org.apache.sis.metadata.iso.quality;
 
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.XmlRootElement;
-import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
+import org.opengis.metadata.quality.Homogeneity;
 
 
 /**
- * Correctness of the temporal references of an item (reporting of error in time measurement).
- * The following property is mandatory in a well-formed metadata according ISO 19115:
- *
- * <div class="preformat">{@code DQ_AccuracyOfATimeMeasurement}
- * {@code   └─result……………} Value obtained from applying a data quality measure.</div>
+ * Expected or tested uniformity of the results obtained for a data quality evaluation.
+ * The following properties are mandatory in a well-formed metadata according ISO 19115:
  *
  * <p><b>Limitations:</b></p>
  * <ul>
@@ -37,27 +34,23 @@ import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
  *       same version of Apache SIS. For long term storage, use {@link org.apache.sis.xml.XML} instead.</li>
  * </ul>
  *
- * @author  Martin Desruisseaux (IRD, Geomatys)
- * @author  Touraïvane (IRD)
  * @author  Alexis Gaillard (Geomatys)
+ * @author  Martin Desruisseaux (Geomatys)
  * @version 1.1
- * @since   0.3
+ * @since   1.1
  * @module
  */
-@XmlType(name = "DQ_AccuracyOfATimeMeasurement_Type")
-@XmlRootElement(name = "DQ_AccuracyOfATimeMeasurement")
-public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
-        implements AccuracyOfATimeMeasurement
-{
+@XmlType(name = "DQ_Confidence_Type")
+@XmlRootElement(name = "DQ_Confidence")
+public class DefaultHomogeneity extends AbstractMetaquality implements Homogeneity {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 2248263966450664491L;
-
+    private static final long serialVersionUID = -8440822895642971849L;
     /**
-     * Constructs an initially empty accuracy of a time measurement.
+     * Constructs an initially empty aggregation derivation.
      */
-    public DefaultAccuracyOfATimeMeasurement() {
+    public DefaultHomogeneity() {
     }
 
     /**
@@ -67,9 +60,9 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      *
      * @param  object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(AccuracyOfATimeMeasurement)
+     * @see #castOrCopy(Homogeneity)
      */
-    public DefaultAccuracyOfATimeMeasurement(final AccuracyOfATimeMeasurement object) {
+    public DefaultHomogeneity(final Homogeneity object) {
         super(object);
     }
 
@@ -80,9 +73,9 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
      *   <li>Otherwise if the given object is already an instance of
-     *       {@code DefaultAccuracyOfATimeMeasurement}, then it is returned unchanged.</li>
-     *   <li>Otherwise a new {@code DefaultAccuracyOfATimeMeasurement} instance is created using the
-     *       {@linkplain #DefaultAccuracyOfATimeMeasurement(AccuracyOfATimeMeasurement) copy constructor}
+     *       {@code DefaultHomogeneity}, then it is returned unchanged.</li>
+     *   <li>Otherwise a new {@code DefaultHomogeneity} instance is created using the
+     *       {@linkplain #DefaultHomogeneity(Homogeneity) copy constructor}
      *       and returned. Note that this is a <cite>shallow</cite> copy operation, since the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -91,10 +84,10 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static DefaultAccuracyOfATimeMeasurement castOrCopy(final AccuracyOfATimeMeasurement object) {
-        if (object == null || object instanceof DefaultAccuracyOfATimeMeasurement) {
-            return (DefaultAccuracyOfATimeMeasurement) object;
+    public static DefaultHomogeneity castOrCopy(final Homogeneity object) {
+        if (object == null || object instanceof DefaultHomogeneity) {
+            return (DefaultHomogeneity) object;
         }
-        return new DefaultAccuracyOfATimeMeasurement(object);
+        return new DefaultHomogeneity(object);
     }
 }

@@ -17,16 +17,20 @@
 package org.apache.sis.metadata.iso.quality;
 
 import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
+import org.apache.sis.metadata.iso.ISOMetadata;
+import org.apache.sis.internal.jaxb.FilterByVersion;
+import org.opengis.metadata.citation.Citation;
+import org.opengis.metadata.quality.SourceReference;
 
 
 /**
- * Correctness of the temporal references of an item (reporting of error in time measurement).
+ * Reference to the source of the data quality measure.
  * The following property is mandatory in a well-formed metadata according ISO 19115:
  *
- * <div class="preformat">{@code DQ_AccuracyOfATimeMeasurement}
- * {@code   └─result……………} Value obtained from applying a data quality measure.</div>
+ * <div class="preformat">{@code DQM_SourceReference}
+ * {@code   └─citation……………} References to the source.</div>
  *
  * <p><b>Limitations:</b></p>
  * <ul>
@@ -37,27 +41,30 @@ import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
  *       same version of Apache SIS. For long term storage, use {@link org.apache.sis.xml.XML} instead.</li>
  * </ul>
  *
- * @author  Martin Desruisseaux (IRD, Geomatys)
- * @author  Touraïvane (IRD)
  * @author  Alexis Gaillard (Geomatys)
+ * @author  Martin Desruisseaux (Geomatys)
  * @version 1.1
- * @since   0.3
+ * @since   1.1
  * @module
  */
-@XmlType(name = "DQ_AccuracyOfATimeMeasurement_Type")
-@XmlRootElement(name = "DQ_AccuracyOfATimeMeasurement")
-public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
-        implements AccuracyOfATimeMeasurement
-{
+@XmlType(name = "DQM_SourceReference_Type", propOrder = {
+    "citation"
+})
+@XmlRootElement(name = "DQM_SourceReference")
+public class DefaultSourceReference extends ISOMetadata implements SourceReference {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 2248263966450664491L;
+    private static final long serialVersionUID = 2923526577209702000L;
+    /**
+     * References to the source.
+     */
+    private Citation citation;
 
     /**
-     * Constructs an initially empty accuracy of a time measurement.
+     * Constructs an initially empty source reference.
      */
-    public DefaultAccuracyOfATimeMeasurement() {
+    public DefaultSourceReference() {
     }
 
     /**
@@ -65,12 +72,15 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      * This is a <cite>shallow</cite> copy constructor, since the other metadata contained in the
      * given object are not recursively copied.
      *
-     * @param  object  the metadata to copy values from, or {@code null} if none.
+     * @param object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(AccuracyOfATimeMeasurement)
+     * @see #castOrCopy(SourceReference)
      */
-    public DefaultAccuracyOfATimeMeasurement(final AccuracyOfATimeMeasurement object) {
+    public DefaultSourceReference(final SourceReference object) {
         super(object);
+        if (object != null) {
+            citation             = object.getCitation();
+        }
     }
 
     /**
@@ -79,10 +89,16 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      *
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
+     *   <li>Otherwise if the given object is an instance of {@link PositionalAccuracy},
+     *       {@link TemporalAccuracy}, {@link ThematicAccuracy}, {@link LogicalConsistency},
+     *       {@link Completeness} or {@link Usability}, then this method delegates to the
+     *       {@code castOrCopy(…)} method of the corresponding SIS subclass.
+     *       Note that if the given object implements more than one of the above-cited interfaces,
+     *       then the {@code castOrCopy(…)} method to be used is unspecified.</li>
      *   <li>Otherwise if the given object is already an instance of
-     *       {@code DefaultAccuracyOfATimeMeasurement}, then it is returned unchanged.</li>
-     *   <li>Otherwise a new {@code DefaultAccuracyOfATimeMeasurement} instance is created using the
-     *       {@linkplain #DefaultAccuracyOfATimeMeasurement(AccuracyOfATimeMeasurement) copy constructor}
+     *       {@code AbstractElement}, then it is returned unchanged.</li>
+     *   <li>Otherwise a new {@code AbstractElement} instance is created using the
+     *       {@linkplain #AbstractElement(Element) copy constructor}
      *       and returned. Note that this is a <cite>shallow</cite> copy operation, since the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -91,10 +107,34 @@ public class DefaultAccuracyOfATimeMeasurement extends AbstractTemporalQuality
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static DefaultAccuracyOfATimeMeasurement castOrCopy(final AccuracyOfATimeMeasurement object) {
-        if (object == null || object instanceof DefaultAccuracyOfATimeMeasurement) {
-            return (DefaultAccuracyOfATimeMeasurement) object;
+    public static DefaultSourceReference castOrCopy(final SourceReference object) {
+
+        if (object instanceof DefaultSourceReference) {
+            return DefaultSourceReference.castOrCopy(object);
         }
-        return new DefaultAccuracyOfATimeMeasurement(object);
+        return new DefaultSourceReference(object);
+    }
+
+    /**
+     * Returns the references to the source.
+     *
+     * @return references to the source, or {@code null}.
+     *
+     * @see <a href="https://issues.apache.org/jira/browse/SIS-394">Issue SIS-394</a>
+     */
+    @Override
+    @XmlElement(name = "citation")
+    public Citation getCitation() {
+        return FilterByVersion.CURRENT_METADATA.accept() ? citation : null;
+    }
+
+    /**
+     * Sets the references to the source.
+     *
+     * @param  newValue  the new source references.
+     */
+    public void setCitation(final Citation newValue)  {
+        checkWritePermission(citation);
+        citation = newValue;
     }
 }

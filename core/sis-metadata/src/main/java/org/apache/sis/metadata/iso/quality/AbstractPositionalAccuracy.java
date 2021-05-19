@@ -44,7 +44,7 @@ import org.opengis.metadata.quality.RelativeInternalPositionalAccuracy;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @version 1.1
  * @since   0.3
  * @module
  */

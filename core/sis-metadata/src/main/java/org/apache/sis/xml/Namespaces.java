@@ -324,6 +324,16 @@ public final class Namespaces extends Static {
 
     /**
      * The <code>{@value}</code> URL. This is the namespace of
+     * <a href="http://standards.iso.org/iso/19157/-2/dqm/1.0/index.html">Data Quality Measures (DQM) version 1.0</a>.
+     * The usual prefix for this namespace is {@code "dqm"}.
+     *
+     * @category ISO
+     * @since 1.0
+     */
+    public static final String DQM = "http://standards.iso.org/iso/19157/-2/dqm/1.0";
+
+    /**
+     * The <code>{@value}</code> URL. This is the namespace of
      * <a href="http://standards.iso.org/iso/19157/-2/mdq/1.0/index.html">Metadata for Data Quality (MDQ) version 1.0</a>.
      * The usual prefix for this namespace is {@code "mdq"}.
      *

@@ -140,17 +140,25 @@ public class MetadataStandard implements Serializable {
      * in the {@link org.opengis.coverage} package and sub-packages.
      */
     public static final MetadataStandard ISO_19123;
+
+    /**
+     * An instance working on ISO 19115 standard as defined by GeoAPI interfaces
+     * in the {@link org.opengis.metadata} package and sub-packages.
+     */
+    public static final MetadataStandard ISO_19157;
     static {
         final String[] acronyms = {"CoordinateSystem", "CS", "CoordinateReferenceSystem", "CRS"};
 
         // If new StandardImplementation instances are added below, please update StandardImplementation.readResolve().
         ISO_19115 = new StandardImplementation("ISO 19115", "org.opengis.metadata.", "org.apache.sis.metadata.iso.", null, null);
         ISO_19111 = new StandardImplementation("ISO 19111", "org.opengis.referencing.", "org.apache.sis.referencing.", acronyms, new MetadataStandard[] {ISO_19115});
-        ISO_19123 = new MetadataStandard      ("ISO 19123", "org.opengis.coverage.", new MetadataStandard[] {ISO_19111});
+        ISO_19123 = new MetadataStandard      ("ISO 19123", "org.opengis.coverage", new MetadataStandard[] {ISO_19111});
+        ISO_19157 = new MetadataStandard      ("ISO 19157", "org.opengis.metadata.", new MetadataStandard[] {ISO_19115});
         INSTANCES = new MetadataStandard[] {
             ISO_19111,
             ISO_19115,
-            ISO_19123
+            ISO_19123,
+            ISO_19157
         };
         SystemListener.add(new SystemListener(Modules.METADATA) {
             @Override protected void classpathChanged() {

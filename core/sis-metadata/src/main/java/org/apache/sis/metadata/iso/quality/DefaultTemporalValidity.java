@@ -39,13 +39,14 @@ import org.opengis.metadata.quality.TemporalValidity;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Touraïvane (IRD)
- * @version 1.0
+ * @author  Alexis Gaillard (Geomatys)
+ * @version 1.1
  * @since   0.3
  * @module
  */
 @XmlType(name = "DQ_TemporalValidity_Type")
 @XmlRootElement(name = "DQ_TemporalValidity")
-public class DefaultTemporalValidity extends AbstractTemporalAccuracy implements TemporalValidity {
+public class DefaultTemporalValidity extends AbstractTemporalQuality implements TemporalValidity {
     /**
      * Serial number for inter-operability with different versions.
      */

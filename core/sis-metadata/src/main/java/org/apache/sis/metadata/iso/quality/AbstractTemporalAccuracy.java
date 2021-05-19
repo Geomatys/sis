@@ -18,11 +18,7 @@ package org.apache.sis.metadata.iso.quality;
 
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlSeeAlso;
 import org.opengis.metadata.quality.TemporalAccuracy;
-import org.opengis.metadata.quality.TemporalValidity;
-import org.opengis.metadata.quality.TemporalConsistency;
-import org.opengis.metadata.quality.AccuracyOfATimeMeasurement;
 import org.apache.sis.xml.Namespaces;
 
 
@@ -50,11 +46,7 @@ import org.apache.sis.xml.Namespaces;
  */
 @XmlType(name = "AbstractDQ_TemporalAccuracy_Type", namespace = Namespaces.GMD)     // TODO: renamed TemporalQuality
 @XmlRootElement(name = "AbstractDQ_TemporalAccuracy", namespace = Namespaces.GMD)
-@XmlSeeAlso({
-    DefaultAccuracyOfATimeMeasurement.class,
-    DefaultTemporalConsistency.class,
-    DefaultTemporalValidity.class
-})
+@Deprecated
 public class AbstractTemporalAccuracy extends AbstractElement implements TemporalAccuracy {
     /**
      * Serial number for inter-operability with different versions.
@@ -104,16 +96,6 @@ public class AbstractTemporalAccuracy extends AbstractElement implements Tempora
      *         given object itself), or {@code null} if the argument was null.
      */
     public static AbstractTemporalAccuracy castOrCopy(final TemporalAccuracy object) {
-        if (object instanceof AccuracyOfATimeMeasurement) {
-            return DefaultAccuracyOfATimeMeasurement.castOrCopy((AccuracyOfATimeMeasurement) object);
-        }
-        if (object instanceof TemporalConsistency) {
-            return DefaultTemporalConsistency.castOrCopy((TemporalConsistency) object);
-        }
-        if (object instanceof TemporalValidity) {
-            return DefaultTemporalValidity.castOrCopy((TemporalValidity) object);
-        }
-        // Intentionally tested after the sub-interfaces.
         if (object == null || object instanceof AbstractTemporalAccuracy) {
             return (AbstractTemporalAccuracy) object;
         }

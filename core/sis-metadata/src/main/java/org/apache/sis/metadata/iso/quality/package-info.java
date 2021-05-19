@@ -122,7 +122,8 @@
            xmlns = {
                 @XmlNs(prefix = "mdq", namespaceURI = Namespaces.MDQ),      // Metadata for Data Quality
                 @XmlNs(prefix = "mrd", namespaceURI = Namespaces.MRD),      // Metadata for Resource Distribution
-           //   @XmlNs(prefix = "dqc", namespaceURI = Namespaces.DQC),      // Data Quality Common Classes
+                @XmlNs(prefix = "dqc", namespaceURI = Namespaces.DQC),      // Data Quality Common Classes
+                @XmlNs(prefix = "dqm", namespaceURI = Namespaces.DQM),      // Data Quality Measures
                 @XmlNs(prefix = "mcc", namespaceURI = Namespaces.MCC),      // Metadata Common Classes
                 @XmlNs(prefix = "gmd", namespaceURI = LegacyNamespaces.GMD),
                 @XmlNs(prefix = "gmi", namespaceURI = LegacyNamespaces.GMI)
@@ -131,8 +132,16 @@
 @XmlJavaTypeAdapters({
     @XmlJavaTypeAdapter(CI_Citation.class),
     @XmlJavaTypeAdapter(DQ_Element.class),
+    @XmlJavaTypeAdapter(DQ_EvaluationMethod.class),
     @XmlJavaTypeAdapter(DQ_EvaluationMethodTypeCode.class),
+    @XmlJavaTypeAdapter(DQ_MeasureReference.class),
     @XmlJavaTypeAdapter(DQ_Result.class),
+    @XmlJavaTypeAdapter(DQ_StandaloneQualityReportInformation.class),
+    @XmlJavaTypeAdapter(DQ_AccuracyOfATimeMeasurement.class),
+    @XmlJavaTypeAdapter(DQ_NonQuantitativeAttributeAccuracy.class),
+    @XmlJavaTypeAdapter(DQ_TemporalAccuracy.class),
+    @XmlJavaTypeAdapter(DQ_TemporalConsistency.class),
+    @XmlJavaTypeAdapter(DQ_TemporalValidity.class),
     @XmlJavaTypeAdapter(GO_Boolean.class),
     @XmlJavaTypeAdapter(GO_DateTime.class),
     @XmlJavaTypeAdapter(GO_Record.class),

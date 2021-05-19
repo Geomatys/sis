@@ -16,6 +16,7 @@
  */
 package org.apache.sis.test.xml;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -132,7 +133,7 @@ public final strictfp class SchemaCompliance extends SchemaInformation {
                         path = classRootDirectory.relativize(path);
                         buffer.setLength(0);
                         buffer.append(path.toString()).setLength(buffer.length() - 6);      // Remove ".class" suffix.
-                        StringBuilders.replace(buffer, '/', '.');
+                        StringBuilders.replace(buffer, File.separatorChar, '.');
                         final Class<?> c = Class.forName(buffer.toString());
                         if (verifier == null) {
                             verifier = new PackageVerifier(this, c.getPackage());
