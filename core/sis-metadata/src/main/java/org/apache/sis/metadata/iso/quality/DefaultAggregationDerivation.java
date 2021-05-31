@@ -26,10 +26,10 @@ import org.opengis.metadata.quality.AggregationDerivation;
  * The following properties are mandatory in a well-formed metadata according ISO 19115:
  *
  * <div class="preformat">{@code DQ_AggregationDerivation}
- * {@code   └─evaluationMethodType……………} Value obtained from applying a data quality measure.
- * {@code   └─evaluationMethodDescription……………} Value obtained from applying a data quality measure.
- * {@code   └─evaluationProcedure……………} Value obtained from applying a data quality measure.
- * {@code   └─referenceDoc……………} Information on documents which are referenced in developing and applying a data quality evaluation method.
+ * {@code   ├─evaluationMethodType……………} Value obtained from applying a data quality measure.
+ * {@code   ├─evaluationMethodDescription……………} Value obtained from applying a data quality measure.
+ * {@code   ├─evaluationProcedure……………} Value obtained from applying a data quality measure.
+ * {@code   ├─referenceDoc……………} Information on documents which are referenced in developing and applying a data quality evaluation method.
  * {@code   └─dateTime……………} Value obtained from applying a data quality measure.</div>
  *
  * <p><b>Limitations:</b></p>

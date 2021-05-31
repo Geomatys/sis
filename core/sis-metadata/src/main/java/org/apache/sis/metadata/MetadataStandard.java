@@ -152,7 +152,7 @@ public class MetadataStandard implements Serializable {
         // If new StandardImplementation instances are added below, please update StandardImplementation.readResolve().
         ISO_19115 = new StandardImplementation("ISO 19115", "org.opengis.metadata.", "org.apache.sis.metadata.iso.", null, null);
         ISO_19111 = new StandardImplementation("ISO 19111", "org.opengis.referencing.", "org.apache.sis.referencing.", acronyms, new MetadataStandard[] {ISO_19115});
-        ISO_19123 = new MetadataStandard      ("ISO 19123", "org.opengis.coverage", new MetadataStandard[] {ISO_19111});
+        ISO_19123 = new MetadataStandard      ("ISO 19123", "org.opengis.coverage.", new MetadataStandard[] {ISO_19111});
         ISO_19157 = new MetadataStandard      ("ISO 19157", "org.opengis.metadata.", new MetadataStandard[] {ISO_19115});
         INSTANCES = new MetadataStandard[] {
             ISO_19111,

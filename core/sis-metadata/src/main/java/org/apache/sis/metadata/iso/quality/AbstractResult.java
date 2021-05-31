@@ -35,8 +35,8 @@ import org.apache.sis.metadata.iso.ISOMetadata;
  * The following properties are mandatory in a well-formed metadata according ISO 19115:
  *
  * <div class="preformat">{@code DQ_QuantitativeResult}
- * {@code   └─resultScope………………………………} Scope of the result.
- * {@code   ├─dateTime……………………} Date when the result was generated.</div>
+ * {@code ├─resultScope……………} Scope of the result.
+ * {@code └─dateTime……………………} Date when the result was generated.</div>
  *
  * <p><b>Limitations:</b></p>
  * <ul>
@@ -166,6 +166,8 @@ public class AbstractResult extends ISOMetadata implements Result {
      * Sets the scope of the result.
      *
      * @param  newValue  the new evaluation procedure.
+     *
+     * @since 1.1
      */
     public void setResultScope(final Scope newValue) {
         resultScope = newValue;
