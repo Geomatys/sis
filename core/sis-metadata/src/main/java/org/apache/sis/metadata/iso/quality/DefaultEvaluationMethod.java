@@ -89,17 +89,17 @@ public class DefaultEvaluationMethod extends ISOMetadata implements EvaluationMe
     /**
      * Type of method used to evaluate quality of the data.
      */
-    private EvaluationMethodType evaluationMethodType;
+    EvaluationMethodType evaluationMethodType;
 
     /**
      * Description of the evaluation method.
      */
-    private InternationalString evaluationMethodDescription;
+    InternationalString evaluationMethodDescription;
 
     /**
      * Reference to the procedure information.
      */
-    private Citation evaluationProcedure;
+    Citation evaluationProcedure;
 
     /**
      * Information on documents which are referenced in developing and applying a data quality evaluation method.

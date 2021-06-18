@@ -281,12 +281,23 @@ public class AbstractElement extends ISOMetadata implements Element {
     @Override
     @XmlElement(name = "measureIdentification", namespace = LegacyNamespaces.GMD)
     public Identifier getMeasureIdentification() {
-         if (this.measure == null) {
-            return null;
+        final Context context = Context.current();
+        if (Context.isFlagSet(context, Context.MARSHALLING)) {
+            if (measure == null || !Context.isFlagSet(context, Context.LEGACY_METADATA)) {
+                return null;
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultMeasureReference) measure).measureIdentification;
+            }
         } else {
-            Identifier measureIdentification = measure.getMeasureIdentification();
-            return FilterByVersion.LEGACY_METADATA.accept() ? measureIdentification : null;
+            if (measure == null) {
+                measure = new DefaultMeasureReference();
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultMeasureReference) measure).getMeasureIdentification();
+            }
         }
+        return measure.getMeasureIdentification();
     }
 
     /**
@@ -323,12 +334,23 @@ public class AbstractElement extends ISOMetadata implements Element {
     @Override
     @XmlElement(name = "measureDescription", namespace = LegacyNamespaces.GMD)
     public InternationalString getMeasureDescription() {
-         if (this.measure == null) {
-            return null;
+        final Context context = Context.current();
+        if (Context.isFlagSet(context, Context.MARSHALLING)) {
+            if (measure == null || !Context.isFlagSet(context, Context.LEGACY_METADATA)) {
+                return null;
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultMeasureReference) measure).measureDescription;
+            }
         } else {
-            InternationalString measureDescription = measure.getMeasureDescription();
-            return FilterByVersion.LEGACY_METADATA.accept() ? measureDescription : null;
+            if (measure == null) {
+                measure = new DefaultMeasureReference();
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultMeasureReference) measure).getMeasureDescription();
+            }
         }
+        return measure.getMeasureDescription();
     }
 
     /**
@@ -365,12 +387,23 @@ public class AbstractElement extends ISOMetadata implements Element {
     @Override
     @XmlElement(name = "evaluationMethodType", namespace = LegacyNamespaces.GMD)
     public EvaluationMethodType getEvaluationMethodType() {
-        if (this.evaluationMethod == null) {
-            return null;
+        final Context context = Context.current();
+        if (Context.isFlagSet(context, Context.MARSHALLING)) {
+            if (evaluationMethod == null || !Context.isFlagSet(context, Context.LEGACY_METADATA)) {
+                return null;
+            }
+            if (evaluationMethod instanceof DefaultMeasureReference) {
+                return ((DefaultEvaluationMethod) evaluationMethod).evaluationMethodType;
+            }
         } else {
-            EvaluationMethodType evaluationMethodType = evaluationMethod.getEvaluationMethodType();
-            return FilterByVersion.LEGACY_METADATA.accept() ? evaluationMethodType : null;
+            if (evaluationMethod == null) {
+                evaluationMethod = new DefaultEvaluationMethod();
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultEvaluationMethod) evaluationMethod).getEvaluationMethodType();
+            }
         }
+        return evaluationMethod.getEvaluationMethodType();
     }
 
     /**
@@ -407,12 +440,23 @@ public class AbstractElement extends ISOMetadata implements Element {
     @Override
     @XmlElement(name = "evaluationMethodDescription", namespace = LegacyNamespaces.GMD)
     public InternationalString getEvaluationMethodDescription() {
-        if (this.evaluationMethod == null) {
-            return null;
+        final Context context = Context.current();
+        if (Context.isFlagSet(context, Context.MARSHALLING)) {
+            if (evaluationMethod == null || !Context.isFlagSet(context, Context.LEGACY_METADATA)) {
+                return null;
+            }
+            if (evaluationMethod instanceof DefaultMeasureReference) {
+                return ((DefaultEvaluationMethod) evaluationMethod).evaluationMethodDescription;
+            }
         } else {
-            InternationalString evaluationMethodDescription = evaluationMethod.getEvaluationMethodDescription();
-            return FilterByVersion.LEGACY_METADATA.accept() ? evaluationMethodDescription : null;
+            if (evaluationMethod == null) {
+                evaluationMethod = new DefaultEvaluationMethod();
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultEvaluationMethod) evaluationMethod).getEvaluationMethodDescription();
+            }
         }
+        return evaluationMethod.getEvaluationMethodDescription();
     }
 
     /**
@@ -449,12 +493,23 @@ public class AbstractElement extends ISOMetadata implements Element {
     @Override
     @XmlElement(name = "evaluationProcedure", namespace = LegacyNamespaces.GMD)
     public Citation getEvaluationProcedure() {
-        if (evaluationMethod == null) {
-            return null;
+        final Context context = Context.current();
+        if (Context.isFlagSet(context, Context.MARSHALLING)) {
+            if (evaluationMethod == null || !Context.isFlagSet(context, Context.LEGACY_METADATA)) {
+                return null;
+            }
+            if (evaluationMethod instanceof DefaultMeasureReference) {
+                return ((DefaultEvaluationMethod) evaluationMethod).evaluationProcedure;
+            }
         } else {
-            Citation evaluationProcedure = evaluationMethod.getEvaluationProcedure();
-            return FilterByVersion.LEGACY_METADATA.accept() ? evaluationProcedure : null;
+            if (evaluationMethod == null) {
+                evaluationMethod = new DefaultEvaluationMethod();
+            }
+            if (measure instanceof DefaultMeasureReference) {
+                return ((DefaultEvaluationMethod) evaluationMethod).getEvaluationProcedure();
+            }
         }
+        return evaluationMethod.getEvaluationProcedure();
     }
 
     /**

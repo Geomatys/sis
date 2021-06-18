@@ -66,7 +66,7 @@ public class DefaultMeasureReference extends ISOMetadata implements MeasureRefer
     /**
      * Identifier of the measure, value uniquely identifying the measure within a namespace.
      */
-    private Identifier measureIdentification;
+    Identifier measureIdentification;
 
     /**
      * Name of the test applied to the data.
@@ -76,7 +76,7 @@ public class DefaultMeasureReference extends ISOMetadata implements MeasureRefer
     /**
      * Description of the measure.
      */
-    private InternationalString measureDescription;
+    InternationalString measureDescription;
 
     /**
      * Constructs an initially empty measure reference.
