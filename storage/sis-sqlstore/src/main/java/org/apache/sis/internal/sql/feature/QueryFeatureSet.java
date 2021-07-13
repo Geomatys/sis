@@ -54,12 +54,12 @@ import org.opengis.filter.SortProperty;
  *
  * TODO: move query analysis in a dedicated class.
  *
- * @author Alexis Manin (Geomatys)
- * @version 2.0
- * @since   2.0
+ * @author  Alexis Manin (Geomatys)
+ * @version 1.1
+ * @since   1.1
  * @module
  */
-public class QueryFeatureSet extends AbstractFeatureSet {
+public final class QueryFeatureSet extends AbstractFeatureSet {
 
     /**
      * A regex searching for ANSI or PostgreSQL way of defining max number of rows to return. For details, see
@@ -67,6 +67,7 @@ public class QueryFeatureSet extends AbstractFeatureSet {
      * Documentation states that value could be a reference to a variable name, so we do not search for a digit.
      */
     private static final Pattern LIMIT_PATTERN = Pattern.compile("(?:FETCH|LIMIT)(?:\\s+(?:FIRST|NEXT))?\\s+([^\\s]+)(?:\\s+ROWS?)?(?:\\s+ONLY)?", Pattern.CASE_INSENSITIVE);
+
     /**
      * Search for ANSI or PostgreSQL way of defining a number of rows to skip when returning results. For details, see
      * <a href="https://www.postgresql.org/docs/current/sql-select.html#SQL-LIMIT">PostgreSQL LIMIT documentation</a>.
@@ -112,11 +113,13 @@ public class QueryFeatureSet extends AbstractFeatureSet {
      * batch loading of results.
      */
     boolean allowBatchLoading = true;
+
     /**
      * Profiling variable. Define the fraction (0 none, 1 all) of a single fetch (as defined by {@link ResultSet#getFetchSize()}
      * that {@link PrefetchSpliterator} will load in one go.
      */
     float fetchRatio = 0.5f;
+
     /**
      * Profiling variable, serves to define {{@link PreparedStatement#setFetchSize(int)} SQL result fetch size}.
      */
@@ -223,7 +226,7 @@ public class QueryFeatureSet extends AbstractFeatureSet {
         }
 
         @Override
-        protected FeatureSet create(CharSequence where, SortProperty[] sorting, ColumnRef[] columns) {
+        protected FeatureSet create(CharSequence where, SortProperty[] sorting, Column[] columns) {
             // TODO: use columns.
             final SQLBuilder newQuery = amendQuery(where, sorting);
             return new QueryFeatureSet(newQuery, adapter, null, source);
@@ -276,7 +279,7 @@ public class QueryFeatureSet extends AbstractFeatureSet {
         }
 
         @Override
-        public Connector select(ColumnRef... columns) {
+        public FeatureSource select(Column... columns) {
             if (columns == null || columns.length < 1) {
                 long javaOffset = 0, nativeOffset = 0, javaLimit = 0, nativeLimit = 0;
                 if (originOffset < 0) {
@@ -306,9 +309,10 @@ public class QueryFeatureSet extends AbstractFeatureSet {
         }
     }
 
-    private final class PreparedQueryConnector implements Connector {
+    private final class PreparedQueryConnector extends FeatureSource {
 
         final String sql;
+
         /**
          * In some cases, detection/modification of SQL offset and limit parameters can fail. In such cases, we amend
          * result stream with pure java {@link Stream#skip(long) offset} and {@link Stream#limit(long) limit}.
@@ -324,14 +328,14 @@ public class QueryFeatureSet extends AbstractFeatureSet {
         }
 
         @Override
-        public Stream<Feature> connect(Connection connection) throws SQLException, DataStoreException {
+        public Stream<Feature> stream(Connection connection) throws SQLException {
             final PreparedStatement statement = connection.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
             statement.setFetchSize(fetchSize);
             final ResultSet result = statement.executeQuery();
             final int fetchSize = result.getFetchSize();
             final boolean withPrefetch = !allowBatchLoading || (fetchSize < 1 || fetchSize >= Integer.MAX_VALUE);
             final Spliterator<Feature> spliterator = withPrefetch ?
-                    new ResultSpliterator(result, connection) : new PrefetchSpliterator(result, connection, fetchRatio);
+                    new ResultSpliterator(result) : new PrefetchSpliterator(result, fetchRatio);
             Stream<Feature> stream = StreamSupport.stream(spliterator, parallel && withPrefetch);
             if (additionalLimit > 0) stream = stream.limit(additionalLimit);
             if (additionalOffset > 0) stream = stream.skip(additionalOffset);
@@ -349,7 +353,7 @@ public class QueryFeatureSet extends AbstractFeatureSet {
         }
 
         @Override
-        public String estimateStatement(boolean count) {
+        public String overviewStatement(boolean count) {
             if (count) {
                 return "SELECT COUNT(*) FROM ("+sql+") AS count_all";
             } else {
@@ -370,14 +374,14 @@ public class QueryFeatureSet extends AbstractFeatureSet {
      * the future to determine which implementation to priorize. For now results does not show much difference.
      * The benchmark class is {@code QuerySpliteratorsBench}.
      */
-    private abstract class QuerySpliterator  implements java.util.Spliterator<Feature> {
+    private abstract class QuerySpliterator implements java.util.Spliterator<Feature> {
 
         final ResultSet result;
         final FeatureAdapter.ResultSetAdapter adapter;
 
-        private QuerySpliterator(ResultSet result, Connection origin) {
+        private QuerySpliterator(final ResultSet result) {
             this.result = result;
-            this.adapter = QueryFeatureSet.this.adapter.prepare(origin);
+            this.adapter = QueryFeatureSet.this.adapter.prepare();
         }
 
         @Override
@@ -394,8 +398,8 @@ public class QueryFeatureSet extends AbstractFeatureSet {
 
     private final class ResultSpliterator extends QuerySpliterator {
 
-        private ResultSpliterator(ResultSet result, Connection origin) {
-            super(result, origin);
+        private ResultSpliterator(final ResultSet result) {
+            super(result);
         }
 
         @Override
@@ -406,7 +410,9 @@ public class QueryFeatureSet extends AbstractFeatureSet {
                     action.accept(f);
                     return true;
                 } else return false;
-            } catch (SQLException e) {
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
                 throw new BackingStoreException("Cannot advance in SQL query result", e);
             }
         }
@@ -444,12 +450,8 @@ public class QueryFeatureSet extends AbstractFeatureSet {
          */
         long splittedAmount;
 
-        private PrefetchSpliterator(ResultSet result, Connection origin) throws SQLException {
-            this(result, origin, 0.5f);
-        }
-
-        private PrefetchSpliterator(ResultSet result, Connection origin, float fetchRatio) throws SQLException {
-            super(result, origin);
+        private PrefetchSpliterator(final ResultSet result, final float floatfetchRatio) throws SQLException {
+            super(result);
             this.fetchSize = Math.max((int) (result.getFetchSize()*fetchRatio), 1);
         }
 
@@ -488,7 +490,9 @@ public class QueryFeatureSet extends AbstractFeatureSet {
                 idx = 0;
                 try {
                     chunk = adapter.prefetch(fetchSize, result);
-                } catch (SQLException e) {
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
                     throw new BackingStoreException(e);
                 }
                 return chunk != null && !chunk.isEmpty();

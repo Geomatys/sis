@@ -19,16 +19,14 @@ package org.apache.sis.internal.sql.feature;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.ParseException;
 import java.util.Optional;
 
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import org.apache.sis.internal.feature.Geometries;
-import org.apache.sis.internal.metadata.sql.Dialect;
 import org.apache.sis.setup.GeometryLibrary;
+import org.apache.sis.storage.event.StoreListeners;
 import org.apache.sis.util.collection.BackingStoreException;
-import org.apache.sis.util.collection.Cache;
 
 /**
  * Geometric SQL mapping based on <a href="https://www.ogc.org/standards/sfs">OpenGIS® Implementation Standard
@@ -39,76 +37,48 @@ import org.apache.sis.util.collection.Cache;
  * representation is the default (WKB or WKT). The aim is to base specific drivers on this class (see {@link PostGISMapping}
  * for an example).
  *
- * @author Alexis Manin (Geomatys)
- * @version 2.0
- * @since   2.0
+ * @author  Alexis Manin (Geomatys)
+ * @version 1.1
+ * @since   1.1
  * @module
  */
-final class OGC06104r4 implements DialectMapping {
+final class OGC06104r4<G> extends Session<G> {
 
-    final OGC06104r4.Spi spi;
     final GeometryIdentification identifyGeometries;
 
-    final Geometries library;
-
-    /**
-     * A cache valid ONLY FOR A DATASOURCE. IT'S IMPORTANT ! Why ? Because :
-     * <ul>
-     *     <li>CRS definition could differ between databases (PostGIS version, user alterations, etc.)</li>
-     *     <li>Avoid inter-database locking</li>
-     * </ul>
-     */
-    final Cache<Integer, CoordinateReferenceSystem> sessionCache;
-
-    private OGC06104r4(final OGC06104r4.Spi spi, GeometryLibrary geometryDriver, Connection c) throws SQLException {
-        this.spi = spi;
-        sessionCache = new Cache<>(7, 0, true);
-        this.identifyGeometries = new GeometryIdentification(c, sessionCache);
-
-        this.library = Geometries.implementation(geometryDriver);
+    private OGC06104r4(final Geometries<G> geomLibrary, final StoreListeners listeners, final Connection c) throws SQLException {
+        super(geomLibrary, false, listeners);
+        this.identifyGeometries = new GeometryIdentification(this, c);
     }
 
     @Override
-    public OGC06104r4.Spi getSpi() {
-        return spi;
-    }
-
-    @Override
-    public Optional<ColumnAdapter<?>> getMapping(SQLColumn columnDefinition) {
+    public ValueGetter<?> getMapping(final Column columnDefinition) {
         if (columnDefinition.typeName != null && "geometry".equalsIgnoreCase(columnDefinition.typeName)) {
-            return Optional.of(forGeometry(columnDefinition));
+            // In case of a computed column, geometric definition could be null.
+            try {
+                identifyGeometries.fetch(columnDefinition);
+            } catch (Exception e) {
+                throw new BackingStoreException(e); // TODO
+            }
+            String geometryType = columnDefinition.getGeometryType();
+            final Class<?> geomClass = getGeometricClass(geometryType, geomLibrary);
+            return new WKBReader(geomClass, columnDefinition.getGeometryCRS());
         }
-
-        return Optional.empty();
+        return null;
     }
 
-    private ColumnAdapter<?> forGeometry(SQLColumn definition) {
-        // In case of a computed column, geometric definition could be null.
-        final GeometryIdentification.GeometryColumn geomDef;
-        try {
-            geomDef = identifyGeometries.fetch(definition).orElse(null);
-        } catch (SQLException | ParseException e) {
-            throw new BackingStoreException(e);
-        }
-        String geometryType = geomDef == null ? null : geomDef.type;
-        final Class geomClass = getGeometricClass(geometryType, library);
-
-        return new WKBReader(geomClass, geomDef == null ? null : geomDef.crs);
-    }
-
-    @Override
-    public void close() throws SQLException {
+    public void close() throws Exception {
         identifyGeometries.close();
     }
 
-    static Class getGeometricClass(String geometryType, final Geometries library) {
+    static Class<?> getGeometricClass(String geometryType, final Geometries<?> library) {
         if (geometryType == null) return library.rootClass;
 
         // remove Z, M or ZM suffix
         if (geometryType.endsWith("M")) geometryType = geometryType.substring(0, geometryType.length()-1);
         if (geometryType.endsWith("Z")) geometryType = geometryType.substring(0, geometryType.length()-1);
 
-        final Class geomClass;
+        final Class<?> geomClass;
         switch (geometryType) {
             case "POINT":
                 geomClass = library.pointClass;
@@ -124,59 +94,36 @@ final class OGC06104r4 implements DialectMapping {
         return geomClass;
     }
 
-    abstract static class Reader implements ColumnAdapter {
-
-        final Class geomClass;
-
-        public Reader(Class geomClass) {
-            this.geomClass = geomClass;
-        }
-
-        @Override
-        public Class getJavaType() {
-            return geomClass;
-        }
-    }
-
-    private final class WKBReader extends Reader implements SQLBiFunction<ResultSet, Integer, Object> {
+    private final class WKBReader extends ValueGetter<Object> {
 
         final CoordinateReferenceSystem crsToApply;
 
-        private WKBReader(Class geomClass, CoordinateReferenceSystem crsToApply) {
+        private WKBReader(Class<?> geomClass, CoordinateReferenceSystem crsToApply) {
             super(geomClass);
             this.crsToApply = crsToApply;
         }
 
         @Override
-        public Object apply(ResultSet resultSet, Integer integer) throws SQLException {
-            final byte[] bytes = resultSet.getBytes(integer);
+        public Object getValue(final ResultSet source, final int columnIndex) throws Exception {
+            final byte[] bytes = source.getBytes(columnIndex);
             if (bytes == null) return null;
-            // EWKB reader should be compliant with standard WKB format. However, it is not sure that database driver
-            // will return WKB, so we should find a way to ensure SQL queries would use ST_AsBinary function.
-            return new EWKBReader(library).forCrs(crsToApply).read(bytes);
+            /*
+             * TODO: it is not sure that database driver return WKB, so we should
+             * find a way to ensure that SQL queries use `ST_AsBinary` function.
+             */
+            return new EWKBReader<>(geomLibrary, crsToApply).read(bytes).implementation();
         }
 
         @Override
-        public SQLBiFunction prepare(Connection target) {
-            return this;
-        }
-
-        @Override
-        public Optional<CoordinateReferenceSystem> getCrs() {
+        public Optional<CoordinateReferenceSystem> getCRS() {
             return Optional.ofNullable(crsToApply);
         }
     }
 
-    public static final class Spi implements DialectMapping.Spi {
-
+    public static final class Spi implements Session.Spi {
         @Override
-        public Optional<DialectMapping> create(GeometryLibrary geometryDriver, Connection c) throws SQLException {
-            return Optional.of(new OGC06104r4(this, geometryDriver, c));
-        }
-
-        @Override
-        public Dialect getDialect() {
-            return Dialect.ANSI;
+        public Session<?> create(final GeometryLibrary geomlib, final StoreListeners listeners, Connection c) throws SQLException {
+            return new OGC06104r4<>(Geometries.implementation(geomlib), listeners, c);
         }
     }
 }

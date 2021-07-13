@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 
@@ -83,12 +82,11 @@ final class Table extends AbstractFeatureSet {
     final TableReference name;
 
     /**
-     * Name of all columns to fetch from database, optionally amended with an alias. Alias is used for feature type
-     * attributes which have been renamed to avoid name collisions. In any case, a call to {@link ColumnRef#getAttributeName()}}
-     * will return the name available in target feature type. This list contains only {@link Attribute} names, not any
-     * relation one.
+     * Name of all columns to fetch from database, optionally amended with a label. Alias is used for feature type
+     * attributes which have been renamed to avoid name collisions. In any case, {@link Column#label} will be the
+     * name available in target feature type. This list contains only {@link Attribute} names, not any relation one.
      */
-    final List<ColumnRef> attributes;
+    final List<Column> attributes;
 
     /**
      * The columns that constitute the primary key, or {@code null} if there is no primary key.
@@ -196,11 +194,7 @@ final class Table extends AbstractFeatureSet {
         this.exportedKeys     = toArray(specification.getExports());
         this.primaryKeyClass  = primaryKeys.length < 2 ? Object.class : Object[].class;
         this.hasGeometry      = specification.getPrimaryGeometryColumn().isPresent();
-        this.attributes       = Collections.unmodifiableList(
-                specification.getColumns().stream()
-                        .map(column -> column.naming)
-                        .collect(Collectors.toList())
-        );
+        this.attributes       = specification.getColumns();
     }
 
     @Override
@@ -296,8 +290,8 @@ final class Table extends AbstractFeatureSet {
     @Debug
     final void appendTo(TreeTable.Node parent) {
         parent = Relation.newChild(parent, featureType.getName().toString());
-        for (final ColumnRef attribute : attributes) {
-            TableReference.newChild(parent, attribute.getAttributeName());
+        for (final Column attribute : attributes) {
+            TableReference.newChild(parent, attribute.label);
         }
         appendAll(parent, importedKeys, " → ");
         appendAll(parent, exportedKeys, " ← ");

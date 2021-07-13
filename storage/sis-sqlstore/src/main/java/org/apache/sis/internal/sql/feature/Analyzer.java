@@ -16,22 +16,32 @@
  */
 package org.apache.sis.internal.sql.feature;
 
+import java.util.Set;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.function.Supplier;
+import javax.sql.DataSource;
+import java.sql.SQLException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import javax.sql.DataSource;
-
-import org.opengis.util.GenericName;
 import org.opengis.util.NameFactory;
 import org.opengis.util.NameSpace;
-
+import org.opengis.util.GenericName;
 import org.apache.sis.feature.builder.AssociationRoleBuilder;
 import org.apache.sis.feature.builder.AttributeRole;
 import org.apache.sis.feature.builder.AttributeTypeBuilder;
@@ -41,16 +51,15 @@ import org.apache.sis.internal.metadata.sql.Reflection;
 import org.apache.sis.internal.metadata.sql.SQLUtilities;
 import org.apache.sis.internal.sql.feature.FeatureAdapter.PropertyMapper;
 import org.apache.sis.internal.system.DefaultFactories;
-import org.apache.sis.storage.DataStoreContentException;
+import org.apache.sis.storage.sql.SQLStore;
 import org.apache.sis.storage.DataStoreException;
+import org.apache.sis.storage.DataStoreContentException;
 import org.apache.sis.storage.InternalDataStoreException;
 import org.apache.sis.storage.event.StoreListeners;
-import org.apache.sis.storage.sql.SQLStore;
-import org.apache.sis.util.collection.BackingStoreException;
-import org.apache.sis.util.iso.Names;
 import org.apache.sis.util.resources.ResourceInternationalString;
-
-import static org.apache.sis.util.ArgumentChecks.ensureNonNull;
+import org.apache.sis.util.collection.BackingStoreException;
+import org.apache.sis.util.ArgumentChecks;
+import org.apache.sis.util.iso.Names;
 
 
 /**
@@ -61,7 +70,7 @@ import static org.apache.sis.util.ArgumentChecks.ensureNonNull;
  * @author  Johann Sorel (Geomatys)
  * @author  Martin Desruisseaux (Geomatys)
  * @author  Alexis Manin (Geomatys)
- * @version 1.0
+ * @version 1.1
  * @since   1.0
  * @module
  */
@@ -72,11 +81,6 @@ final class Analyzer {
      * because {@code SQLStore} will frequently opens and closes connections.
      */
     final DataSource source;
-
-    /**
-     * A connection used all along this component life to query database.
-     */
-    final Connection connection;
 
     /**
      * Information about the database as a whole.
@@ -147,30 +151,30 @@ final class Analyzer {
      * The namespace created with {@link #catalog} and {@link #schema}.
      */
     private transient NameSpace namespace;
-    public static final Supplier<GenericName> RANDOME_NAME = () -> Names.createGenericName("sis", ":", UUID.randomUUID().toString());
+
+    private static final Supplier<GenericName> RANDOM_NAME = () -> Names.createGenericName("sis", ":", UUID.randomUUID().toString());
 
     /**
      * Creates a new analyzer for the database described by given metadata.
      *
-     * @param  source     the data source, usually given by user at {@code SQLStore} creation time.
-     * @param  databaseConnection   Database entrypoint. It's the caller responsability to handle connection lifecycle,
-     *                              and ensure this object life span is shorter than the connection one.
-     * @param  listeners  Value of {@code SQLStore.listeners}.
-     * @param  locale     Value of {@code SQLStore.getLocale()}.
+     * @param  source      the data source, usually given by user at {@code SQLStore} creation time.
+     * @param  connection  database entrypoint. It's the caller responsability to handle connection lifecycle,
+     *                     and ensure this object life span is shorter than the connection one.
+     * @param  listeners   value of {@code SQLStore.listeners}.
+     * @param  locale      value of {@code SQLStore.getLocale()}.
      */
-    Analyzer(final DataSource source, final Connection databaseConnection, final StoreListeners listeners,
-             final Locale locale) throws SQLException
+    Analyzer(final DataSource source, final Connection connection,
+             final StoreListeners listeners, final Locale locale) throws SQLException
     {
-        ensureNonNull("Database connection provider", source);
-        ensureNonNull("Database connection", databaseConnection);
+        ArgumentChecks.ensureNonNull("source", source);
+        ArgumentChecks.ensureNonNull("connection", connection);
         this.source      = source;
-        this.connection  = databaseConnection;
-        this.metadata    = databaseConnection.getMetaData();
+        this.metadata    = connection.getMetaData();
         this.listeners   = listeners;
         this.locale      = locale;
         this.strings     = new HashMap<>();
         this.escape      = metadata.getSearchStringEscape();
-        this.functions   = new SpatialFunctions(databaseConnection, metadata);
+        this.functions   = new SpatialFunctions(listeners, connection, metadata);
         this.nameFactory = DefaultFactories.forBuildin(NameFactory.class);
         /*
          * The following tables are defined by ISO 19125 / OGC Simple feature access part 2.
@@ -178,7 +182,7 @@ final class Analyzer {
          * the default case specified by the SQL standard.  However some databases use lower
          * cases instead.
          */
-        String crs  = "SPATIAL_REF_SYS";
+        String crs  = CachedStatements.SPATIAL_REF_SYS;
         String geom = "GEOMETRY_COLUMNS";
         if (metadata.storesLowerCaseIdentifiers()) {
             crs  = crs .toLowerCase(Locale.US).intern();
@@ -332,6 +336,8 @@ final class Analyzer {
         return tables.values();
     }
 
+    //////// ---- TODO: REVIEW FROM HERE ----
+
     /**
      * Performs a simple analysis of given table to find its attributes and constraints.
      *
@@ -368,40 +374,36 @@ final class Analyzer {
      */
     public FeatureAdapter buildAdapter(final SQLTypeSpecification spec) throws SQLException {
         final FeatureTypeBuilder builder = new FeatureTypeBuilder(nameFactory, functions.library, locale);
-        builder.setName(spec.getName().orElseGet(RANDOME_NAME));
+        builder.setName(spec.getName().orElseGet(RANDOM_NAME));
         spec.getDefinition().ifPresent(builder::setDefinition);
-        final String geomCol = spec.getPrimaryGeometryColumn().map(ColumnRef::getAttributeName).orElse("");
-        final List pkCols = spec.getPK().map(PrimaryKey::getColumns).orElse(Collections.EMPTY_LIST);
+        final String geomCol = spec.getPrimaryGeometryColumn().map((c) -> c.label).orElse("");
+        final List pkCols = spec.getPK().map(PrimaryKey::getColumns).orElse(Collections.emptyList());
         List<PropertyMapper> attributes = new ArrayList<>();
         // JDBC column indices are 1 based.
         int i = 0;
-        for (SQLColumn col : spec.getColumns()) {
+        for (Column col : spec.getColumns()) {
             i++;
-            final ColumnAdapter<?> colAdapter = functions.toJavaType(col);
-            Class<?> type = colAdapter.getJavaType();
-            final String colName = col.naming.getColumnName();
-            final String attrName = col.naming.getAttributeName();
+            final ValueGetter<?> colAdapter = functions.toJavaType(col);
+            final String colName = col.name;
+            final String attrName = col.label;
 
             final AttributeTypeBuilder<?> attribute = builder
-                    .addAttribute(type)
+                    .addAttribute(colAdapter.valueType)
                     .setName(attrName);
             if (col.isNullable) attribute.setMinimumOccurs(0);
             /* TODO: we should check column type. Precision for numbers or blobs is meaningful, but the convention
              * exposed by SIS does not allow to distinguish such cases.
              */
-            if (col.precision > 0) attribute.setMaximalLength(col.precision);
-
-            colAdapter.getCrs().ifPresent(attribute::setCRS);
+            if (col.precision > 0) {
+                attribute.setMaximalLength(col.precision);
+            }
+            colAdapter.getCRS().ifPresent(attribute::setCRS);
             if (geomCol.equals(attrName)) attribute.addRole(AttributeRole.DEFAULT_GEOMETRY);
-
             if (pkCols.contains(colName)) attribute.addRole(AttributeRole.IDENTIFIER_COMPONENT);
             attributes.add(new PropertyMapper(attrName, i, colAdapter));
         }
-
         addImports(spec, builder);
-
         addExports(spec, builder);
-
         return new FeatureAdapter(builder.build(), attributes);
     }
 
@@ -412,7 +414,6 @@ final class Analyzer {
         } catch (DataStoreContentException e) {
             throw new BackingStoreException(e);
         }
-
         for (final Relation r : exports) {
             try {
                 final GenericName foreignTypeName = r.getName(Analyzer.this);
@@ -458,18 +459,20 @@ final class Analyzer {
         private final String tableEsc;
         private final String schemaEsc;
 
-        private final Optional<PrimaryKey> pk;
+        /**
+         * The primary key (simple or composite), or {@code null} if none.
+         */
+        private final PrimaryKey pk;
 
         private final TableReference importedBy;
 
-        private final List<SQLColumn> columns;
+        private final List<Column> columns;
 
         private TableMetadata(TableReference source, TableReference importedBy) throws SQLException {
             this.id = source;
             this.importedBy = importedBy;
             tableEsc = escape(source.table);
             schemaEsc = escape(source.schema);
-
             try (ResultSet reflect = metadata.getPrimaryKeys(id.catalog, id.schema, id.table)) {
                 final List<String> cols = new ArrayList<>();
                 while (reflect.next()) {
@@ -477,20 +480,11 @@ final class Analyzer {
                 }
                 pk = PrimaryKey.create(cols);
             }
-
             try (ResultSet reflect = metadata.getColumns(source.catalog, schemaEsc, tableEsc, null)) {
-
-                final ArrayList<SQLColumn> tmpList = new ArrayList<>();
+                final ArrayList<Column> tmpList = new ArrayList<>();
                 while (reflect.next()) {
-                    final int type = reflect.getInt(Reflection.DATA_TYPE);
-                    final String typeName = reflect.getString(Reflection.TYPE_NAME);
-                    final boolean isNullable = Boolean.TRUE.equals(SQLUtilities.parseBoolean(reflect.getString(Reflection.IS_NULLABLE)));
-                    final ColumnRef name = new ColumnRef(getUniqueString(reflect, Reflection.COLUMN_NAME));
-                    final int precision = reflect.getInt(Reflection.COLUMN_SIZE);
-                    final SQLColumn col = new SQLColumn(type, typeName, isNullable, name, precision, source);
-                    tmpList.add(col);
+                    tmpList.add(new Column(Analyzer.this, source, reflect));
                 }
-
                 columns = Collections.unmodifiableList(tmpList);
             }
         }
@@ -523,12 +517,12 @@ final class Analyzer {
         }
 
         @Override
-        public Optional<PrimaryKey> getPK() throws SQLException {
-            return pk;
+        public Optional<PrimaryKey> getPK() {
+            return Optional.ofNullable(pk);
         }
 
         @Override
-        public List<SQLColumn> getColumns() {
+        public List<Column> getColumns() {
             return columns;
         }
 
@@ -577,7 +571,7 @@ final class Analyzer {
         }
 
         @Override
-        public Optional<ColumnRef> getPrimaryGeometryColumn() {
+        public Optional<Column> getPrimaryGeometryColumn() {
             return Optional.empty();
             //throw new UnsupportedOperationException("Not supported yet"); // "Alexis Manin (Geomatys)" on 20/09/2019
         }
@@ -591,7 +585,7 @@ final class Analyzer {
         private final String definition;
         private final GenericName name;
 
-        private final List<SQLColumn> columns;
+        private final List<Column> columns;
 
         public QuerySpecification(PreparedStatement source, String definition, GenericName optName) throws SQLException {
             this.source = source;
@@ -599,24 +593,17 @@ final class Analyzer {
             total = meta.getColumnCount();
             this.definition = definition;
             name = optName;
-
-            final ArrayList<SQLColumn> tmpCols = new ArrayList<>(total);
-            for (int i = 1 ; i <= total ; i++) {
+            final ArrayList<Column> tmpCols = new ArrayList<>(total);
+            for (int i=1; i <= total; i++) {
                 final TableReference optTable;
                 final String table = meta.getTableName(i);
                 if (table != null) {
                     optTable = new TableReference(meta.getCatalogName(i), meta.getSchemaName(i), table, null);
-                } else optTable = null;
-                tmpCols.add(new SQLColumn(
-                        meta.getColumnType(i),
-                        meta.getColumnTypeName(i),
-                        meta.isNullable(i) == ResultSetMetaData.columnNullable,
-                        new ColumnRef(meta.getColumnName(i)).as(meta.getColumnLabel(i)),
-                        meta.getPrecision(i),
-                        optTable
-                ));
+                } else {
+                    optTable = null;
+                }
+                tmpCols.add(new Column(optTable, meta, i));
             }
-
             columns = Collections.unmodifiableList(tmpCols);
         }
 
@@ -631,12 +618,12 @@ final class Analyzer {
         }
 
         @Override
-        public Optional<PrimaryKey> getPK() throws SQLException {
+        public Optional<PrimaryKey> getPK() {
             return Optional.empty();
         }
 
         @Override
-        public List<SQLColumn> getColumns() {
+        public List<Column> getColumns() {
             return columns;
         }
 

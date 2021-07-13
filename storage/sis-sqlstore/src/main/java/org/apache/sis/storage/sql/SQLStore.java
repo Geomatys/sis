@@ -16,30 +16,28 @@
  */
 package org.apache.sis.storage.sql;
 
-import java.lang.reflect.Method;
+import java.util.Optional;
+import java.util.Collection;
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Optional;
-import javax.sql.DataSource;
-
-import org.opengis.metadata.Metadata;
-import org.opengis.metadata.spatial.SpatialRepresentationType;
-import org.opengis.parameter.ParameterValueGroup;
+import java.lang.reflect.Method;
 import org.opengis.util.GenericName;
-
-import org.apache.sis.internal.sql.feature.Database;
-import org.apache.sis.internal.sql.feature.Resources;
-import org.apache.sis.internal.storage.MetadataBuilder;
+import org.opengis.metadata.Metadata;
+import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.metadata.spatial.SpatialRepresentationType;
+import org.apache.sis.storage.Resource;
 import org.apache.sis.storage.Aggregate;
 import org.apache.sis.storage.DataStore;
 import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.IllegalNameException;
-import org.apache.sis.storage.Resource;
 import org.apache.sis.storage.StorageConnector;
 import org.apache.sis.storage.event.StoreEvent;
 import org.apache.sis.storage.event.StoreListener;
 import org.apache.sis.storage.event.WarningEvent;
+import org.apache.sis.internal.sql.feature.Database;
+import org.apache.sis.internal.sql.feature.Resources;
+import org.apache.sis.internal.storage.MetadataBuilder;
 import org.apache.sis.internal.util.Strings;
 import org.apache.sis.util.ArgumentChecks;
 import org.apache.sis.util.Exceptions;
@@ -53,7 +51,7 @@ import org.apache.sis.util.Exceptions;
  *
  * @author  Johann Sorel (Geomatys)
  * @author  Martin Desruisseaux (Geomatys)
- * @version 1.0
+ * @version 1.1
  * @since   1.0
  * @module
  */

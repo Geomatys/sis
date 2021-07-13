@@ -16,21 +16,20 @@
  */
 package org.apache.sis.internal.sql.feature;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
-
+import org.apache.sis.internal.system.Modules;
 import org.apache.sis.internal.metadata.sql.Dialect;
 import org.apache.sis.internal.metadata.sql.Reflection;
-import org.apache.sis.internal.system.Modules;
+import org.apache.sis.internal.feature.Geometries;
 import org.apache.sis.setup.GeometryLibrary;
+import org.apache.sis.storage.event.StoreListeners;
 import org.apache.sis.util.logging.Logging;
 
 
@@ -48,24 +47,17 @@ import org.apache.sis.util.logging.Logging;
  */
 class SpatialFunctions {
     /**
-     * Whether {@link Types#TINYINT} is an unsigned integer. Both conventions (-128 … 127 range and
-     * 0 … 255 range) are found on the web. If unspecified, we conservatively assume unsigned bytes.
-     * All other integer types are presumed signed.
-     */
-    private final boolean isByteUnsigned;
-
-    /**
      * The library to use for creating geometric objects, or {@code null} for the default.
      */
     final GeometryLibrary library;
 
-    private final ANSIMapping defaultMapping;
-    private final Optional<DialectMapping> specificMapping;
+    private final Session<?> defaultMapping;
+    private final Session<?> specificMapping;
 
     /**
      * Creates a new accessor to geospatial functions for the database described by given metadata.
      */
-    SpatialFunctions(final Connection c, final DatabaseMetaData metadata) throws SQLException {
+    SpatialFunctions(final StoreListeners listeners, final Connection c, final DatabaseMetaData metadata) throws SQLException {
         /*
          * Get information about whether byte are unsigned.
          * According JDBC specification, the rows shall be ordered by DATA_TYPE.
@@ -80,7 +72,6 @@ class SpatialFunctions {
                 }
             }
         }
-        isByteUnsigned = unsigned;
         /*
          * The library to use depends on the database implementation.
          * For now use the default library.
@@ -88,14 +79,12 @@ class SpatialFunctions {
         library = null;
 
         final Dialect dialect = Dialect.guess(metadata);
-        specificMapping = forDialect(dialect, library, c);
-        defaultMapping = new ANSIMapping(isByteUnsigned);
+        specificMapping = forDialect(dialect, library, listeners, c);
+        defaultMapping = new Session(Geometries.implementation(library), !unsigned, listeners);
     }
 
     /**
      * Maps a given SQL type to a Java class.
-     * This method shall not return primitive types; their wrappers shall be used instead.
-     * It may return array of primitive types however.
      * If no match is found, then this method returns {@code null}.
      *
      * <p>The default implementation handles the types declared in {@link Types} class.
@@ -104,10 +93,12 @@ class SpatialFunctions {
      * @param  columnDefinition Definition of source database column, including its SQL type and type name.
      * @return corresponding java type, or {@code null} if unknown.
      */
-    @SuppressWarnings("fallthrough")
-    protected ColumnAdapter<?> toJavaType(final SQLColumn columnDefinition) {
-        return specificMapping.flatMap(dialect -> dialect.getMapping(columnDefinition))
-                .orElseGet(() -> defaultMapping.getMappingImpl(columnDefinition));
+    protected ValueGetter<?> toJavaType(final Column columnDefinition) {
+        if (specificMapping != null) {
+            ValueGetter<?> g = specificMapping.getMapping(columnDefinition);
+            if (g != null) return null;
+        }
+        return defaultMapping.getMapping(columnDefinition);
     }
 
     /**
@@ -132,19 +123,25 @@ class SpatialFunctions {
      * @return
      * @throws SQLException
      */
-    static Optional<DialectMapping> forDialect(final Dialect dialect, final GeometryLibrary geomDriver, Connection c) throws SQLException {
+    private static Session forDialect(final Dialect dialect, final GeometryLibrary geomlib, final StoreListeners listeners, Connection c) throws SQLException {
         switch (dialect) {
-            case POSTGRESQL: return new PostGISMapping.Spi().create(geomDriver, c);
+            case POSTGRESQL: return new PostGISMapping.Spi().create(geomlib, listeners, c);
             default: {
                 try {
-                    return new OGC06104r4.Spi().create(geomDriver, c);
+                    return new OGC06104r4.Spi().create(geomlib, listeners, c);
                 } catch (SQLException e) {
+                    /*
+                     * TODO: the exception is:
+                     * Caused by: ERROR 42X05: Table/View 'GEOMETRY_COLUMNS' does not exist.
+                     * at org.apache.sis.internal.sql.feature.GeometryIdentification.<init>(GeometryIdentification.java:77)
+                     * The intent is to handle the case where the database is not a spatial database.
+                     */
                     final Logger logger = Logging.getLogger(Modules.SQL);
                     logger.warning("No supported geometric binding. For more information, activate debug logs.");
                     logger.log(Level.FINE, "Error while creating default Geometric binding over SQL", e);
                 }
+                return null;
             }
         }
-        return Optional.empty();
     }
 }

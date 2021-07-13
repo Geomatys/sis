@@ -16,25 +16,25 @@
  */
 package org.apache.sis.internal.sql.feature;
 
-import java.lang.reflect.Array;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.Statement;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.lang.reflect.Array;
 import org.opengis.util.GenericName;
 import org.apache.sis.internal.metadata.sql.SQLBuilder;
 import org.apache.sis.storage.DataStoreException;
@@ -157,7 +157,7 @@ final class Features implements Spliterator<Feature> {
      *
      * @param table             the table for which we are creating an iterator.
      * @param connection        connection to the database.
-     * @param columns           Names of columns to read, along with an eventual alias. The alias (or name if no alias
+     * @param columns           Names of columns to read, along with a label. The label (or name if no label
      *                          is provided) must match a property name in output feature type.
      * @param following         the relations that we are following. Used for avoiding never ending loop.
      * @param noFollow          relation to not follow, or {@code null} if none.
@@ -167,7 +167,7 @@ final class Features implements Spliterator<Feature> {
      * @param limit             Maximum number of rows to return. Corresponds to a LIMIT statement in underlying SQL
      *                          query. A negative or 0 value means no limit will be set.
      */
-    Features(final Table table, final Connection connection, final Collection<ColumnRef> columns,
+    Features(final Table table, final Connection connection, final Collection<Column> columns,
              final List<Relation> following, final Relation noFollow,
              boolean distinct, final long offset, final long limit, CharSequence where)
              throws SQLException, InternalDataStoreException
@@ -176,12 +176,12 @@ final class Features implements Spliterator<Feature> {
         String[] attributeColumns = new String[columns.size()];
         attributeNames = new String[attributeColumns.length];
         int i = 0;
-        for (ColumnRef column : columns) {
-            attributeColumns[i] = column.getColumnName();
-            attributeNames[i++] = column.getAttributeName();
+        for (Column column : columns) {
+            attributeColumns[i] = column.name;
+            attributeNames[i++] = column.label;
         }
         this.featureType = table.featureType;
-        this.adapter = table.adapter.prepare(connection);
+        this.adapter = table.adapter.prepare();
         final DatabaseMetaData metadata = connection.getMetaData();
         estimatedSize = following.isEmpty() ? table.countRows(metadata, true) : 0;
         /*
@@ -389,7 +389,9 @@ final class Features implements Spliterator<Feature> {
     public boolean tryAdvance(final Consumer<? super Feature> action) {
         try {
             return fetch(action, false);
-        } catch (SQLException e) {
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
             throw new BackingStoreException(e);
         }
     }
@@ -401,7 +403,9 @@ final class Features implements Spliterator<Feature> {
     public void forEachRemaining(final Consumer<? super Feature> action) {
         try {
             fetch(action, true);
-        } catch (SQLException e) {
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
             throw new BackingStoreException(e);
         }
     }
@@ -414,7 +418,7 @@ final class Features implements Spliterator<Feature> {
      * @param  all     {@code true} for reading all remaining feature instances, or {@code false} for only the next one.
      * @return {@code true} if we have read an instance and {@code all} is {@code false} (so there is maybe other instances).
      */
-    private boolean fetch(final Consumer<? super Feature> action, final boolean all) throws SQLException {
+    private boolean fetch(final Consumer<? super Feature> action, final boolean all) throws Exception {
         while (result.next()) {
             final Feature feature = adapter.read(result);
             for (int i=0; i < dependencies.length; i++) {
@@ -471,7 +475,7 @@ final class Features implements Spliterator<Feature> {
      * @param  owner  if the features to fetch are components of another feature, that container feature instance.
      * @return the feature as a singleton {@code Feature} or as a {@code Collection<Feature>}.
      */
-    private Object fetchReferenced(final Object key, final Feature owner) throws SQLException {
+    private Object fetchReferenced(final Object key, final Feature owner) throws Exception {
         if (key != null) {
             Object existing = instances.get(key);
             if (existing != null) {
@@ -538,7 +542,7 @@ final class Features implements Spliterator<Feature> {
         long limit, offset;
         SortProperty[] sort;
 
-        ColumnRef[] columns;
+        Column[] columns;
 
         boolean distinct;
 
@@ -559,7 +563,7 @@ final class Features implements Spliterator<Feature> {
             return this;
         }
 
-        Builder setColumns(final ColumnRef... columns) {
+        Builder setColumns(final Column... columns) {
             // TODO: empty array is not the same than null array.
             if (columns == null || columns.length < 1) this.columns = null;
             else this.columns = Arrays.copyOf(columns, columns.length);
@@ -585,22 +589,22 @@ final class Features implements Spliterator<Feature> {
         }
 
         @Override
-        public Connector select(ColumnRef... columns) {
+        public FeatureSource select(Column... columns) {
             return new TableConnector(this, columns == null || columns.length < 1 ? this.columns : columns);
         }
     }
 
-    static final class TableConnector implements Connector {
+    static final class TableConnector extends FeatureSource {
         final Builder source;
 
         final boolean distinct;
-        final ColumnRef[] columns;
+        final Column[] columns;
 
         final SortProperty[] sort;
 
         final CharSequence where;
 
-        TableConnector(Builder source, ColumnRef[] columns) {
+        TableConnector(Builder source, Column[] columns) {
             this.source = source;
             this.distinct = source.distinct;
             this.columns = columns;
@@ -608,7 +612,8 @@ final class Features implements Spliterator<Feature> {
             this.where = source.whereClause;
         }
 
-        public Stream<Feature> connect(final Connection conn) throws SQLException, DataStoreException {
+        @Override
+        public Stream<Feature> stream(final Connection conn) throws SQLException, DataStoreException {
             final Features features = new Features(
                     source.parent, conn,
                     columns == null || columns.length < 1 ? source.parent.attributes : Arrays.asList(columns),
@@ -622,14 +627,16 @@ final class Features implements Spliterator<Feature> {
          * @param count True if a count query must be generated. False for a simple selection.
          * @return A text representing (roughly) the SQL query which will be posted.
          */
-        public String estimateStatement(final boolean count) {
+        @Override
+        public String overviewStatement(final boolean count) {
             final SQLBuilder sql = source.parent.createStatement().append("SELECT ");
             if (count) sql.append("COUNT(");
             if (distinct) sql.append("DISTINCT ");
-            // If we want a count and no distinct clause is specified, we can query it for a single column.
-            if (count && !distinct) source.parent.attributes.get(0).append(sql);
-            else {
-                final Iterator<ColumnRef> it = source.parent.attributes.iterator();
+            if (count && !distinct) {
+                // If we want a count and no distinct clause is specified, we can query it for a single column.
+                source.parent.attributes.get(0).append(sql);
+            } else {
+                final Iterator<Column> it = source.parent.attributes.iterator();
                 it.next().append(sql);
                 while (it.hasNext()) {
                     it.next().append(sql.append(", "));

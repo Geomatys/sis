@@ -56,13 +56,15 @@ import org.opengis.filter.LikeOperator;
  * Writes SQL statement for a filter or an expression.
  * This base class is restricted to ANSI compliant SQL.
  *
- * @implNote For now, we over-use parenthesis to ensure consistent operator priority. In the future, we could evolve
- * this component to provide more elegant transcription of filter groups.
+ * <h2>Implementation notes</h2>
+ * For now, we over-use parenthesis to ensure consistent operator priority.
+ * In the future, we could evolve this component to provide more elegant transcription of filter groups.
  *
  * No case insensitive support of binary comparison is done.
  *
- * TODO: define a set of accepter property names (even better: link to {@link FeatureAdapter}), so any {@link ValueReference}
- * filter refering to non pure SQL property (like relations) will cause a failure.
+ * <h2>Future work (TODO)</h2>
+ * Define a set of accepter property names (even better: link to {@link FeatureAdapter}),
+ * so any {@link ValueReference} filter referring to non pure SQL property (like relations) will cause a failure.
  *
  * @author  Alexis Manin (Geomatys)
  * @version 1.1

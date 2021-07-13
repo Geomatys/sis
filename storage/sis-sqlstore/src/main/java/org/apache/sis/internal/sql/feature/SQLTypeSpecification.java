@@ -16,17 +16,16 @@
  */
 package org.apache.sis.internal.sql.feature;
 
+import java.util.List;
+import java.util.Optional;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.List;
-import java.util.Optional;
-
 import org.opengis.util.GenericName;
-
 import org.apache.sis.feature.builder.FeatureTypeBuilder;
 import org.apache.sis.internal.feature.AttributeConvention;
 import org.apache.sis.storage.DataStoreContentException;
+
 
 /**
  * Defines an application schema inferred from an SQL database (query, table, etc.). Implementations will be used by
@@ -34,9 +33,9 @@ import org.apache.sis.storage.DataStoreContentException;
  * can be retrieved for tables and queries respectively through {@link Analyzer#create(TableReference, TableReference)}
  * and {@link Analyzer#create(PreparedStatement, String, GenericName)} methods.
  *
- * @author Alexis Manin (Geomatys)
- * @version 2.0
- * @since   2.0
+ * @author  Alexis Manin (Geomatys)
+ * @version 1.1
+ * @since   1.1
  * @module
  */
 interface SQLTypeSpecification {
@@ -76,7 +75,7 @@ interface SQLTypeSpecification {
      * @return Ordered list of columns in application schema. Order is important, and will be relied upon to retrieve
      *  {@link ResultSet#getObject(int) result values by index}.
      */
-    List<SQLColumn> getColumns();
+    List<Column> getColumns();
 
     /**
      *
@@ -104,5 +103,7 @@ interface SQLTypeSpecification {
      * @return The name of the column/attribute to be considered as main geometry information, or an empty shell if
      * unknown.
      */
-    default Optional<ColumnRef> getPrimaryGeometryColumn() {return Optional.empty();}
+    default Optional<Column> getPrimaryGeometryColumn() {
+        return Optional.empty();
+    }
 }

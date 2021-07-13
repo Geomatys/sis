@@ -157,7 +157,7 @@ final class SubsetAdapter {
         /**
          * Specify a subset of columns to return to the driver.
          *
-         * @param columns The columns to fetch in result set. Neither null nor empty list accepted.
+         * @param columns  the columns to fetch in result set. Neither null nor empty list accepted.
          * @return True if underlying driver can entirely manage column selection. False otherwise, meaning that column
          * selection won't be done, or only partially, and a fallback filter must be applied over driver feature set to
          * ensure proper selection.

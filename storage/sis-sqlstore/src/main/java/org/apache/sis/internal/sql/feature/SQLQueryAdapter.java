@@ -38,7 +38,7 @@ import org.opengis.filter.SortProperty;
  */
 abstract class SQLQueryAdapter implements SubsetAdapter.AdapterBuilder {
 
-    private ColumnRef[] columns;
+    private Column[] columns;
     private SortProperty[] sorting;
 
     private CharSequence where;
@@ -103,7 +103,8 @@ abstract class SQLQueryAdapter implements SubsetAdapter.AdapterBuilder {
 
     @Override
     public boolean select(List<FeatureQuery.NamedExpression> columns) {
-        /* We've got a lot of trouble with current column API. It defines an expression and an alias, which allow to
+        /*
+         * We've got a lot of trouble with current column API. It defines an expression and a label, which allow to
          * infer output property type. However, it's very difficult with current methods to infer source columns used
          * for building output. Note that we could check if column expression is a property name or a literal, but if
          * any column is not one of those two, it means it uses unknown (for us) SQL columns, so we cannot filter
@@ -118,7 +119,7 @@ abstract class SQLQueryAdapter implements SubsetAdapter.AdapterBuilder {
         return Optional.of(create(where, sorting, columns));
     }
 
-    protected abstract FeatureSet create(final CharSequence where, final SortProperty[] sorting, final ColumnRef[] columns);
+    protected abstract FeatureSet create(final CharSequence where, final SortProperty[] sorting, final Column[] columns);
 
     private boolean isNoOp() {
         return (sorting == null || sorting.length < 1)
@@ -134,7 +135,7 @@ abstract class SQLQueryAdapter implements SubsetAdapter.AdapterBuilder {
         }
 
         @Override
-        protected FeatureSet create(CharSequence where, SortProperty[] sorting, ColumnRef[] columns) {
+        protected FeatureSet create(CharSequence where, SortProperty[] sorting, Column[] columns) {
             // TODO: column information is lost for now. What should be done is factorize/sanitize feature set
             // implementations from this package to better handle SQL filtering.
             return new TableSubset(parent, sorting, where);
@@ -143,7 +144,7 @@ abstract class SQLQueryAdapter implements SubsetAdapter.AdapterBuilder {
 
     /**
      * Give back a filter/expression interpreter for a given database dialect.
-     * TODO: unify with {@link DialectMapping}.
+     * TODO: unify with {@link Session}.
      *
      * @param dialect Database dialect that must be produced by the interpreter. If null, {@link Dialect#ANSI} is used
      *                as a fallback.

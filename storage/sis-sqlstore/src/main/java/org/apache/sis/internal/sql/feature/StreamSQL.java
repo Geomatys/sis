@@ -145,7 +145,7 @@ final class StreamSQL extends StreamWrapper<Feature> {
         return this;
     }
 
-    private Connector select() {
+    private FeatureSource select() {
         queryAdapter.offset(offset);
         queryAdapter.limit(limit);
         return queryAdapter.select();
@@ -154,10 +154,8 @@ final class StreamSQL extends StreamWrapper<Feature> {
     @Override
     public long count() {
         // Avoid opening a connection if sql text cannot be evaluated.
-        final String sql;
-        try {
-            sql = select().estimateStatement(true);
-        } catch (UnsupportedOperationException e) {
+        final String sql = select().overviewStatement(true);
+        if (sql == null) {
             // If underlying connector does not support query estimation, we will fallback on brut-force counting.
             return super.count();
         }
@@ -181,7 +179,7 @@ final class StreamSQL extends StreamWrapper<Feature> {
                 .peek(connectionRef::set)
                 .flatMap(conn -> {
                     try {
-                        return select().connect(conn);
+                        return select().stream(conn);
                     } catch (SQLException | DataStoreException e) {
                         throw new BackingStoreException(e);
                     }
@@ -403,6 +401,6 @@ final class StreamSQL extends StreamWrapper<Feature> {
 
         QueryBuilder distinct(boolean activate);
 
-        Connector select(ColumnRef... columns);
+        FeatureSource select(Column... columns);
     }
 }

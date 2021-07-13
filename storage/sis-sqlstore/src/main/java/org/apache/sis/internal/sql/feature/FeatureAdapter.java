@@ -16,13 +16,11 @@
  */
 package org.apache.sis.internal.sql.feature;
 
-import java.sql.Connection;
+import java.util.List;
+import java.util.ArrayList;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.apache.sis.internal.util.UnmodifiableArrayList;
 import org.apache.sis.util.ArgumentChecks;
 
 // Branch-dependent imports
@@ -31,21 +29,23 @@ import org.opengis.feature.FeatureType;
 
 
 /**
- * Convert data from a specific query into Feature entities. This object can be prepared once for a specific statement,
- * and reused each time it is executed.
+ * Convert data from a specific query into {@link Feature} entities.
+ * This object can be prepared once for a specific statement, and reused each time it is executed.
  *
- * @implNote For now, only attributes (values) are converted. Associations are delegated to the specific table reading
- * case, through {@link Features} class.
+ * <h2>Implementation notes</h2>
+ * For now, only attributes (values) are converted.
+ * Associations are delegated to the specific table reading case, through {@link Features} class.
  *
- * This object has an initialization phase, to prepare it for a specific ResultSet, through {@link #prepare(Connection)}
- * method. It allows mappers to fetch specific information from the database when needed.
+ * This object has an initialization phase for preparing it for a specific {@link ResultSet},
+ * through {@link #prepare()} method.
+ * It allows mappers to fetch specific information from the database when needed.
  *
  * @author  Alexis Manin (Geomatys)
  * @version 1.1
  * @since   1.1
  * @module
  */
-class FeatureAdapter {
+final class FeatureAdapter {
 
     final FeatureType type;
 
@@ -57,24 +57,20 @@ class FeatureAdapter {
      * @param type              the data type to produce as output. Can not be null.
      * @param attributeMappers  attribute mappers to use to decode SQL values. Mandatory but can be empty.
      */
-    FeatureAdapter(FeatureType type, List<PropertyMapper> attributeMappers) {
+    FeatureAdapter(final FeatureType type, final List<PropertyMapper> attributeMappers) {
         ArgumentChecks.ensureNonNull("type", type);
-        ArgumentChecks.ensureNonNull("attributeMappers", attributeMappers);
         this.type = type;
-        this.attributeMappers = Collections.unmodifiableList(new ArrayList<>(attributeMappers));
+        this.attributeMappers = UnmodifiableArrayList.wrap(attributeMappers.toArray(new PropertyMapper[attributeMappers.size()]));
     }
 
     /**
      * Get a worker for a specific connection. Note that any number of result sets can be parsed with this, as long as
      * the connection is open.
-     * @param target Connection usable by the mapper all along its lifecycle.
+     *
      * @return A mapper ready-to-read SQL result set.
      */
-    ResultSetAdapter prepare(final Connection target) {
-        final List<ReadyMapper> rtu = attributeMappers.stream()
-                .map(mapper -> mapper.prepare(target))
-                .collect(Collectors.toList());
-        return new ResultSetAdapter(rtu);
+    ResultSetAdapter prepare() {
+        return new ResultSetAdapter(attributeMappers);
     }
 
     /**
@@ -82,9 +78,9 @@ class FeatureAdapter {
      * party data.
      */
     final class ResultSetAdapter {
-        final List<ReadyMapper> mappers;
+        private final List<PropertyMapper> mappers;
 
-        ResultSetAdapter(List<ReadyMapper> mappers) {
+        ResultSetAdapter(final List<PropertyMapper> mappers) {
             this.mappers = mappers;
         }
 
@@ -97,16 +93,13 @@ class FeatureAdapter {
          * @return A feature holding values of the current row of input result set. Never null.
          * @throws SQLException If an error occurs while querying a column value.
          */
-        Feature read(final ResultSet cursor) throws SQLException {
-            final Feature result = readAttributes(cursor);
+        Feature read(final ResultSet cursor) throws Exception {
+            final Feature result = type.newInstance();
+            for (final PropertyMapper mapper : mappers) {
+                mapper.read(cursor, result);
+            }
             addImports(result, cursor);
             addExports(result);
-            return result;
-        }
-
-        private Feature readAttributes(final ResultSet cursor) throws SQLException {
-            final Feature result = type.newInstance();
-            for (ReadyMapper mapper : mappers) mapper.read(cursor, result);
             return result;
         }
 
@@ -123,7 +116,7 @@ class FeatureAdapter {
          * but never more.
          * @throws SQLException If extracting values from input result set fails.
          */
-        List<Feature> prefetch(final int size, final ResultSet cursor) throws SQLException {
+        List<Feature> prefetch(final int size, final ResultSet cursor) throws Exception {
             // TODO: optimize by resolving import associations by  batch import fetching.
             final ArrayList<Feature> features = new ArrayList<>(size);
             for (int i = 0 ; i < size && cursor.next() ; i++) {
@@ -148,31 +141,17 @@ class FeatureAdapter {
         // nature, and an indexed implementation could (to verify, still) be bad on memory footprint.
         final String propertyName;
         final int columnIndex;
-        final ColumnAdapter fetchValue;
+        final ValueGetter<?> fetchValue;
 
-        PropertyMapper(String propertyName, int columnIndex, ColumnAdapter fetchValue) {
+        PropertyMapper(String propertyName, int columnIndex, ValueGetter<?> fetchValue) {
             this.propertyName = propertyName;
             this.columnIndex = columnIndex;
             this.fetchValue = fetchValue;
         }
 
-        ReadyMapper prepare(final Connection target) {
-            return new ReadyMapper(this, fetchValue.prepare(target));
-        }
-    }
-
-    private static class ReadyMapper {
-        final SQLBiFunction<ResultSet, Integer, ?> reader;
-        final PropertyMapper parent;
-
-        public ReadyMapper(PropertyMapper parent, SQLBiFunction<ResultSet, Integer, ?> reader) {
-            this.reader = reader;
-            this.parent = parent;
-        }
-
-        private void read(ResultSet cursor, Feature target) throws SQLException {
-            final Object value = reader.apply(cursor, parent.columnIndex);
-            if (value != null) target.setPropertyValue(parent.propertyName, value);
+        final void read(final ResultSet cursor, final Feature target) throws Exception {
+            final Object value = fetchValue.getValue(cursor, columnIndex);
+            if (value != null) target.setPropertyValue(propertyName, value);
         }
     }
 }
