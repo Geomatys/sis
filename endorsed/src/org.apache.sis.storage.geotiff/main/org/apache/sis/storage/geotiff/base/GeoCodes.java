@@ -61,9 +61,14 @@ public final class GeoCodes {
      *   correspond to the FGDC metadata Geographic and
      *   Planar-Projected coordinate system types.
      */
-    /** Projection Coordinate System         */ public static final short ModelTypeProjected  = 1;
-    /** Geographic latitude-longitude System */ public static final short ModelTypeGeographic = 2;
-    /** Geocentric (X,Y,Z) Coordinate System */ public static final short ModelTypeGeocentric = 3;
+    /** Projection Coordinate System.         */ public static final short ModelTypeProjected     =   1;
+    /** Geographic latitude-longitude System. */ public static final short ModelTypeGeographic    =   2;
+    /** Geocentric (X,Y,Z) Coordinate System. */ public static final short ModelTypeGeocentric    =   3;
+    /** Geocentric spherical CS (3D).         */ public static final short ModelTypeSpherical     =   4;
+    /** Geocentric spherical without radius.  */ public static final short ModelTypeSpherical2D   =   5;
+    /** Engineering datum with Cartesian CS.  */ public static final short EngineeringCartesian   = 103;
+    /** Engineering datum with spherical CS.  */ public static final short EngineeringSpherical   = 104;
+    /** Engineering datum with spherical CS.  */ public static final short EngineeringSpherical2D = 105;
 
     /*
      * 6.3.1.2 Raster Type Codes
@@ -93,7 +98,7 @@ public final class GeoCodes {
      * <p>This field should be part of {@link GeoKeys}, but is declared here because we
      * need to avoid public constants that are not GeoKey names in {@code GeoKeys}.</p>
      */
-    public static final int NUM_GEOKEYS = 46;
+    public static final int NUM_GEOKEYS = 62;
 
     /**
      * Number of GeoTIFF key associated to values of type {@code double}.

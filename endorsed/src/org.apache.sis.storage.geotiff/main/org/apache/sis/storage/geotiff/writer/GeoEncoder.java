@@ -34,14 +34,17 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.GeodeticCRS;
 import org.opengis.referencing.crs.ProjectedCRS;
 import org.opengis.referencing.crs.VerticalCRS;
+import org.opengis.referencing.crs.EngineeringCRS;
 import org.opengis.referencing.cs.AxisDirection;
 import org.opengis.referencing.cs.CoordinateSystem;
 import org.opengis.referencing.cs.CartesianCS;
+import org.opengis.referencing.cs.SphericalCS;
 import org.opengis.referencing.cs.EllipsoidalCS;
 import org.opengis.referencing.datum.Ellipsoid;
 import org.opengis.referencing.datum.PrimeMeridian;
 import org.opengis.referencing.datum.GeodeticDatum;
 import org.opengis.referencing.datum.VerticalDatum;
+import org.opengis.referencing.datum.EngineeringDatum;
 import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.Conversion;
 import org.opengis.referencing.operation.Matrix;
@@ -59,6 +62,7 @@ import org.apache.sis.referencing.operation.matrix.Matrices;
 import org.apache.sis.referencing.operation.transform.MathTransforms;
 import org.apache.sis.referencing.factory.UnavailableFactoryException;
 import org.apache.sis.referencing.util.ReferencingUtilities;
+import org.apache.sis.referencing.util.AxisDirections;
 import org.apache.sis.referencing.util.WKTKeywords;
 import org.apache.sis.coverage.grid.GridGeometry;
 import org.apache.sis.coverage.grid.IncompleteGridGeometryException;
@@ -96,6 +100,21 @@ public final class GeoEncoder {
      * This is the value to store in {@link GeoKeys#Citation}.
      */
     private String citation;
+
+    /**
+     * The model type. Shall be one of the following constants:
+     * {@link GeoCodes#ModelTypeGeocentric},
+     * {@link GeoCodes#ModelTypeSpherical},
+     * {@link GeoCodes#ModelTypeSpherical2D},
+     * {@link GeoCodes#ModelTypeGeographic},
+     * {@link GeoCodes#ModelTypeProjected},
+     * {@link GeoCodes#EngineeringCartesian},
+     * {@link GeoCodes#EngineeringSpherical}.
+     * {@link GeoCodes#EngineeringSpherical2D},
+     *
+     * @see #writeModelType(short)
+     */
+    private short modelType;
 
     /**
      * The coordinate reference system of the grid geometry, or {@code null} if none.
@@ -233,11 +252,20 @@ public final class GeoEncoder {
         }
         if (grid.isDefined(GridGeometry.CRS)) {
             fullCRS = grid.getCoordinateReferenceSystem();
-            final CoordinateReferenceSystem crs = CRS.getHorizontalComponent(fullCRS);
+            CoordinateReferenceSystem crs = CRS.getHorizontalComponent(fullCRS);
+            if (crs == null) crs = fullCRS;
             if ((crs instanceof ProjectedCRS && writeCRS((ProjectedCRS) crs)) ||
                 (crs instanceof GeodeticCRS  && writeCRS((GeodeticCRS) crs, false)))
             {
+                /*
+                 * Successfully wrote an horizontal CRS (projected of geographic).
+                 * Add the vertical component if any.
+                 */
                 writeCRS(CRS.getVerticalComponent(fullCRS, true));
+            } else if (crs instanceof EngineeringCRS && writeCRS((EngineeringCRS) crs)) {
+                /*
+                 * Successfully wrote an engineering CRS. Nothing more to do.
+                 */
             } else {
                 unsupportedType(fullCRS);
                 writeModelType(GeoCodes.userDefined);
@@ -254,12 +282,58 @@ public final class GeoEncoder {
      * @param  type  value of {@link GeoKeys#ModelType}.
      */
     private void writeModelType(final short type) {
+        assert modelType == 0 : modelType;
+        modelType = type;
         writeShort(GeoKeys.ModelType, type);
         writeShort(GeoKeys.RasterType, isPoint ? GeoCodes.RasterPixelIsPoint : GeoCodes.RasterPixelIsArea);
         if (citation != null) {
             writeString(GeoKeys.Citation, citation);
             citation = null;
         }
+    }
+
+    /**
+     * Writes an engineering CRS.
+     *
+     * @param  crs  the CRS to write, or {@code null} if none.
+     * @return whether this method has been able to write the CRS.
+     * @throws FactoryException if an error occurred while fetching an EPSG code.
+     */
+    private boolean writeCRS(final EngineeringCRS crs) throws FactoryException {
+        final short type;
+        final UnitKey unit;
+        final CoordinateSystem cs = crs.getCoordinateSystem();
+        if (cs instanceof CartesianCS) {
+            type = GeoCodes.EngineeringCartesian;
+            unit = UnitKey.ENGINEERING_LINEAR;
+        } else if (cs instanceof SphericalCS) {
+            unit = UnitKey.ENGINEERING_ANGULAR;
+            switch (cs.getDimension()) {
+                case 2:  type = GeoCodes.EngineeringSpherical2D; break;
+                case 3:  type = GeoCodes.EngineeringSpherical;   break;
+                default: return false;
+            }
+        } else {
+            return false;
+        }
+        writeModelType(type);
+        if (writeEPSG(GeoKeys.Engineering, crs)) {
+            writeName(GeoKeys.EngineeringCitation, "ECS Name", crs);
+            addUnits(unit, crs.getCoordinateSystem());          // Actually process both angular and linear.
+            final EngineeringDatum datum = crs.getDatum();
+            if (writeEPSG(GeoKeys.EngineeringDatum, datum)) {
+                /*
+                 * We have the same issue as for VerticalCRS below: how to encode the datum name?
+                 * This is necessary for making possible to connect the CRS to an operation chain.
+                 * However this hack is not satisfying because the name of the CRS is associated
+                 * to "GCS Name" key. TODO: need resolution of GeoTIFF issue #59.
+                 */
+                appendName(WKTKeywords.Datum, datum);
+            }
+            writeUnit(UnitKey.ENGINEERING_LINEAR);
+            writeUnit(UnitKey.ENGINEERING_ANGULAR);
+        }
+        return true;
     }
 
     /**
@@ -697,11 +771,48 @@ public final class GeoEncoder {
          */
         if (fullCRS != null) {
             final AxisDirection[] source = CoordinateSystems.getAxisDirections(fullCRS.getCoordinateSystem());
-            final AxisDirection[] target = new AxisDirection[hasVerticalAxis ? 3 : 2];
-            target[0] = AxisDirection.EAST;
-            target[1] = AxisDirection.NORTH;
-            if (hasVerticalAxis) {
-                target[2] = AxisDirection.UP;
+            final AxisDirection[] target;
+            switch (modelType) {
+                case GeoCodes.ModelTypeGeocentric: {
+                    target = new AxisDirection[] {
+                        AxisDirection.GEOCENTRIC_X,
+                        AxisDirection.GEOCENTRIC_Y,
+                        AxisDirection.GEOCENTRIC_Z
+                    };
+                    break;
+                }
+                case GeoCodes.EngineeringCartesian: {
+                    target = new AxisDirection[] {
+                        AxisDirections.FORWARD,
+                        AxisDirections.PORT,
+                        AxisDirection.UP
+                    };
+                    break;
+                }
+                case GeoCodes.EngineeringSpherical: {
+                    target = new AxisDirection[] {
+                        AxisDirections.CLOCKWISE,
+                        AxisDirection.UP,
+                        AxisDirections.AWAY_FROM
+                    };
+                    break;
+                }
+                case GeoCodes.EngineeringSpherical2D: {
+                    target = new AxisDirection[] {
+                        AxisDirections.CLOCKWISE,
+                        AxisDirection.UP
+                    };
+                    break;
+                }
+                default: {
+                    target = new AxisDirection[hasVerticalAxis ? 3 : 2];
+                    target[0] = AxisDirection.EAST;
+                    target[1] = AxisDirection.NORTH;
+                    if (hasVerticalAxis) {
+                        target[2] = AxisDirection.UP;
+                    }
+                    break;
+                }
             }
             gridToCRS = Matrices.createTransform(source, target).multiply(gridToCRS);
             fullCRS   = null;       // For avoiding to do the multiplication again.

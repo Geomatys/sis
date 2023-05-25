@@ -70,6 +70,11 @@ public final class GeoKeys {
     /** A ratio.               */ public static final short InvFlattening          = 2059;    // Was `GeogInvFlattening`
     /** For some parameters.   */ public static final short GeogAzimuthUnits       = 2060;
     /** In GeogAngularUnits.   */ public static final short PrimeMeridianLongitude = 2061;    // Was `GeogPrimeMeridianLong`
+    /** GDAL-specific.         */ public static final short GeogToWGS84            = 2062;    // TODO: not yet read.
+    /** TestBed 19 proposal.   */ public static final short GeodeticTextDef        = 2063;
+    /** TestBed 19 proposal.   */ public static final short GeodeticDatumTextDef   = 2064;
+    /** TestBed 19 proposal.   */ public static final short EllipsoidTextDef       = 2065;
+    /** TestBed 19 proposal.   */ public static final short PrimeMeridianTextDef   = 2066;
 
     // Projected CRS Parameter Keys, omitting "Proj" prefix in map projection parameters
     /** EPSG code.             */ public static final short ProjectedCRS           = 3072;    // Was `ProjectedCSType`
@@ -98,12 +103,25 @@ public final class GeoKeys {
     /** In GeogAngularUnits.   */ public static final short StraightVertPoleLong   = 3095;
     /** In GeogAzimuthUnits.   */ public static final short RectifiedGridAngle     = 3096;
     /** For unit inference.    */ static final short LAST_MAP_PROJECTION_PARAMETER = RectifiedGridAngle;
+    /** TestBed 19 proposal.   */ public static final short ProjectedCrsTextDef    = 4000;
+    /** TestBed 19 proposal.   */ public static final short ProjectionTextDef      = 4001;
 
     // Vertical CRS Keys
     /** EPSG code.             */ public static final short Vertical               = 4096;    // Was `VerticalCSType`
     /** Documentation.         */ public static final short VerticalCitation       = 4097;
     /** For user-defined CRS.  */ public static final short VerticalDatum          = 4098;
     /** For vertical axis.     */ public static final short VerticalUnits          = 4099;
+    /** TestBed 19 proposal.   */ public static final short VerticalTextDef        = 4100;
+    /** TestBed 19 proposal.   */ public static final short VerticalDatumTextDef   = 4101;
+
+    // Engineering CS Keys
+    /** TestBed 19 proposal.   */ public static final short Engineering            = 6144;
+    /** TestBed 19 proposal.   */ public static final short EngineeringCitation    = 6145;
+    /** TestBed 19 proposal.   */ public static final short EngineeringDatum       = 6146;
+    /** TestBed 19 proposal.   */ public static final short EngLinearUnits         = 6147;
+    /** TestBed 19 proposal.   */ public static final short EngLinearUnitSize      = 6148;
+    /** TestBed 19 proposal.   */ public static final short EngAngularUnits        = 6149;
+    /** TestBed 19 proposal.   */ public static final short EngAngularUnitSize     = 6150;
 
     /**
      * Returns the name of the given key. Implementation of this method is inefficient,

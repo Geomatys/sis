@@ -47,13 +47,20 @@ import org.opengis.referencing.crs.GeographicCRS;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.ProjectedCRS;
 import org.opengis.referencing.crs.VerticalCRS;
+import org.opengis.referencing.crs.EngineeringCRS;
+import org.opengis.referencing.cs.CSFactory;
 import org.opengis.referencing.cs.CartesianCS;
+import org.opengis.referencing.cs.SphericalCS;
 import org.opengis.referencing.cs.EllipsoidalCS;
 import org.opengis.referencing.cs.VerticalCS;
+import org.opengis.referencing.cs.AxisDirection;
+import org.opengis.referencing.cs.CoordinateSystem;
+import org.opengis.referencing.cs.CoordinateSystemAxis;
 import org.opengis.referencing.datum.Ellipsoid;
 import org.opengis.referencing.datum.GeodeticDatum;
 import org.opengis.referencing.datum.PrimeMeridian;
 import org.opengis.referencing.datum.VerticalDatum;
+import org.opengis.referencing.datum.EngineeringDatum;
 import org.opengis.referencing.operation.Conversion;
 import org.opengis.referencing.operation.CoordinateOperation;
 import org.opengis.referencing.operation.OperationMethod;
@@ -61,10 +68,12 @@ import org.opengis.util.FactoryException;
 import org.apache.sis.parameter.Parameters;
 import org.apache.sis.referencing.CommonCRS;
 import org.apache.sis.referencing.IdentifiedObjects;
+import org.apache.sis.referencing.cs.AxisFilter;
 import org.apache.sis.referencing.cs.AxesConvention;
 import org.apache.sis.referencing.cs.CoordinateSystems;
 import org.apache.sis.referencing.crs.DefaultProjectedCRS;
 import org.apache.sis.referencing.crs.DefaultGeographicCRS;
+import org.apache.sis.referencing.util.AxisDirections;
 import org.apache.sis.referencing.util.WKTKeywords;
 import org.apache.sis.referencing.util.NilReferencingObject;
 import org.apache.sis.referencing.util.ReferencingUtilities;
@@ -543,13 +552,18 @@ public final class CRSBuilder extends ReferencingFactoryContainer {
         CoordinateReferenceSystem crs = null;
         final int crsType = getAsInteger(GeoKeys.ModelType);
         switch (crsType) {
-            case GeoCodes.undefined:           break;
-            case GeoCodes.ModelTypeProjected:  crs = createProjectedCRS();  break;
-            case GeoCodes.ModelTypeGeocentric: crs = createGeocentricCRS(); break;
-            case GeoCodes.ModelTypeGeographic: crs = createGeographicCRS(); break;
+            case GeoCodes.undefined:              break;
+            case GeoCodes.ModelTypeProjected:     crs = createProjectedCRS();              break;
+            case GeoCodes.ModelTypeGeocentric:    crs = createGeocentricCRS(false, false); break;
+            case GeoCodes.ModelTypeSpherical:     crs = createGeocentricCRS (true,  false); break;
+            case GeoCodes.ModelTypeSpherical2D:   crs = createGeocentricCRS (true,  true);  break;
+            case GeoCodes.ModelTypeGeographic:    crs = createGeographicCRS ();             break;
+            case GeoCodes.EngineeringCartesian:   crs = createEngineeringCRS(false, false); break;
+            case GeoCodes.EngineeringSpherical:   crs = createEngineeringCRS(true,  false); break;
+            case GeoCodes.EngineeringSpherical2D: crs = createEngineeringCRS(true,  true);  break;
             default: warning(Resources.Keys.UnsupportedCoordinateSystemKind_1, crsType); break;
         }
-        if (crsType != GeoCodes.ModelTypeGeocentric) {
+        if (ReferencingUtilities.getDimension(crs) < 3) {
             final VerticalCRS vertical = createVerticalCRS();
             if (vertical != null) {
                 if (crs == null) {
@@ -640,6 +654,28 @@ public final class CRSBuilder extends ReferencingFactoryContainer {
      */
     private Unit<Length> createLinearUnit(final UnitKey key) throws FactoryException {
         return createUnit(key, Length.class, Units.METRE);
+    }
+
+    /**
+     * Returns a coordinate system (CS) with the same axis directions than the given CS but potentially different units.
+     * This method is invoked for coordinate systems that are less common than the Cartesian or spherical ones,
+     * for example the coordinate system associated to engineering CRS. This method does not search in EPSG database.
+     * Instead, this method returns a CS with an arbitrary name.
+     *
+     * <h4>Dimensionality reduction</h4>
+     * If {@code is2D} is {@code true}, then this method assumes that the axes to keep are those
+     * that are associated to non-linear units of measurement (typically longitude and latitude).
+     */
+    private CoordinateSystem replaceUnits(final CoordinateSystem cs, final Unit<Length> linearUnit, final Unit<Angle> angularUnit, final boolean is2D) {
+        return CoordinateSystems.replaceAxes(cs, new AxisFilter() {
+            @Override public boolean accept(CoordinateSystemAxis axis) {
+                return !(is2D && Units.isLinear(axis.getUnit()));
+            }
+            @Override public Unit<?> getUnitReplacement(CoordinateSystemAxis axis, Unit<?> unit) {
+                return Units.isAngular(unit) ? angularUnit :
+                       Units.isLinear (unit) ? linearUnit : unit;
+            }
+        });
     }
 
     /**
@@ -1114,6 +1150,8 @@ public final class CRSBuilder extends ReferencingFactoryContainer {
      * Creates a geocentric CRS from user-defined parameters.
      * The GeoTIFF values used by this method are the same as the ones used by {@code createGeographicCRS(…)}.
      *
+     * @param  spherical  whether to use a spherical coordinate system instead of a Cartesian one.
+     * @param  is2D       whether the spherical CS should be without radius.
      * @throws NoSuchElementException if a mandatory value is missing.
      * @throws NumberFormatException if a numeric value was stored as a string and cannot be parsed.
      * @throws ClassCastException if an object defined by an EPSG code is not of the expected type.
@@ -1121,7 +1159,7 @@ public final class CRSBuilder extends ReferencingFactoryContainer {
      *
      * @see #createGeodeticDatum(String[], Unit, Unit)
      */
-    private GeocentricCRS createGeocentricCRS() throws FactoryException {
+    private GeocentricCRS createGeocentricCRS(final boolean spherical, final boolean is2D) throws FactoryException {
         final int epsg = getAsInteger(GeoKeys.GeodeticCRS);
         switch (epsg) {
             case GeoCodes.undefined: {
@@ -1137,11 +1175,19 @@ public final class CRSBuilder extends ReferencingFactoryContainer {
                 final Unit<Length> linearUnit = createLinearUnit(UnitKey.LINEAR);
                 final Unit<Angle> angularUnit = createAngularUnit(UnitKey.ANGULAR);
                 final GeodeticDatum datum = createGeodeticDatum(names, angularUnit, linearUnit);
-                CartesianCS cs = (CartesianCS) CommonCRS.WGS84.geocentric().getCoordinateSystem();
-                if (!Units.METRE.equals(linearUnit)) {
-                    cs = replaceLinearUnit(cs, linearUnit);
+                final Map<String,?> properties = properties(getOrDefault(names, GCRS));
+                final GeocentricCRS crs;
+                if (spherical) {
+                    CoordinateSystem cs = CommonCRS.WGS84.spherical().getCoordinateSystem();
+                    cs = replaceUnits(cs, linearUnit, angularUnit, is2D);
+                    crs = getCRSFactory().createGeocentricCRS(properties, datum, (SphericalCS) cs);
+                } else {
+                    CartesianCS cs = (CartesianCS) CommonCRS.WGS84.geocentric().getCoordinateSystem();
+                    if (!Units.METRE.equals(linearUnit)) {
+                        cs = replaceLinearUnit(cs, linearUnit);
+                    }
+                    crs = getCRSFactory().createGeocentricCRS(properties, datum, cs);
                 }
-                final GeocentricCRS crs = getCRSFactory().createGeocentricCRS(properties(getOrDefault(names, GCRS)), datum, cs);
                 lastName = crs.getName();
                 return crs;
             }
@@ -1585,6 +1631,96 @@ public final class CRSBuilder extends ReferencingFactoryContainer {
                 return getCRSAuthorityFactory().createVerticalCRS(String.valueOf(epsg));
             }
         }
+    }
+
+
+
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////                                                                                  ////////
+    ////////                                 Engineering CRS                                  ////////
+    ////////                                                                                  ////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Creates an engineering datum.
+     */
+    private EngineeringDatum createEngineeringDatum(final String[] names) throws FactoryException {
+        final int epsg = getAsInteger(GeoKeys.EngineeringDatum);
+        switch (epsg) {
+            case GeoCodes.undefined:
+                alreadyReported = true;
+                throw new NoSuchElementException(missingValue(GeoKeys.EngineeringDatum));
+            case GeoCodes.userDefined: {
+                return getDatumFactory().createEngineeringDatum(properties(getOrDefault(names, DATUM)));
+            }
+            default: {
+                return getDatumAuthorityFactory().createEngineeringDatum(String.valueOf(epsg));
+            }
+        }
+    }
+
+    /**
+     * Creates an optional engineering CRS, or returns {@code null} if no engineering CRS definition is found.
+     * Some GeoTIFF values used by this method are:
+     *
+     * <ul>
+     *   <li>A code given by {@link GeoKeys#EngineeringCSType}.</li>
+     *   <li>If above code is {@link GeoCodes#userDefined}, then:<ul>
+     *     <li>a name given by {@link GeoKeys#EngineeringCitation},</li>
+     *     <li>a {@link EngineeringDatum} given by {@link GeoKeys#EngineeringDatum}.</li>
+     *   </ul></li>
+     *   <li>A unit code given by {@link GeoKeys#EngineeringLinearUnits} (optional).</li>
+     *   <li>A unit code given by {@link GeoKeys#EngineeringAngularUnits} (optional).</li>
+     * </ul>
+     *
+     * @param  spherical  whether to use a spherical coordinate system instead of a Cartesian one.
+     * @param  is2D       whether the spherical CS should be without radius.
+     * @throws NoSuchElementException if a mandatory value is missing.
+     * @throws NumberFormatException if a numeric value was stored as a string and cannot be parsed.
+     * @throws FactoryException if an error occurred during objects creation with the factories.
+     */
+    private EngineeringCRS createEngineeringCRS(final boolean spherical, final boolean is2D) throws FactoryException {
+        final int epsg = getAsInteger(GeoKeys.Engineering);
+        switch (epsg) {
+            case GeoCodes.undefined: {
+                return null;
+            }
+            case GeoCodes.userDefined: {
+                final String[] names = splitName(getAsString(GeoKeys.EngineeringCitation));
+                final Unit<Length> linearUnit = createLinearUnit (UnitKey.ENGINEERING_LINEAR);
+                final Unit<Angle> angularUnit = createAngularUnit(UnitKey.ENGINEERING_ANGULAR);
+                final EngineeringDatum  datum = createEngineeringDatum(names);
+                final CSFactory f = getCSFactory();
+                final CoordinateSystem cs;
+                if (spherical) {
+                    var b = f.createCoordinateSystemAxis(name("Relative bearing"), "θ", AxisDirections.CLOCKWISE, angularUnit);
+                    var a = f.createCoordinateSystemAxis(name("Altitude"), "α", AxisDirection.UP, angularUnit);
+                    if (is2D) {
+                        cs = f.createSphericalCS(name("Spherical (clockwise, up)"), b, a);
+                    } else {
+                        var d = f.createCoordinateSystemAxis(name("Distance"), "D", AxisDirections.AWAY_FROM, linearUnit);
+                        cs = f.createSphericalCS(name("Spherical (clockwise, up, away-from)"), b, a, d);
+                    }
+                } else {
+                    var x = f.createCoordinateSystemAxis(name("Ahead"), "x", AxisDirections.FORWARD, linearUnit);
+                    var y = f.createCoordinateSystemAxis(name("Right"), "y", AxisDirections.PORT, linearUnit);
+                    var z = f.createCoordinateSystemAxis(name("Up"),    "z", AxisDirection.UP, linearUnit);
+                    cs = f.createCartesianCS(name("Cartesian (forward, port, up)"), x, y, z);
+                }
+                return getCRSFactory().createEngineeringCRS(properties(getOrDefault(names, GCRS)), datum, cs);
+            }
+            default: {
+                return getCRSAuthorityFactory().createEngineeringCRS(String.valueOf(epsg));
+            }
+        }
+    }
+
+    /**
+     * Convenience method for the properties map to pass to coordinate system factory methods.
+     */
+    private static Map<String,String> name(final String s) {
+        return Map.of(CoordinateSystem.NAME_KEY, s);
     }
 
     /**

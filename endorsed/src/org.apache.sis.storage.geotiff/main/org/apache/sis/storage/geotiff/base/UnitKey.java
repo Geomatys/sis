@@ -69,6 +69,18 @@ public enum UnitKey {
     VERTICAL(GeoKeys.VerticalUnits, (short) 0, true, true, false, false),
 
     /**
+     * Linear unit in engineering CRS.
+     *
+     * @see #PROJECTED
+     */
+    ENGINEERING_LINEAR(GeoKeys.EngLinearUnits, GeoKeys.EngLinearUnitSize, true, true, false, false),
+
+    /**
+     * Angular unit in engineering CRS.
+     */
+    ENGINEERING_ANGULAR(GeoKeys.EngAngularUnits, GeoKeys.EngAngularUnitSize, true, false, true, false),
+
+    /**
      * Unit of measurement of ratios. There is no GeoTIFF keys associated to this unit.
      */
     RATIO((short) 0, (short) 0, false, false, false, true),
@@ -168,8 +180,10 @@ public enum UnitKey {
             return this;
         }
         switch (this) {
-            case LINEAR:  if (Units.isAngular(unit)) return ANGULAR; else break;
-            case ANGULAR: if (Units.isLinear (unit)) return LINEAR;  else break;
+            case LINEAR:              if (Units.isAngular(unit)) return ANGULAR;             else break;
+            case ANGULAR:             if (Units.isLinear (unit)) return LINEAR;              else break;
+            case ENGINEERING_LINEAR:  if (Units.isAngular(unit)) return ENGINEERING_ANGULAR; else break;
+            case ENGINEERING_ANGULAR: if (Units.isLinear (unit)) return ENGINEERING_LINEAR;  else break;
         }
         return null;
     }
