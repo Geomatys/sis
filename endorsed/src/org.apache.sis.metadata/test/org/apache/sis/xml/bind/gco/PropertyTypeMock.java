@@ -19,7 +19,7 @@ package org.apache.sis.xml.bind.gco;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.opengis.metadata.Identifier;
-import org.opengis.metadata.quality.Result;
+import org.opengis.metadata.quality.QualityResult;
 import org.apache.sis.xml.IdentifiedObject;
 import org.apache.sis.xml.IdentifierMap;
 import org.apache.sis.xml.bind.ModifiableIdentifierMap;
@@ -27,13 +27,13 @@ import org.apache.sis.xml.bind.ModifiableIdentifierMap;
 
 /**
  * A dummy {@link PropertyType} implementation, as a wrapper for instances of the
- * GeoAPI {@link Result} interface.
+ * GeoAPI {@link QualityResult} interface.
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version 0.3
  * @since   0.3
  */
-final class PropertyTypeMock extends PropertyType<PropertyTypeMock, Result> {
+final class PropertyTypeMock extends PropertyType<PropertyTypeMock, QualityResult> {
     /**
      * Creates a new adapter. Only the {@link #marshal(Object)}
      * method shall be invoked on that new instance.
@@ -45,7 +45,7 @@ final class PropertyTypeMock extends PropertyType<PropertyTypeMock, Result> {
      * Creates a new wrapper around the given metadata.
      * This constructor is for the {@link #wrap} method only.
      */
-    private PropertyTypeMock(final Result metadata) {
+    private PropertyTypeMock(final QualityResult metadata) {
         super(metadata);
     }
 
@@ -58,7 +58,7 @@ final class PropertyTypeMock extends PropertyType<PropertyTypeMock, Result> {
      * @return a {@code PropertyType} wrapping the given the metadata element.
      */
     @Override
-    protected PropertyTypeMock wrap(final Result metadata) {
+    protected PropertyTypeMock wrap(final QualityResult metadata) {
         return new PropertyTypeMock(metadata);
     }
 
@@ -66,14 +66,14 @@ final class PropertyTypeMock extends PropertyType<PropertyTypeMock, Result> {
      * The metadata interface implemented by the objects wrapped by {@code PropertyTypeMock}.
      */
     @Override
-    protected Class<Result> getBoundType() {
-        return Result.class;
+    protected Class<QualityResult> getBoundType() {
+        return QualityResult.class;
     }
 
     /**
-     * A dummy implementation of the {@link Result} interface, to be used together with {@link PropertyTypeMock}.
+     * A dummy implementation of the {@link QualityResult} interface, to be used together with {@link PropertyTypeMock}.
      */
-    static final class Value implements IdentifiedObject, Result {
+    static final class Value implements IdentifiedObject, QualityResult {
         /** All identifiers associated with this metadata. */
         private final Collection<Identifier> identifiers;
 

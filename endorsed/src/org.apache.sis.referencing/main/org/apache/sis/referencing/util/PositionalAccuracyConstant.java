@@ -22,12 +22,13 @@ import java.io.ObjectStreamException;
 import jakarta.xml.bind.annotation.XmlTransient;
 import javax.measure.Unit;
 import javax.measure.quantity.Length;
-import org.opengis.util.Record;
+
+import org.opengis.metadata.quality.QualityResult;
 import org.opengis.util.InternationalString;
+import org.opengis.util.Record;
 import org.opengis.metadata.quality.PositionalAccuracy;
 import org.opengis.metadata.quality.EvaluationMethodType;
 import org.opengis.metadata.quality.QuantitativeResult;
-import org.opengis.metadata.quality.Result;
 import org.opengis.referencing.operation.ConcatenatedOperation;
 import org.opengis.referencing.operation.Conversion;
 import org.opengis.referencing.operation.CoordinateOperation;
@@ -35,7 +36,7 @@ import org.opengis.referencing.operation.Transformation;
 import org.apache.sis.measure.Units;
 import org.apache.sis.metadata.iso.citation.Citations;
 import org.apache.sis.metadata.iso.quality.DefaultConformanceResult;
-import org.apache.sis.metadata.iso.quality.DefaultAbsoluteExternalPositionalAccuracy;
+import org.apache.sis.metadata.iso.quality.DefaultAbsolutePositionalAccuracy;
 import org.apache.sis.system.Configuration;
 import org.apache.sis.referencing.internal.Resources;
 import org.apache.sis.util.resources.Vocabulary;
@@ -52,7 +53,7 @@ import org.apache.sis.util.resources.Vocabulary;
  * @since 0.5
  */
 @XmlTransient
-public final class PositionalAccuracyConstant extends DefaultAbsoluteExternalPositionalAccuracy {
+public final class PositionalAccuracyConstant extends DefaultAbsolutePositionalAccuracy {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -129,10 +130,11 @@ public final class PositionalAccuracyConstant extends DefaultAbsoluteExternalPos
             final InternationalString evaluationMethodDescription, final boolean pass)
     {
         DefaultConformanceResult result = new DefaultConformanceResult(Citations.SIS, evaluationMethodDescription, pass);
-        setResults(Set.of(result));
-        setMeasureDescription(measureDescription);
-        setEvaluationMethodDescription(evaluationMethodDescription);
-        setEvaluationMethodType(EvaluationMethodType.DIRECT_INTERNAL);
+        setQualityResults(Set.of(result));
+        //todo : needs clarification on relationship between Element and QualityElement
+//        setMeasureDescription(measureDescription);
+//        setEvaluationMethodDescription(evaluationMethodDescription);
+//        setEvaluationMethodType(EvaluationMethodType.DIRECT_INTERNAL);
         transitionTo(State.FINAL);
     }
 
@@ -178,7 +180,7 @@ public final class PositionalAccuracyConstant extends DefaultAbsoluteExternalPos
         double accuracy = Double.NaN;
         final Collection<PositionalAccuracy> accuracies = operation.getCoordinateOperationAccuracy();
         for (final PositionalAccuracy metadata : accuracies) {
-            for (final Result result : metadata.getResults()) {
+            for (final QualityResult result : metadata.getQualityResults()) {
                 if (result instanceof QuantitativeResult) {
                     final QuantitativeResult quantity = (QuantitativeResult) result;
                     final Collection<? extends Record> records = quantity.getValues();

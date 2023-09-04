@@ -43,16 +43,19 @@ import org.opengis.metadata.quality.AbsoluteExternalPositionalAccuracy;
  * @author  Touraïvane (IRD)
  * @version 1.4
  * @since   0.3
+ *
+ * @deprecated Renamed {@link DefaultAbsolutePositionalAccuracy}.
  */
+@Deprecated
 @XmlType(name = "DQ_AbsoluteExternalPositionalAccuracy_Type")
 @XmlRootElement(name = "DQ_AbsoluteExternalPositionalAccuracy")
-public class DefaultAbsoluteExternalPositionalAccuracy extends AbstractPositionalAccuracy
+public class DefaultAbsoluteExternalPositionalAccuracy extends DefaultAbsolutePositionalAccuracy
         implements AbsoluteExternalPositionalAccuracy
 {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = -5520313307277547148L;
+    private static final long serialVersionUID = -5908650624946594481L;
 
     /**
      * Constructs an initially empty absolute external positional accuracy.

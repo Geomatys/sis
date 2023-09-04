@@ -42,14 +42,17 @@ import org.opengis.metadata.quality.CompletenessOmission;
  * @author  Touraïvane (IRD)
  * @version 1.4
  * @since   0.3
+ *
+ * @deprecated Renamed {@link DefaultOmission}.
  */
+@Deprecated
 @XmlType(name = "DQ_CompletenessOmission_Type")
 @XmlRootElement(name = "DQ_CompletenessOmission")
-public class DefaultCompletenessOmission extends AbstractCompleteness implements CompletenessOmission {
+public class DefaultCompletenessOmission extends DefaultOmission implements CompletenessOmission {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 6782225824097039360L;
+    private static final long serialVersionUID = 4302925683782294402L;
 
     /**
      * Constructs an initially empty completeness omission.

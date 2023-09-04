@@ -123,10 +123,10 @@ public class DefaultIndirectEvaluation extends AbstractDataEvaluation implements
     /**
      * Returns the information on which data are used as sources in deductive evaluation method.
      *
-     * @return information on which data are used.
+     * @return information on which data are used, or {@code null} if none.
      */
     @Override
-    @XmlElement(name = "deductiveSource", required = true)
+    @XmlElement(name = "deductiveSource", required = false)
     public InternationalString getDeductiveSource() {
         return deductiveSource;
     }
@@ -134,7 +134,7 @@ public class DefaultIndirectEvaluation extends AbstractDataEvaluation implements
     /**
      * Sets the information on which data are used as sources in deductive evaluation method.
      *
-     * @param  newValue  the new information.
+     * @param  newValue  the new information, or {@code null} if none.
      */
     public void setDeductiveSource(final InternationalString newValue) {
         checkWritePermission(deductiveSource);

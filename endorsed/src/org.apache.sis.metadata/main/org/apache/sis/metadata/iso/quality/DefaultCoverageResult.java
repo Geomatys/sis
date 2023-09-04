@@ -68,11 +68,11 @@ import org.apache.sis.xml.util.LegacyNamespaces;
     "resultFile"
 })
 @XmlRootElement(name = "QE_CoverageResult")     // "DQ_" in abstract model but "QE_" in XML.
-public class DefaultCoverageResult extends AbstractResult implements CoverageResult {
+public class DefaultCoverageResult extends AbstractQualityResult implements CoverageResult {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 5860811052940576277L;
+    private static final long serialVersionUID = 2129713203660562226L;
 
     /**
      * Method used to spatially represent the coverage result.
@@ -108,8 +108,11 @@ public class DefaultCoverageResult extends AbstractResult implements CoverageRes
 
     /**
      * Provides information about the data file containing the result coverage data.
+     *
+     * @deprecated Removed as of ISO 19157:2023.
      */
     @SuppressWarnings("serial")
+    @Deprecated(since="4.0")
     private DataFile resultFile;
 
     /**
@@ -136,6 +139,7 @@ public class DefaultCoverageResult extends AbstractResult implements CoverageRes
             resultContentDescription    = object.getResultContentDescription();
             resultContent               = copyCollection(object.getResultContent(), RangeDimension.class);
             resultFormat                = object.getResultFormat();
+            // this field is deprecated. The following instruction is kept only for retro-compatibility.
             resultFile                  = object.getResultFile();
         }
     }
@@ -286,7 +290,11 @@ public class DefaultCoverageResult extends AbstractResult implements CoverageRes
      * Returns the information about the data file containing the result coverage data.
      *
      * @return data file containing the result coverage data, or {@code null}.
+     *
+     * @deprecated Removed as of ISO 19157:2023.
      */
+    @SuppressWarnings("serial")
+    @Deprecated(since="4.0")
     @Override
     @XmlElement(name = "resultFile", required = true)
     public DataFile getResultFile() {
@@ -297,7 +305,11 @@ public class DefaultCoverageResult extends AbstractResult implements CoverageRes
      * Sets the information about the data file containing the result coverage data.
      *
      * @param  newValue  the new result file value.
+     *
+     * @deprecated Removed as of ISO 19157:2023.
      */
+    @SuppressWarnings("serial")
+    @Deprecated(since="4.0")
     public void setResultFile(final DataFile newValue) {
         checkWritePermission(resultFile);
         resultFile = newValue;

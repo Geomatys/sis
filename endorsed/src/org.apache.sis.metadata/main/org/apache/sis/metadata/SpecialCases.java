@@ -16,7 +16,7 @@
  */
 package org.apache.sis.metadata;
 
-import org.opengis.metadata.quality.Element;
+import org.opengis.metadata.quality.QualityElement;
 import org.opengis.metadata.extent.GeographicBoundingBox;
 import org.apache.sis.measure.Latitude;
 import org.apache.sis.measure.Longitude;
@@ -76,7 +76,7 @@ final class SpecialCases extends PropertyAccessor {
      * @return {@code true} if the given method should be excluded.
      */
     static boolean exclude(final Class<?> type, final String method) {
-        return method.equals("getMeasure") && Element.class.isAssignableFrom(type);
+        return method.equals("getMeasure") && QualityElement.class.isAssignableFrom(type);
     }
 
     /**

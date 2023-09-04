@@ -77,7 +77,14 @@ public class DefaultEvaluationMethod extends ISOMetadata implements EvaluationMe
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 5196994626251088685L;
+    private static final long serialVersionUID = 5649612033329637651L;
+
+    /**
+     * Name of method used to evaluate quality of the data.
+     *
+     * @since 4.0
+     */
+    private InternationalString name;
 
     /**
      * Type of method used to evaluate quality of the data.
@@ -287,6 +294,7 @@ public class DefaultEvaluationMethod extends ISOMetadata implements EvaluationMe
     public DefaultEvaluationMethod(final EvaluationMethod object) {
         super(object);
         if (object != null) {
+            name                        = object.getName();
             evaluationMethodType        = object.getEvaluationMethodType();
             evaluationMethodDescription = object.getEvaluationMethodDescription();
             evaluationProcedure         = object.getEvaluationProcedure();
@@ -329,6 +337,30 @@ public class DefaultEvaluationMethod extends ISOMetadata implements EvaluationMe
             return (DefaultEvaluationMethod) object;
         }
         return new DefaultEvaluationMethod(object);
+    }
+
+    /**
+     * Returns the name of the method used to evaluate quality of the data.
+     *
+     * @return name of the method used to evaluate quality, or {@code null} if none.
+     *
+     * @since 4.0
+     */
+    @Override
+    public InternationalString getName() {
+        return name;
+    }
+
+    /**
+     * Sets the name of the method used to evaluate quality of the data.
+     *
+     * @param  newValue  the new evaluation method name.
+     *
+     * @since 4.0
+     */
+    public void setName(InternationalString newValue) {
+        checkWritePermission(name);
+        name = newValue;
     }
 
     /**

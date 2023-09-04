@@ -18,16 +18,14 @@ package org.apache.sis.feature;
 
 import java.util.Collection;
 import java.util.Collections;
+
+import org.apache.sis.metadata.iso.quality.*;
 import org.opengis.util.GenericName;
 import org.opengis.util.InternationalString;
 import org.opengis.metadata.Identifier;
 import org.opengis.metadata.maintenance.ScopeCode;
 import org.opengis.metadata.quality.DataQuality;
 import org.opengis.metadata.quality.EvaluationMethodType;
-import org.apache.sis.metadata.iso.quality.AbstractElement;
-import org.apache.sis.metadata.iso.quality.DefaultDataQuality;
-import org.apache.sis.metadata.iso.quality.DefaultDomainConsistency;
-import org.apache.sis.metadata.iso.quality.DefaultConformanceResult;
 import org.apache.sis.referencing.NamedIdentifier;
 import org.apache.sis.util.resources.Errors;
 
@@ -89,18 +87,22 @@ final class Validator {
      * @return the {@code report}, or a new report if {@code report} was null.
      */
     @SuppressWarnings("deprecation")
-    private AbstractElement addViolationReport(AbstractElement report,
-            final PropertyType type, final InternationalString explanation)
+    private AbstractQualityElement addViolationReport(AbstractQualityElement report,
+                                                      final PropertyType type, final InternationalString explanation)
     {
         if (report == null) {
             final GenericName name = type.getName();
             report = new DefaultDomainConsistency();
             // Do not invoke report.setMeasureDescription(type.getDescription()) - see above javadoc.
-            report.setMeasureIdentification(name instanceof Identifier ? (Identifier) name : new NamedIdentifier(name));
-            report.setEvaluationMethodType(EvaluationMethodType.DIRECT_INTERNAL);
+            //todo : needs clarification on relationship between Element and QualityElement
+            if (report instanceof AbstractElement) {
+                ((AbstractElement) report).setMeasureIdentification(name instanceof Identifier ? (Identifier) name : new NamedIdentifier(name));
+                ((AbstractElement) report).setEvaluationMethodType(EvaluationMethodType.DIRECT_INTERNAL);
+            }
+
             quality.getReports().add(report);
         }
-        report.getResults().add(new DefaultConformanceResult(null, explanation, false));
+        report.getQualityResults().add(new DefaultConformanceResult(null, explanation, false));
         return report;
     }
 
@@ -163,7 +165,7 @@ final class Validator {
      * Verifies if the given values are valid for the given attribute type.
      */
     void validate(final AttributeType<?> type, final Collection<?> values) {
-        AbstractElement report = null;
+        AbstractQualityElement report = null;
         for (final Object value : values) {
             /*
              * In theory, the following check is unnecessary since the type was constrained by the Attribute.setValue(V)
@@ -186,7 +188,7 @@ final class Validator {
      * Verifies if the given value is valid for the given association role.
      */
     void validate(final FeatureAssociationRole role, final Collection<?> values) {
-        AbstractElement report = null;
+        AbstractQualityElement report = null;
         for (final Object value : values) {
             final FeatureType type = ((Feature) value).getType();
             final FeatureType valueType = role.getValueType();
@@ -206,8 +208,8 @@ final class Validator {
      *
      * @param report  where to add the result, or {@code null} if not yet created.
      */
-    private void verifyCardinality(final AbstractElement report, final PropertyType type,
-            final int minimumOccurs, final int maximumOccurs, final int count)
+    private void verifyCardinality(final AbstractQualityElement report, final PropertyType type,
+                                   final int minimumOccurs, final int maximumOccurs, final int count)
     {
         if (count < minimumOccurs) {
             final InternationalString message;

@@ -22,17 +22,16 @@ import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import org.opengis.metadata.lineage.Lineage;
 import org.opengis.metadata.quality.DataQuality;
-import org.opengis.metadata.quality.Element;
+import org.opengis.metadata.quality.QualityElement;
 import org.opengis.metadata.maintenance.ScopeCode;
 import org.apache.sis.xml.bind.FilterByVersion;
 import org.apache.sis.xml.util.LegacyNamespaces;
 
-// Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.StandaloneQualityReportInformation;
-
 // Specific to the geoapi-4.0 branch:
+import org.opengis.metadata.quality.QualityEvaluationReportInformation;
 import org.opengis.metadata.maintenance.Scope;
 import org.apache.sis.metadata.iso.maintenance.DefaultScope;
+import org.opengis.metadata.quality.StandaloneQualityReportInformation;
 
 
 /**
@@ -70,7 +69,7 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 5036527927404894540L;
+    private static final long serialVersionUID = 5159680463734773335L;
 
     /**
      * The specific data to which the data quality information applies.
@@ -82,7 +81,7 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
      * Quality information for the data specified by the scope.
      */
     @SuppressWarnings("serial")
-    private Collection<Element> reports;
+    private Collection<QualityElement> reports;
 
     /**
      * Non-quantitative quality information about the lineage of the data specified by the scope.
@@ -96,9 +95,19 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
     /**
      * Reference to an external standalone quality report.
      * Can be used for providing more details than reported as standard metadata.
+     *
+     * @deprecated Removed from ISO 19157:2023.
      */
+    @Deprecated(since="4.0")
     @SuppressWarnings("serial")
     private StandaloneQualityReportInformation standaloneQualityReport;
+
+    /**
+     * Reference to an external quality evaluation report.
+     * Can be used for providing more details than reported as standard metadata.
+     */
+    @SuppressWarnings("serial")
+    private QualityEvaluationReportInformation qualityEvaluationReport;
 
     /**
      * Constructs an initially empty data quality.
@@ -143,9 +152,11 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
         super(object);
         if (object != null) {
             scope                   = object.getScope();
-            reports                 = copyCollection(object.getReports(), Element.class);
-            standaloneQualityReport = object.getStandaloneQualityReport();
+            reports                 = copyCollection(object.getReports(), QualityElement.class);
+            qualityEvaluationReport = object.getQualityEvaluationReport();
             lineage                 = object.getLineage();
+            // this field is deprecated. The following instruction is kept only for retro-compatibility.
+            standaloneQualityReport = object.getStandaloneQualityReport();
         }
     }
 
@@ -202,8 +213,8 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
      */
     @Override
     @XmlElement(name = "report", required = true)
-    public Collection<Element> getReports() {
-        return reports = nonNullCollection(reports, Element.class);
+    public Collection<QualityElement> getReports() {
+        return reports = nonNullCollection(reports, QualityElement.class);
     }
 
     /**
@@ -211,8 +222,8 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
      *
      * @param  newValues  the new reports.
      */
-    public void setReports(final Collection<? extends Element> newValues) {
-        reports = writeCollection(newValues, reports, Element.class);
+    public void setReports(final Collection<? extends QualityElement> newValues) {
+        reports = writeCollection(newValues, reports, QualityElement.class);
     }
 
     /**
@@ -221,9 +232,10 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
      *
      * @return reference to an external standalone quality report, or {@code null} if none.
      *
-     * @since 1.3
+     * @deprecated Removed from ISO 19157:2023.
      */
     @Override
+    @Deprecated(since="4.0")
     @XmlElement(name = "standaloneQualityReport")
     public StandaloneQualityReportInformation getStandaloneQualityReport() {
         return standaloneQualityReport;
@@ -234,11 +246,37 @@ public class DefaultDataQuality extends ISOMetadata implements DataQuality {
      *
      * @param  newValue  the new quality information.
      *
-     * @since 1.3
+     * @deprecated Removed from ISO 19157:2023.
      */
+    @Deprecated(since="4.0")
     public void setStandaloneQualityReport(final StandaloneQualityReportInformation newValue) {
         checkWritePermission(standaloneQualityReport);
         standaloneQualityReport = newValue;
+    }
+
+    /**
+     * Returns the reference to a quality evaluation report.
+     * Can be used for providing more details than reported as standard metadata.
+     *
+     * @return reference to a quality evaluation report, or {@code null} if none.
+     *
+     * @since 1.3
+     */
+    @Override
+    public QualityEvaluationReportInformation getQualityEvaluationReport() {
+        return qualityEvaluationReport;
+    }
+
+    /**
+     * Sets the quality of the reported information.
+     *
+     * @param  newValue  the new quality information.
+     *
+     * @since 1.3
+     */
+    public void setQualityEvaluationReport(final QualityEvaluationReportInformation newValue) {
+        checkWritePermission(qualityEvaluationReport);
+        qualityEvaluationReport = newValue;
     }
 
     /**

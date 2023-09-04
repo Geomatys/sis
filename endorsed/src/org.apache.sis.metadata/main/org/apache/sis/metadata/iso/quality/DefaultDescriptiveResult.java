@@ -52,7 +52,7 @@ import org.opengis.metadata.quality.DescriptiveResult;
     "statement"
 })
 @XmlRootElement(name = "DQ_DescriptiveResult")
-public class DefaultDescriptiveResult extends AbstractResult implements DescriptiveResult {
+public class DefaultDescriptiveResult extends AbstractQualityResult implements DescriptiveResult {
     /**
      * Serial number for inter-operability with different versions.
      */

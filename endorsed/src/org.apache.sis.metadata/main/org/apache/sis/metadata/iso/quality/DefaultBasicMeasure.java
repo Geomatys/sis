@@ -24,7 +24,7 @@ import org.opengis.util.InternationalString;
 import org.apache.sis.xml.Namespaces;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.Description;
+import org.opengis.metadata.quality.MeasureDescription;
 import org.opengis.metadata.quality.BasicMeasure;
 
 
@@ -82,7 +82,7 @@ public class DefaultBasicMeasure extends ISOMetadata implements BasicMeasure {
      * Illustration of the use of a data quality measure.
      */
     @SuppressWarnings("serial")
-    private Description example;
+    private MeasureDescription example;
 
     /**
      * Value type for the result of the basic measure.
@@ -189,7 +189,7 @@ public class DefaultBasicMeasure extends ISOMetadata implements BasicMeasure {
      */
     @Override
     @XmlElement(name = "example")
-    public Description getExample() {
+    public MeasureDescription getExample() {
         return example;
     }
 
@@ -198,7 +198,7 @@ public class DefaultBasicMeasure extends ISOMetadata implements BasicMeasure {
      *
      * @param  newValues  the new basic measure example.
      */
-    public void setExample(final Description newValues) {
+    public void setExample(final MeasureDescription newValues) {
         checkWritePermission(example);
         example = newValues;
     }

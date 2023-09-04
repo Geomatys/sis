@@ -47,7 +47,7 @@ public final class DefaultDomainConsistencyTest extends TestCase {
         final DefaultDescriptiveResult r = new DefaultDescriptiveResult("A result");
         final DefaultDomainConsistency c = new DefaultDomainConsistency();
         final Map<String,Object> m = c.asMap();
-        c.setResults(Set.of(r));
+        c.setQualityResults(Set.of(r));
         assertEquals(List.of(r), m.get("result"));
     }
 }

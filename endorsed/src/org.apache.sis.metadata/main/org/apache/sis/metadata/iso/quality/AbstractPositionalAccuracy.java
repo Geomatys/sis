@@ -19,11 +19,7 @@ package org.apache.sis.metadata.iso.quality;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlSeeAlso;
-import org.opengis.metadata.quality.Result;
-import org.opengis.metadata.quality.PositionalAccuracy;
-import org.opengis.metadata.quality.GriddedDataPositionalAccuracy;
-import org.opengis.metadata.quality.AbsoluteExternalPositionalAccuracy;
-import org.opengis.metadata.quality.RelativeInternalPositionalAccuracy;
+import org.opengis.metadata.quality.*;
 
 
 /**
@@ -50,11 +46,11 @@ import org.opengis.metadata.quality.RelativeInternalPositionalAccuracy;
 @XmlType(name = "AbstractDQ_PositionalAccuracy_Type")
 @XmlRootElement(name = "AbstractDQ_PositionalAccuracy")
 @XmlSeeAlso({
-    DefaultAbsoluteExternalPositionalAccuracy.class,
-    DefaultRelativeInternalPositionalAccuracy.class,
+    DefaultAbsolutePositionalAccuracy.class,
+    DefaultRelativePositionalAccuracy.class,
     DefaultGriddedDataPositionalAccuracy.class
 })
-public class AbstractPositionalAccuracy extends AbstractElement implements PositionalAccuracy {
+public class AbstractPositionalAccuracy extends AbstractQualityElement implements PositionalAccuracy {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -72,7 +68,7 @@ public class AbstractPositionalAccuracy extends AbstractElement implements Posit
      * @param result  the value obtained from applying a data quality measure against a specified
      *                acceptable conformance quality level.
      */
-    public AbstractPositionalAccuracy(final Result result) {
+    public AbstractPositionalAccuracy(final QualityResult result) {
         super(result);
     }
 
@@ -95,8 +91,8 @@ public class AbstractPositionalAccuracy extends AbstractElement implements Posit
      *
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
-     *   <li>Otherwise if the given object is an instance of {@link RelativeInternalPositionalAccuracy},
-     *       {@link AbsoluteExternalPositionalAccuracy} or {@link GriddedDataPositionalAccuracy}, then this
+     *   <li>Otherwise if the given object is an instance of {@link RelativePositionalAccuracy},
+     *       {@link AbsolutePositionalAccuracy} or {@link GriddedDataPositionalAccuracy}, then this
      *       method delegates to the {@code castOrCopy(…)} method of the corresponding SIS subclass.
      *       Note that if the given object implements more than one of the above-cited interfaces,
      *       then the {@code castOrCopy(…)} method to be used is unspecified.</li>
@@ -113,11 +109,11 @@ public class AbstractPositionalAccuracy extends AbstractElement implements Posit
      *         given object itself), or {@code null} if the argument was null.
      */
     public static AbstractPositionalAccuracy castOrCopy(final PositionalAccuracy object) {
-        if (object instanceof AbsoluteExternalPositionalAccuracy) {
-            return DefaultAbsoluteExternalPositionalAccuracy.castOrCopy((AbsoluteExternalPositionalAccuracy) object);
+        if (object instanceof AbsolutePositionalAccuracy) {
+            return DefaultAbsolutePositionalAccuracy.castOrCopy((AbsolutePositionalAccuracy) object);
         }
-        if (object instanceof RelativeInternalPositionalAccuracy) {
-            return DefaultRelativeInternalPositionalAccuracy.castOrCopy((RelativeInternalPositionalAccuracy) object);
+        if (object instanceof RelativePositionalAccuracy) {
+            return DefaultRelativePositionalAccuracy.castOrCopy((RelativePositionalAccuracy) object);
         }
         if (object instanceof GriddedDataPositionalAccuracy) {
             return DefaultGriddedDataPositionalAccuracy.castOrCopy((GriddedDataPositionalAccuracy) object);

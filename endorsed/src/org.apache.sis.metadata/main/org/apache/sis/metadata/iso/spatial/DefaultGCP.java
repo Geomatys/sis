@@ -21,7 +21,7 @@ import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlType;
 import org.opengis.geometry.DirectPosition;
-import org.opengis.metadata.quality.Element;
+import org.opengis.metadata.quality.QualityElement;
 import org.opengis.metadata.spatial.GCP;
 import org.apache.sis.metadata.iso.ISOMetadata;
 
@@ -73,7 +73,7 @@ public class DefaultGCP extends ISOMetadata implements GCP {
      * Accuracy of a ground control point.
      */
     @SuppressWarnings("serial")
-    private Collection<Element> accuracyReports;
+    private Collection<QualityElement> accuracyReports;
 
     /**
      * Constructs an initially empty ground control point.
@@ -93,7 +93,7 @@ public class DefaultGCP extends ISOMetadata implements GCP {
     public DefaultGCP(final GCP object) {
         super(object);
         if (object != null) {
-            accuracyReports       = copyCollection(object.getAccuracyReports(), Element.class);
+            accuracyReports       = copyCollection(object.getAccuracyReports(), QualityElement.class);
             geographicCoordinates = object.getGeographicCoordinates();
         }
     }
@@ -153,8 +153,8 @@ public class DefaultGCP extends ISOMetadata implements GCP {
      */
     @Override
     @XmlElement(name = "accuracyReport")
-    public Collection<Element> getAccuracyReports() {
-        return accuracyReports = nonNullCollection(accuracyReports, Element.class);
+    public Collection<QualityElement> getAccuracyReports() {
+        return accuracyReports = nonNullCollection(accuracyReports, QualityElement.class);
     }
 
     /**
@@ -162,7 +162,7 @@ public class DefaultGCP extends ISOMetadata implements GCP {
      *
      * @param  newValues  the new accuracy report values.
      */
-    public void setAccuracyReports(final Collection<? extends Element> newValues) {
-        accuracyReports = writeCollection(newValues, accuracyReports, Element.class);
+    public void setAccuracyReports(final Collection<? extends QualityElement> newValues) {
+        accuracyReports = writeCollection(newValues, accuracyReports, QualityElement.class);
     }
 }

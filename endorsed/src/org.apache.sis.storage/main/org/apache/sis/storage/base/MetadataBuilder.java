@@ -49,7 +49,7 @@ import org.opengis.metadata.extent.*;
 import org.opengis.metadata.identification.*;
 import org.opengis.metadata.lineage.*;
 import org.opengis.metadata.maintenance.*;
-import org.opengis.metadata.quality.Element;
+import org.opengis.metadata.quality.QualityElement;
 import org.opengis.metadata.spatial.*;
 import org.opengis.referencing.ReferenceSystem;
 import org.opengis.referencing.cs.CoordinateSystem;
@@ -2226,7 +2226,7 @@ parse:      for (int i = 0; i < length;) {
      * @param  accuracyReport         the accuracy of a ground control point, or {@code null} if none.
      *                                Ignored if {@code geographicCoordinates} is null.
      */
-    public final void addControlPoints(final DirectPosition geographicCoordinates, final Element accuracyReport) {
+    public final void addControlPoints(final DirectPosition geographicCoordinates, final QualityElement accuracyReport) {
         if (geographicCoordinates != null) {
             final DefaultGridSpatialRepresentation gridRepresentation = gridRepresentation();
             final Collection<GCP> points;

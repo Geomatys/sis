@@ -43,16 +43,19 @@ import org.opengis.metadata.quality.RelativeInternalPositionalAccuracy;
  * @author  Touraïvane (IRD)
  * @version 1.4
  * @since   0.3
+ *
+ * @deprecated Renamed {@link DefaultRelativePositionalAccuracy}.
  */
+@Deprecated
 @XmlType(name = "DQ_RelativeInternalPositionalAccuracy_Type")
 @XmlRootElement(name = "DQ_RelativeInternalPositionalAccuracy")
-public class DefaultRelativeInternalPositionalAccuracy extends AbstractPositionalAccuracy
+public class DefaultRelativeInternalPositionalAccuracy extends DefaultRelativePositionalAccuracy
         implements RelativeInternalPositionalAccuracy
 {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 8385667875833802576L;
+    private static final long serialVersionUID = 7726173533580794824L;
 
     /**
      * Constructs an initially empty relative internal positional accuracy.

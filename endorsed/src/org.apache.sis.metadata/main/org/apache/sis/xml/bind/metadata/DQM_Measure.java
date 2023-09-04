@@ -21,7 +21,7 @@ import org.apache.sis.metadata.iso.quality.DefaultQualityMeasure;
 import org.apache.sis.xml.bind.gco.PropertyType;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.Measure;
+import org.opengis.metadata.quality.QualityMeasure;
 
 
 /**
@@ -32,7 +32,7 @@ import org.opengis.metadata.quality.Measure;
  * @version 1.4
  * @since   1.3
  */
-public final class DQM_Measure extends PropertyType<DQM_Measure, Measure> {
+public final class DQM_Measure extends PropertyType<DQM_Measure, QualityMeasure> {
     /**
      * Empty constructor for JAXB only.
      */
@@ -47,14 +47,14 @@ public final class DQM_Measure extends PropertyType<DQM_Measure, Measure> {
      * @return {@code Measure.class}
      */
     @Override
-    protected Class<Measure> getBoundType() {
-        return Measure.class;
+    protected Class<QualityMeasure> getBoundType() {
+        return QualityMeasure.class;
     }
 
     /**
      * Constructor for the {@link #wrap} method only.
      */
-    private DQM_Measure(final Measure metadata) {
+    private DQM_Measure(final QualityMeasure metadata) {
         super(metadata);
     }
 
@@ -66,7 +66,7 @@ public final class DQM_Measure extends PropertyType<DQM_Measure, Measure> {
      * @return a {@code PropertyType} wrapping the given the metadata element.
      */
     @Override
-    protected DQM_Measure wrap(final Measure metadata) {
+    protected DQM_Measure wrap(final QualityMeasure metadata) {
         return new DQM_Measure(metadata);
     }
 

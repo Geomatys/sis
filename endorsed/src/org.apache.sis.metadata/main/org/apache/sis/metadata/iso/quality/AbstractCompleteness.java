@@ -20,8 +20,8 @@ import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlSeeAlso;
 import org.opengis.metadata.quality.Completeness;
-import org.opengis.metadata.quality.CompletenessOmission;
-import org.opengis.metadata.quality.CompletenessCommission;
+import org.opengis.metadata.quality.Commission;
+import org.opengis.metadata.quality.Omission;
 
 
 /**
@@ -48,10 +48,10 @@ import org.opengis.metadata.quality.CompletenessCommission;
 @XmlType(name = "AbstractDQ_Completeness_Type")
 @XmlRootElement(name = "AbstractDQ_Completeness")
 @XmlSeeAlso({
-    DefaultCompletenessCommission.class,
-    DefaultCompletenessOmission.class
+    DefaultCommission.class,
+    DefaultOmission.class
 })
-public class AbstractCompleteness extends AbstractElement implements Completeness {
+public class AbstractCompleteness extends AbstractQualityElement implements Completeness {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -82,8 +82,8 @@ public class AbstractCompleteness extends AbstractElement implements Completenes
      *
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
-     *   <li>Otherwise if the given object is an instance of {@link CompletenessCommission} or
-     *       {@link CompletenessOmission}, then this method delegates to the {@code castOrCopy(…)}
+     *   <li>Otherwise if the given object is an instance of {@link Commission} or
+     *       {@link Omission}, then this method delegates to the {@code castOrCopy(…)}
      *       method of the corresponding SIS subclass. Note that if the given object implements
      *       more than one of the above-cited interfaces, then the {@code castOrCopy(…)} method
      *       to be used is unspecified.</li>
@@ -100,11 +100,11 @@ public class AbstractCompleteness extends AbstractElement implements Completenes
      *         given object itself), or {@code null} if the argument was null.
      */
     public static AbstractCompleteness castOrCopy(final Completeness object) {
-        if (object instanceof CompletenessCommission) {
-            return DefaultCompletenessCommission.castOrCopy((CompletenessCommission) object);
+        if (object instanceof Commission) {
+            return DefaultCommission.castOrCopy((Commission) object);
         }
-        if (object instanceof CompletenessOmission) {
-            return DefaultCompletenessOmission.castOrCopy((CompletenessOmission) object);
+        if (object instanceof Omission) {
+            return DefaultOmission.castOrCopy((Omission) object);
         }
         // Intentionally tested after the sub-interfaces.
         if (object == null || object instanceof AbstractCompleteness) {

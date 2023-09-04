@@ -57,7 +57,7 @@ import org.apache.sis.util.iso.Types;
     "pass"
 })
 @XmlRootElement(name = "DQ_ConformanceResult")
-public class DefaultConformanceResult extends AbstractResult implements ConformanceResult {
+public class DefaultConformanceResult extends AbstractQualityResult implements ConformanceResult {
     /**
      * Serial number for compatibility with different versions.
      */

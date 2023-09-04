@@ -18,9 +18,11 @@ package org.apache.sis.xml.bind.metadata;
 
 import jakarta.xml.bind.annotation.XmlElementRef;
 import org.apache.sis.metadata.iso.quality.DefaultEvaluationReportInformation;
+import org.apache.sis.metadata.iso.quality.DefaultQualityEvaluationReportInformation;
 import org.apache.sis.xml.bind.gco.PropertyType;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
+import org.opengis.metadata.quality.QualityEvaluationReportInformation;
 import org.opengis.metadata.quality.StandaloneQualityReportInformation;
 
 
@@ -50,7 +52,7 @@ public final class DQ_StandaloneQualityReportInformation extends
      * This method is indirectly invoked by the private constructor
      * below, so it shall not depend on the state of this object.
      *
-     * @return {@code StandaloneQualityReportInformation.class}
+     * @return {@code QualityEvaluationReportInformation.class}
      */
     @Override
     protected Class<StandaloneQualityReportInformation> getBoundType() {

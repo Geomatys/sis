@@ -56,7 +56,7 @@ import org.opengis.metadata.quality.ConceptualConsistency;
     DefaultFormatConsistency.class,
     DefaultTopologicalConsistency.class
 })
-public class AbstractLogicalConsistency extends AbstractElement implements LogicalConsistency {
+public class AbstractLogicalConsistency extends AbstractQualityElement implements LogicalConsistency {
     /**
      * Serial number for inter-operability with different versions.
      */

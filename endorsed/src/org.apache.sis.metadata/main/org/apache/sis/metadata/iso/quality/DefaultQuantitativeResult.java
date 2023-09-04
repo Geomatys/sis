@@ -23,10 +23,11 @@ import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import org.opengis.metadata.quality.QuantitativeResult;
 import org.opengis.util.InternationalString;
-import org.opengis.util.Record;
 import org.opengis.util.RecordType;
+import org.opengis.util.Record;
 import org.apache.sis.xml.bind.FilterByVersion;
 import org.apache.sis.xml.util.LegacyNamespaces;
+import org.opengis.util.TypeName;
 
 
 /**
@@ -61,7 +62,7 @@ import org.apache.sis.xml.util.LegacyNamespaces;
     "errorStatistic"
 })
 @XmlRootElement(name = "DQ_QuantitativeResult")
-public class DefaultQuantitativeResult extends AbstractResult implements QuantitativeResult {
+public class DefaultQuantitativeResult extends AbstractQualityResult implements QuantitativeResult {
     /**
      * Serial number for compatibility with different versions.
      */
@@ -218,13 +219,15 @@ public class DefaultQuantitativeResult extends AbstractResult implements Quantit
     }
 
     /**
-     * Sets the value unit for reporting a data quality result.
+     * Sets the value unit for reporting a data quality result. This parameter should be filled only if the valueType is numeric
      *
      * @param  newValue  the new value unit.
      */
     public void setValueUnit(final Unit<?> newValue) {
-        checkWritePermission(valueUnit);
-        valueUnit = newValue;
+        if (valueType.getTypeName().toJavaType().orElse(null) instanceof Number) {
+            checkWritePermission(valueUnit);
+            valueUnit = newValue;
+        }
     }
 
     /**

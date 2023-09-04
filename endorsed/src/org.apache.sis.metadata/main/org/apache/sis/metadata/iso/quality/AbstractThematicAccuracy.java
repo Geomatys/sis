@@ -55,7 +55,7 @@ import org.opengis.metadata.quality.NonQuantitativeAttributeCorrectness;
     DefaultNonQuantitativeAttributeCorrectness.class,
     DefaultQuantitativeAttributeAccuracy.class
 })
-public class AbstractThematicAccuracy extends AbstractElement implements ThematicAccuracy {
+public class AbstractThematicAccuracy extends AbstractQualityElement implements ThematicAccuracy {
     /**
      * Serial number for inter-operability with different versions.
      */

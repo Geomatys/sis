@@ -23,8 +23,8 @@ import org.opengis.util.GenericName;
 import org.opengis.util.InternationalString;
 import org.opengis.metadata.quality.ConformanceResult;
 import org.opengis.metadata.quality.DataQuality;
-import org.opengis.metadata.quality.Element;
-import org.opengis.metadata.quality.Result;
+import org.opengis.metadata.quality.QualityElement;
+import org.opengis.metadata.quality.QualityResult;
 import org.apache.sis.util.Static;
 import org.apache.sis.util.iso.Names;
 import org.apache.sis.util.iso.DefaultNameFactory;
@@ -338,8 +338,8 @@ public final class Features extends Static {
              * NOTE: other types of result are ignored for now, since those other
              * types may require threshold and other information to be evaluated.
              */
-            for (Element element : quality.getReports()) {
-                for (Result result : element.getResults()) {
+            for (QualityElement element : quality.getReports()) {
+                for (QualityResult result : element.getQualityResults()) {
                     if (result instanceof ConformanceResult) {
                         if (Boolean.FALSE.equals(((ConformanceResult) result).pass())) {
                             final InternationalString message = ((ConformanceResult) result).getExplanation();

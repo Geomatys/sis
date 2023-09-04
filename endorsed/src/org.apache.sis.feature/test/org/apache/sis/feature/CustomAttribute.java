@@ -82,8 +82,9 @@ final class CustomAttribute<V> extends AbstractAttribute<V> {
         final DefaultDomainConsistency  report  = new DefaultDomainConsistency();
         final DefaultQuantitativeResult result  = new DefaultQuantitativeResult();
         result.setErrorStatistic(new SimpleInternationalString(ADDITIONAL_QUALITY_INFO));
-        report.setMeasureIdentification(NamedIdentifier.castOrCopy(getName()));
-        report .setResults(Set.of(result));
+        //todo : needs clarification on relationship between Element and QualityElement, and between Result and QualityResult
+//        report.setMeasureIdentification(NamedIdentifier.castOrCopy(getName()));
+        report.setQualityResults(Set.of(result));
         quality.setReports(Set.of(report));
         return quality;
     }

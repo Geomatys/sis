@@ -17,8 +17,8 @@
 package org.apache.sis.xml.bind.metadata;
 
 import jakarta.xml.bind.annotation.XmlElementRef;
-import org.opengis.metadata.quality.Result;
-import org.apache.sis.metadata.iso.quality.AbstractResult;
+import org.apache.sis.metadata.iso.quality.AbstractQualityResult;
+import org.opengis.metadata.quality.QualityResult;
 import org.apache.sis.xml.bind.gco.PropertyType;
 
 
@@ -31,7 +31,7 @@ import org.apache.sis.xml.bind.gco.PropertyType;
  * @version 1.4
  * @since   0.3
  */
-public final class DQ_Result extends PropertyType<DQ_Result, Result> {
+public final class DQ_Result extends PropertyType<DQ_Result, QualityResult> {
     /**
      * Empty constructor for JAXB only.
      */
@@ -46,14 +46,14 @@ public final class DQ_Result extends PropertyType<DQ_Result, Result> {
      * @return {@code Result.class}
      */
     @Override
-    protected Class<Result> getBoundType() {
-        return Result.class;
+    protected Class<QualityResult> getBoundType() {
+        return QualityResult.class;
     }
 
     /**
      * Constructor for the {@link #wrap} method only.
      */
-    private DQ_Result(final Result value) {
+    private DQ_Result(final QualityResult value) {
         super(value);
     }
 
@@ -65,7 +65,7 @@ public final class DQ_Result extends PropertyType<DQ_Result, Result> {
      * @return a {@code PropertyType} wrapping the given the metadata element.
      */
     @Override
-    protected DQ_Result wrap(final Result value) {
+    protected DQ_Result wrap(final QualityResult value) {
         return new DQ_Result(value);
     }
 
@@ -77,8 +77,8 @@ public final class DQ_Result extends PropertyType<DQ_Result, Result> {
      * @return the metadata to be marshalled.
      */
     @XmlElementRef
-    public AbstractResult getElement() {
-        return AbstractResult.castOrCopy(metadata);
+    public AbstractQualityResult getElement() {
+        return AbstractQualityResult.castOrCopy(metadata);
     }
 
     /**
@@ -86,7 +86,7 @@ public final class DQ_Result extends PropertyType<DQ_Result, Result> {
      *
      * @param  value  the unmarshalled metadata.
      */
-    public void setElement(final AbstractResult value) {
+    public void setElement(final AbstractQualityResult value) {
         metadata = value;
     }
 }

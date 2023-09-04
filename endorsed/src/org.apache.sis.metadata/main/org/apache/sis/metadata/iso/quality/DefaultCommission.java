@@ -17,20 +17,16 @@
 package org.apache.sis.metadata.iso.quality;
 
 import jakarta.xml.bind.annotation.XmlType;
-import jakarta.xml.bind.annotation.XmlSeeAlso;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import org.opengis.metadata.quality.NonQuantitativeAttributeAccuracy;
-
-// Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.NonQuantitativeAttributeCorrectness;
+import org.opengis.metadata.quality.Commission;
 
 
 /**
- * Correctness of non-quantitative attributes.
- * See the {@link NonQuantitativeAttributeCorrectness} GeoAPI interface for more details.
+ * Excess data present in the dataset, as described by the scope.
+ * See the {@link Commission} GeoAPI interface for more details.
  * The following property is mandatory in a well-formed metadata according ISO 19157:
  *
- * <div class="preformat">{@code Omission}
+ * <div class="preformat">{@code DQ_CompletenessCommission}
  * {@code   └─result……………} Value obtained from applying a data quality measure.</div>
  *
  * <h2>Limitations</h2>
@@ -42,29 +38,23 @@ import org.opengis.metadata.quality.NonQuantitativeAttributeCorrectness;
  *       same version of Apache SIS. For long term storage, use {@link org.apache.sis.xml.XML} instead.</li>
  * </ul>
  *
- * @author  Martin Desruisseaux (Geomatys)
- * @author  Alexis Gaillard (Geomatys)
+ * @author  Martin Desruisseaux (IRD, Geomatys)
+ * @author  Touraïvane (IRD)
  * @version 1.4
- * @since   1.3
+ * @since   0.3
  */
-@XmlType(name = "DQ_NonQuantitativeAttributeCorrectness_Type")
-@XmlRootElement(name = "DQ_NonQuantitativeAttributeCorrectness")
-@XmlSeeAlso({
-    DefaultNonQuantitativeAttributeAccuracy.class
-})
-@SuppressWarnings("deprecation")
-public class DefaultNonQuantitativeAttributeCorrectness extends AbstractThematicAccuracy
-        implements NonQuantitativeAttributeCorrectness
-{
+@XmlType(name = "DQ_CompletenessCommission_Type")
+@XmlRootElement(name = "DQ_CompletenessCommission")
+public class DefaultCommission extends AbstractCompleteness implements Commission {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 6782225824097039360L;
+    private static final long serialVersionUID = -4724033811122708467L;
 
     /**
-     * Constructs an initially empty completeness omission.
+     * Constructs an initially empty completeness commission.
      */
-    public DefaultNonQuantitativeAttributeCorrectness() {
+    public DefaultCommission() {
     }
 
     /**
@@ -74,9 +64,9 @@ public class DefaultNonQuantitativeAttributeCorrectness extends AbstractThematic
      *
      * @param  object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(NonQuantitativeAttributeCorrectness)
+     * @see #castOrCopy(Commission)
      */
-    public DefaultNonQuantitativeAttributeCorrectness(final NonQuantitativeAttributeCorrectness object) {
+    public DefaultCommission(final Commission object) {
         super(object);
     }
 
@@ -87,9 +77,9 @@ public class DefaultNonQuantitativeAttributeCorrectness extends AbstractThematic
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
      *   <li>Otherwise if the given object is already an instance of
-     *       {@code DefaultNonQuantitativeAttributeCorrectness}, then it is returned unchanged.</li>
-     *   <li>Otherwise a new {@code DefaultNonQuantitativeAttributeCorrectness} instance is created using the
-     *       {@linkplain #DefaultNonQuantitativeAttributeCorrectness(NonQuantitativeAttributeCorrectness) copy constructor}
+     *       {@code DefaultCommission}, then it is returned unchanged.</li>
+     *   <li>Otherwise a new {@code DefaultCommission} instance is created using the
+     *       {@linkplain #DefaultCommission(Commission) copy constructor}
      *       and returned. Note that this is a <em>shallow</em> copy operation, because the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -98,14 +88,10 @@ public class DefaultNonQuantitativeAttributeCorrectness extends AbstractThematic
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    @SuppressWarnings("deprecation")
-    public static DefaultNonQuantitativeAttributeCorrectness castOrCopy(final NonQuantitativeAttributeCorrectness object) {
-        if (object instanceof NonQuantitativeAttributeAccuracy) {
-            return DefaultNonQuantitativeAttributeAccuracy.castOrCopy((NonQuantitativeAttributeAccuracy) object);
+    public static DefaultCommission castOrCopy(final Commission object) {
+        if (object == null || object instanceof DefaultCommission) {
+            return (DefaultCommission) object;
         }
-        if (object == null || object instanceof DefaultNonQuantitativeAttributeCorrectness) {
-            return (DefaultNonQuantitativeAttributeCorrectness) object;
-        }
-        return new DefaultNonQuantitativeAttributeCorrectness(object);
+        return new DefaultCommission(object);
     }
 }

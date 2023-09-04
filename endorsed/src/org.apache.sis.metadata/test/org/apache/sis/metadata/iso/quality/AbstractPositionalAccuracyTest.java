@@ -30,6 +30,7 @@ import static org.junit.Assert.*;
 import static org.opengis.test.Assert.assertInstanceOf;
 import static org.apache.sis.test.TestUtilities.getSingleton;
 
+//todo : needs clarification on relationship between Element and QualityElement, and between Result and QualityResult
 
 /**
  * Tests {@link AbstractPositionalAccuracy}.

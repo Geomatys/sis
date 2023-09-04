@@ -21,10 +21,13 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlSeeAlso;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.Metaquality;
-import org.opengis.metadata.quality.Confidence;
-import org.opengis.metadata.quality.Representativity;
-import org.opengis.metadata.quality.Homogeneity;
+import org.opengis.annotation.UML;
+import org.opengis.metadata.quality.*;
+
+import java.util.Collection;
+
+import static org.opengis.annotation.Obligation.MANDATORY;
+import static org.opengis.annotation.Specification.ISO_19157;
 
 
 /**
@@ -56,11 +59,17 @@ import org.opengis.metadata.quality.Homogeneity;
     DefaultRepresentativity.class,
     DefaultHomogeneity.class
 })
-public class AbstractMetaquality extends AbstractElement implements Metaquality {
+public class AbstractMetaquality extends AbstractQualityElement implements Metaquality {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = -3672977971960830867L;
+    private static final long serialVersionUID = 607826417024371559L;
+
+    /**
+     * Value (or set of values) of quality elements related to metaquality.
+     */
+    @SuppressWarnings("serial")
+    private Collection<QualityElement> relatedQualityElements;
 
     /**
      * Constructs an initially empty metaquality.
@@ -80,6 +89,7 @@ public class AbstractMetaquality extends AbstractElement implements Metaquality 
     @SuppressWarnings("unchecked")
     public AbstractMetaquality(final Metaquality object) {
         super(object);
+        relatedQualityElements  = copyCollection(object.getRelatedQualityElements(), QualityElement.class);
     }
 
     /**
@@ -119,5 +129,27 @@ public class AbstractMetaquality extends AbstractElement implements Metaquality 
             return (AbstractMetaquality) object;
         }
         return new AbstractMetaquality(object);
+    }
+
+    /**
+     * Returns the quality element(s) related to metaquality.
+     *
+     * @return metaquality related quality element(s).
+     *
+     * @since 4.0
+     */
+    public Collection<QualityElement> getRelatedQualityElements() {
+        return relatedQualityElements  = nonNullCollection(relatedQualityElements, QualityElement.class);
+    }
+
+    /**
+     * Sets the quality elements related to metaquality.
+     *
+     * @param  qualityElements  the new elements.
+     *
+     * @since 4.0
+     */
+    public void setRelatedQualityElements(Collection<QualityElement> qualityElements) {
+        relatedQualityElements = writeCollection(qualityElements, relatedQualityElements, QualityElement.class);
     }
 }

@@ -18,7 +18,7 @@ package org.apache.sis.referencing.util;
 
 import java.util.Collection;
 import org.opengis.metadata.quality.ConformanceResult;
-import org.opengis.metadata.quality.Result;
+import org.opengis.metadata.quality.QualityResult;
 import org.apache.sis.test.TestUtilities;
 import org.apache.sis.test.TestCase;
 import org.junit.Test;
@@ -56,8 +56,8 @@ public final class PositionalAccuracyConstantTest extends TestCase {
         assertNotSame(PositionalAccuracyConstant.DATUM_SHIFT_APPLIED,
                       PositionalAccuracyConstant.DATUM_SHIFT_OMITTED);
 
-        final Collection<? extends Result> appliedResults = PositionalAccuracyConstant.DATUM_SHIFT_APPLIED.getResults();
-        final Collection<? extends Result> omittedResults = PositionalAccuracyConstant.DATUM_SHIFT_OMITTED.getResults();
+        final Collection<? extends QualityResult> appliedResults = PositionalAccuracyConstant.DATUM_SHIFT_APPLIED.getQualityResults();
+        final Collection<? extends QualityResult> omittedResults = PositionalAccuracyConstant.DATUM_SHIFT_OMITTED.getQualityResults();
         final ConformanceResult applied = (ConformanceResult) TestUtilities.getSingleton(appliedResults);
         final ConformanceResult omitted = (ConformanceResult) TestUtilities.getSingleton(omittedResults);
         assertNotSame(applied, omitted);

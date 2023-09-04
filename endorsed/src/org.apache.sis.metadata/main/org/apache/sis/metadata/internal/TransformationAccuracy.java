@@ -17,13 +17,15 @@
 package org.apache.sis.metadata.internal;
 
 import java.util.List;
+
+import org.apache.sis.metadata.iso.quality.AbstractElement;
+import org.apache.sis.metadata.iso.quality.DefaultAbsolutePositionalAccuracy;
 import org.opengis.util.RecordType;
 import org.opengis.util.InternationalString;
 import org.opengis.metadata.quality.PositionalAccuracy;
 import org.opengis.metadata.quality.EvaluationMethodType;
 import org.apache.sis.measure.Units;
 import org.apache.sis.metadata.iso.quality.DefaultQuantitativeResult;
-import org.apache.sis.metadata.iso.quality.DefaultAbsoluteExternalPositionalAccuracy;
 import org.apache.sis.util.Static;
 import org.apache.sis.util.collection.WeakValueHashMap;
 import org.apache.sis.util.iso.DefaultRecord;
@@ -75,11 +77,12 @@ public final class TransformationAccuracy extends Static {
             result.setValueUnit(Units.METRE);              // In metres by definition in the EPSG database.
             result.setValueType(type);
 
-            final DefaultAbsoluteExternalPositionalAccuracy element =
-                    new DefaultAbsoluteExternalPositionalAccuracy(result);
-            element.setNamesOfMeasure(List.of(TRANSFORMATION_ACCURACY));
-            element.setEvaluationMethodType(EvaluationMethodType.DIRECT_EXTERNAL);
-            element.transitionTo(DefaultAbsoluteExternalPositionalAccuracy.State.FINAL);
+            final DefaultAbsolutePositionalAccuracy element =
+                    new DefaultAbsolutePositionalAccuracy(result);
+            //todo : needs clarification on relationship between Element and QualityElement
+//            element.setNamesOfMeasure(List.of(TRANSFORMATION_ACCURACY));
+//            element.setEvaluationMethodType(EvaluationMethodType.DIRECT_EXTERNAL);
+            element.transitionTo(DefaultAbsolutePositionalAccuracy.State.FINAL);
 
             p = CACHE.putIfAbsent(accuracy, element);
             if (p == null) {

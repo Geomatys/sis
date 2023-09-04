@@ -22,7 +22,7 @@ import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlSeeAlso;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-import org.opengis.metadata.quality.Result;
+import org.opengis.metadata.quality.QualityResult;
 import org.opengis.metadata.quality.CoverageResult;
 import org.opengis.metadata.quality.ConformanceResult;
 import org.opengis.metadata.quality.QuantitativeResult;
@@ -51,44 +51,40 @@ import org.opengis.metadata.maintenance.Scope;
  * @author  Alexis Gaillard (Geomatys)
  * @version 1.4
  * @since   0.3
- *
- * @deprecated Renamed {@link AbstractQualityResult}.
  */
-@Deprecated
 @XmlType(name = "AbstractDQ_Result_Type", propOrder = {
-        "resultScope",
-        "dateTime"
+    "resultScope",
+    "dateTime"
 })
 @XmlRootElement(name = "AbstractDQ_Result")
 @XmlSeeAlso({
-        DefaultConformanceResult.class,
-        DefaultQuantitativeResult.class,
-        DefaultDescriptiveResult.class,
-        DefaultCoverageResult.class
+    DefaultConformanceResult.class,
+    DefaultQuantitativeResult.class,
+    DefaultDescriptiveResult.class,
+    DefaultCoverageResult.class
 })
-public class AbstractResult extends AbstractQualityResult implements Result {
+public class AbstractQualityResult extends ISOMetadata implements QualityResult {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 3510023908820052467L;
-    //todo : needs clarification on relationship between Result and QualityResult
-//
-//    /**
-//     * Scope of the result.
-//     */
-//    @SuppressWarnings("serial")
-//    private Scope resultScope;
-//
-//    /**
-//     * Date when the result was generated, or {@code null} if none.
-//     */
-//    @SuppressWarnings("serial")
-//    private Temporal dateTime;
+    private static final long serialVersionUID = 9173383918128797562L;
+
+    /**
+     * Scope of the result.
+     */
+    @SuppressWarnings("serial")
+    private Scope resultScope;
+
+    /**
+     * Date when the result was generated, or {@code null} if none.
+     */
+    @SuppressWarnings("serial")
+    private Temporal dateTime;
 
     /**
      * Constructs an initially empty result.
      */
-    public AbstractResult() {
+    public AbstractQualityResult() {
     }
 
     /**
@@ -98,15 +94,14 @@ public class AbstractResult extends AbstractQualityResult implements Result {
      *
      * @param  object  the metadata to copy values from, or {@code null} if none.
      *
-     //todo : needs clarification on relationship between Result and QualityResult
-//     * @see #castOrCopy(Result)
+     * @see #castOrCopy(QualityResult)
      */
-    public AbstractResult(final Result object) {
+    public AbstractQualityResult(final QualityResult object) {
         super(object);
-//        if (object != null) {
-//            resultScope = object.getResultScope();
-//            dateTime    = object.getDateTime();
-//        }
+        if (object != null) {
+            resultScope = object.getResultScope();
+            dateTime    = object.getDateTime();
+        }
     }
 
     /**
@@ -121,9 +116,9 @@ public class AbstractResult extends AbstractQualityResult implements Result {
      *       Note that if the given object implements more than one of the above-cited interfaces,
      *       then the {@code castOrCopy(…)} method to be used is unspecified.</li>
      *   <li>Otherwise if the given object is already an instance of
-     *       {@code AbstractResult}, then it is returned unchanged.</li>
-     *   <li>Otherwise a new {@code AbstractResult} instance is created using the
-     *       {@linkplain #AbstractResult(Result) copy constructor} and returned.
+     *       {@code AbstractQualityResult}, then it is returned unchanged.</li>
+     *   <li>Otherwise a new {@code AbstractQualityResult} instance is created using the
+     *       {@linkplain #AbstractQualityResult(QualityResult) copy constructor} and returned.
      *       Note that this is a <em>shallow</em> copy operation, because the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -132,77 +127,76 @@ public class AbstractResult extends AbstractQualityResult implements Result {
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    //todo : needs clarification on relationship between Result and QualityResult
-//    public static AbstractResult castOrCopy(final Result object) {
-//        if (object instanceof QuantitativeResult) {
-//            return DefaultQuantitativeResult.castOrCopy((QuantitativeResult) object);
-//        }
-//        if (object instanceof ConformanceResult) {
-//            return DefaultConformanceResult.castOrCopy((ConformanceResult) object);
-//        }
-//        if (object instanceof DescriptiveResult) {
-//            return DefaultDescriptiveResult.castOrCopy((DescriptiveResult) object);
-//        }
-//        if (object instanceof CoverageResult) {
-//            return DefaultCoverageResult.castOrCopy((CoverageResult) object);
-//        }
-//        // Intentionally tested after the sub-interfaces.
-//        if (object == null || object instanceof AbstractResult) {
-//            return (AbstractResult) object;
-//        }
-//        return new AbstractResult(object);
-//    }
+    public static AbstractQualityResult castOrCopy(final QualityResult object) {
+        if (object instanceof QuantitativeResult) {
+            return DefaultQuantitativeResult.castOrCopy((QuantitativeResult) object);
+        }
+        if (object instanceof ConformanceResult) {
+            return DefaultConformanceResult.castOrCopy((ConformanceResult) object);
+        }
+        if (object instanceof DescriptiveResult) {
+            return DefaultDescriptiveResult.castOrCopy((DescriptiveResult) object);
+        }
+        if (object instanceof CoverageResult) {
+            return DefaultCoverageResult.castOrCopy((CoverageResult) object);
+        }
+        // Intentionally tested after the sub-interfaces.
+        if (object == null || object instanceof AbstractQualityResult) {
+            return (AbstractQualityResult) object;
+        }
+        return new AbstractQualityResult(object);
+    }
 
-//    /**
-//     * Returns the scope of the result.
-//     *
-//     * @return scope of the result, or {@code null} if unspecified.
-//     *
-//     * @since 1.3
-//     */
-//    @Override
-//    @XmlElement(name = "resultScope")
-//    @XmlJavaTypeAdapter(MD_Scope.Since2014.class)
-//    public Scope getResultScope() {
-//        return resultScope;
-//    }
-//
-//    /**
-//     * Sets the scope of the result.
-//     *
-//     * @param  newValue  the new evaluation procedure.
-//     *
-//     * @since 1.3
-//     */
-//    public void setResultScope(final Scope newValue) {
-//        resultScope = newValue;
-//    }
-//
-//    /**
-//     * Returns the date when the result was generated.
-//     * This is typically a {@link java.time.LocalDate}, {@link java.time.LocalDateTime}
-//     * or {@link java.time.ZonedDateTime} depending on whether the hour of the day and
-//     * the time zone are provided.
-//     *
-//     * @return date of the result, or {@code null} if none.
-//     *
-//     * @since 1.3
-//     */
-//    @Override
-//    @XmlElement(name = "dateTime")
-//    @XmlJavaTypeAdapter(GO_Temporal.Since2014.class)
-//    public Temporal getDateTime() {
-//        return dateTime;
-//    }
-//
-//    /**
-//     * Sets the date when the result was generated.
-//     *
-//     * @param  newValue  the new date, or {@code null}.
-//     *
-//     * @since 1.3
-//     */
-//    public void setDateTime(final Temporal newValue) {
-//        dateTime = newValue;
-//    }
+    /**
+     * Returns the scope of the result.
+     *
+     * @return scope of the result, or {@code null} if unspecified.
+     *
+     * @since 1.3
+     */
+    @Override
+    @XmlElement(name = "resultScope")
+    @XmlJavaTypeAdapter(MD_Scope.Since2014.class)
+    public Scope getResultScope() {
+        return resultScope;
+    }
+
+    /**
+     * Sets the scope of the result.
+     *
+     * @param  newValue  the new evaluation procedure.
+     *
+     * @since 1.3
+     */
+    public void setResultScope(final Scope newValue) {
+        resultScope = newValue;
+    }
+
+    /**
+     * Returns the date when the result was generated.
+     * This is typically a {@link java.time.LocalDate}, {@link java.time.LocalDateTime}
+     * or {@link java.time.ZonedDateTime} depending on whether the hour of the day and
+     * the time zone are provided.
+     *
+     * @return date of the result, or {@code null} if none.
+     *
+     * @since 1.3
+     */
+    @Override
+    @XmlElement(name = "dateTime")
+    @XmlJavaTypeAdapter(GO_Temporal.Since2014.class)
+    public Temporal getDateTime() {
+        return dateTime;
+    }
+
+    /**
+     * Sets the date when the result was generated.
+     *
+     * @param  newValue  the new date, or {@code null}.
+     *
+     * @since 1.3
+     */
+    public void setDateTime(final Temporal newValue) {
+        dateTime = newValue;
+    }
 }

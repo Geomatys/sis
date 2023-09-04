@@ -79,32 +79,32 @@ import org.opengis.metadata.quality.Metaquality;
  * @since   0.3
  */
 @XmlType(name = "AbstractDQ_Element_Type", propOrder = {
-    "standaloneQualityReportDetails",
-    "measureReference",
-    "evaluationMethod",
-    "namesOfMeasure",
-    "measureIdentification",
-    "measureDescription",
-    "evaluationMethodType",
-    "evaluationMethodDescription",
-    "evaluationProcedure",
-    "dates",
-    "results",
-    "derivedElement"
+        "standaloneQualityReportDetails",
+        "measureReference",
+        "evaluationMethod",
+        "namesOfMeasure",
+        "measureIdentification",
+        "measureDescription",
+        "evaluationMethodType",
+        "evaluationMethodDescription",
+        "evaluationProcedure",
+        "dates",
+        "results",
+        "derivedElement"
 })
 @XmlRootElement(name = "AbstractDQ_Element")
 @XmlSeeAlso({
-    AbstractCompleteness.class,
-    AbstractLogicalConsistency.class,
-    AbstractPositionalAccuracy.class,
-    AbstractThematicAccuracy.class,
-    AbstractTemporalQuality.class,
-    DefaultUsability.class,
-    AbstractMetaquality.class,
-    DefaultQualityMeasure.class     // Not a subclass, but "weakly" associated.
+        AbstractCompleteness.class,
+        AbstractLogicalConsistency.class,
+        AbstractPositionalAccuracy.class,
+        AbstractThematicAccuracy.class,
+        AbstractTemporalQuality.class,
+        DefaultUsability.class,
+        AbstractMetaquality.class,
+        DefaultQualityMeasure.class     // Not a subclass, but "weakly" associated.
 })
 @SuppressWarnings("deprecation")
-public class AbstractElement extends ISOMetadata implements Element {
+public class AbstractElement extends AbstractQualityElement implements Element {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -163,7 +163,8 @@ public class AbstractElement extends ISOMetadata implements Element {
      *
      * @param object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(Element)
+     //todo : needs clarification on relationship between Element and QualityElement
+//     * @see #castOrCopy(Element)
      */
     public AbstractElement(final Element object) {
         super(object);
@@ -171,11 +172,12 @@ public class AbstractElement extends ISOMetadata implements Element {
             standaloneQualityReportDetails = object.getStandaloneQualityReportDetails();
             if ((measureReference = object.getMeasureReference()) == null) {
                 DefaultMeasureReference candidate = new DefaultMeasureReference();
-                if (candidate.setLegacy(object)) measureReference = candidate;
+                //todo : needs clarification on relationship between Element and QualityElement
+//                if (candidate.setLegacy(object)) measureReference = candidate;
             }
             evaluationMethod = object.getEvaluationMethod();
             results          = copyCollection(object.getResults(), Result.class);
-            derivedElements  = copyCollection(object.getDerivedElements(), Element.class);
+//            derivedElements  = copyCollection(object.getDerivedElements(), Element.class);
         }
     }
 
@@ -203,34 +205,35 @@ public class AbstractElement extends ISOMetadata implements Element {
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static AbstractElement castOrCopy(final Element object) {
-        if (object instanceof PositionalAccuracy) {
-            return AbstractPositionalAccuracy.castOrCopy((PositionalAccuracy) object);
-        }
-        if (object instanceof TemporalQuality) {
-            return AbstractTemporalQuality.castOrCopy((TemporalQuality) object);
-        }
-        if (object instanceof ThematicAccuracy) {
-            return AbstractThematicAccuracy.castOrCopy((ThematicAccuracy) object);
-        }
-        if (object instanceof LogicalConsistency) {
-            return AbstractLogicalConsistency.castOrCopy((LogicalConsistency) object);
-        }
-        if (object instanceof Completeness) {
-            return AbstractCompleteness.castOrCopy((Completeness) object);
-        }
-        if (object instanceof Usability) {
-            return DefaultUsability.castOrCopy((Usability) object);
-        }
-        if (object instanceof Metaquality) {
-            return AbstractMetaquality.castOrCopy((Metaquality) object);
-        }
-        // Intentionally tested after the sub-interfaces.
-        if (object == null || object instanceof AbstractElement) {
-            return (AbstractElement) object;
-        }
-        return new AbstractElement(object);
-    }
+    //todo : needs clarification on relationship between Element and QualityElement
+//    public static AbstractElement castOrCopy(final Element object) {
+//        if (object instanceof PositionalAccuracy) {
+//            return AbstractPositionalAccuracy.castOrCopy((PositionalAccuracy) object);
+//        }
+//        if (object instanceof TemporalQuality) {
+//            return AbstractTemporalQuality.castOrCopy((TemporalQuality) object);
+//        }
+//        if (object instanceof ThematicAccuracy) {
+//            return AbstractThematicAccuracy.castOrCopy((ThematicAccuracy) object);
+//        }
+//        if (object instanceof LogicalConsistency) {
+//            return AbstractLogicalConsistency.castOrCopy((LogicalConsistency) object);
+//        }
+//        if (object instanceof Completeness) {
+//            return AbstractCompleteness.castOrCopy((Completeness) object);
+//        }
+//        if (object instanceof Usability) {
+//            return DefaultUsability.castOrCopy((Usability) object);
+//        }
+//        if (object instanceof Metaquality) {
+//            return AbstractMetaquality.castOrCopy((Metaquality) object);
+//        }
+//        // Intentionally tested after the sub-interfaces.
+//        if (object == null || object instanceof AbstractElement) {
+//            return (AbstractElement) object;
+//        }
+//        return new AbstractElement(object);
+//    }
 
     /**
      * Returns the clause in the standalone quality report where this data quality element is described.
@@ -269,7 +272,9 @@ public class AbstractElement extends ISOMetadata implements Element {
     @Override
     @XmlElement(name = "measure", required = false)
     public MeasureReference getMeasureReference() {
-        return (measureReference != null) ? measureReference : Element.super.getMeasureReference();
+        return measureReference;
+        //todo : needs clarification on relationship between Element and QualityElement
+//        return (measureReference != null) ? measureReference : Element.super.getMeasureReference();
     }
 
     /**
@@ -435,7 +440,7 @@ public class AbstractElement extends ISOMetadata implements Element {
      * Returns the value of a {@link #evaluationMethod} property.
      * This is used only for deprecated setter methods from older ISO 19115 version.
      *
-     * @see #getMeasureReferenceProperty(Function)
+//     * @see #getMeasureReferenceProperty(Function)
      */
     private <V> V getEvaluationMethodProperty(final Function<EvaluationMethod,V> getter) {
         final EvaluationMethod m = getEvaluationMethod();
@@ -446,7 +451,7 @@ public class AbstractElement extends ISOMetadata implements Element {
      * Sets the value of a {@link #evaluationMethod} property.
      * This is used only for deprecated setter methods from older ISO 19115 version.
      *
-     * @see #setMeasureReferenceProperty(BiConsumer, Object)
+//     * @see #setMeasureReferenceProperty(BiConsumer, Object)
      */
     private <V> void setEvaluationMethodProperty(final BiConsumer<DefaultEvaluationMethod,V> setter, final V newValue) {
         if (newValue != null) {
@@ -602,30 +607,31 @@ public class AbstractElement extends ISOMetadata implements Element {
     public void setResults(final Collection<? extends Result> newValues) {
         results = writeCollection(newValues, results, Result.class);
     }
+//todo : needs clarification on relationship between Element and QualityElement
 
-    /**
-     * Returns the original elements in case of aggregation or derivation.
-     *
-     * @return original element(s) when there is an aggregation or derivation.
-     *
-     * @since 1.3
-     */
-    @Override
-    // @XmlElement at the end of this class.
-    public Collection<Element> getDerivedElements() {
-        return derivedElements = nonNullCollection(derivedElements, Element.class);
-    }
-
-    /**
-     * Sets the original elements in case of aggregation or derivation.
-     *
-     * @param  newValues  the new elements.
-     *
-     * @since 1.3
-     */
-    public void setDerivedElements(final Collection<? extends Element> newValues) {
-        derivedElements = writeCollection(newValues, derivedElements, Element.class);
-    }
+//    /**
+//     * Returns the original elements in case of aggregation or derivation.
+//     *
+//     * @return original element(s) when there is an aggregation or derivation.
+//     *
+//     * @since 1.3
+//     */
+//    @Override
+//    // @XmlElement at the end of this class.
+//    public Collection<Element> getDerivedElements() {
+//        return derivedElements = nonNullCollection(derivedElements, Element.class);
+//    }
+//
+//    /**
+//     * Sets the original elements in case of aggregation or derivation.
+//     *
+//     * @param  newValues  the new elements.
+//     *
+//     * @since 1.3
+//     */
+//    public void setDerivedElements(final Collection<? extends Element> newValues) {
+//        derivedElements = writeCollection(newValues, derivedElements, Element.class);
+//    }
 
 
 
@@ -646,8 +652,8 @@ public class AbstractElement extends ISOMetadata implements Element {
      * This attribute has been added by ISO 19157:2013 standard.
      * If (and only if) marshalling an older standard version, we omit this attribute.
      */
-    @XmlElement(name = "derivedElement")
-    private Collection<Element> getDerivedElement() {
-        return FilterByVersion.CURRENT_METADATA.accept() ? getDerivedElements() : null;
-    }
+//    @XmlElement(name = "derivedElement")
+//    private Collection<Element> getDerivedElement() {
+//        return FilterByVersion.CURRENT_METADATA.accept() ? getDerivedElements() : null;
+//    }
 }

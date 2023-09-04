@@ -20,6 +20,7 @@ import java.util.Collection;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
+import org.opengis.metadata.quality.*;
 import org.opengis.util.TypeName;
 import org.opengis.util.InternationalString;
 import org.opengis.parameter.ParameterDescriptor;
@@ -27,16 +28,11 @@ import org.opengis.metadata.Identifier;
 import org.apache.sis.xml.Namespaces;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.Measure;
-import org.opengis.metadata.quality.BasicMeasure;
-import org.opengis.metadata.quality.Description;
-import org.opengis.metadata.quality.SourceReference;
-import org.opengis.metadata.quality.ValueStructure;
 
 
 /**
  * Data quality measure.
- * See the {@link Measure} GeoAPI interface for more details.
+ * See the {@link QualityMeasure} GeoAPI interface for more details.
  * The following properties are mandatory in a well-formed metadata according ISO 19157:
  *
  * <div class="preformat">{@code DQM_Measure}
@@ -75,11 +71,11 @@ import org.opengis.metadata.quality.ValueStructure;
     "parameters"
 })
 @XmlRootElement(name = "DQM_Measure", namespace = Namespaces.DQM)
-public class DefaultQualityMeasure extends ISOMetadata implements Measure {
+public class DefaultQualityMeasure extends ISOMetadata implements QualityMeasure {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = -2004468907779670827L;
+    private static final long serialVersionUID = -2140833373230176393L;
 
     /**
      * Value uniquely identifying the measure within a namespace.
@@ -121,9 +117,22 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      * Description of the data quality measure.
      * Includes methods of calculation, with all formulae and/or illustrations
      * needed to establish the result of applying the measure.
+     *
+     * @see MeasureReference#getMeasureDescription()
+     *
+     * @deprecated Replaced by {@link #getDescriptions()} as of ISO 19157:2023.
+     */
+    @Deprecated
+    @SuppressWarnings("serial")
+    private MeasureDescription description;
+
+    /**
+     * Descriptions of the data quality measure.
+     * Includes methods of calculation, with all formulae and/or illustrations
+     * needed to establish the result of applying the measure.
      */
     @SuppressWarnings("serial")
-    private Description description;
+    private Collection<MeasureDescription> descriptions;
 
     /**
      * Reference to the source of an item that has been adopted from an external source.
@@ -152,7 +161,7 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      * Illustration of the use of a data quality measure.
      */
     @SuppressWarnings("serial")
-    private Collection<Description> examples;
+    private Collection<MeasureDescription> examples;
 
     /**
      * Constructs an initially empty element.
@@ -167,10 +176,10 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      *
      * @param object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(Measure)
+     * @see #castOrCopy(QualityMeasure)
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public DefaultQualityMeasure(final Measure object) {
+    public DefaultQualityMeasure(final QualityMeasure object) {
         super(object);
         if (object != null) {
             measureIdentifier = object.getMeasureIdentifier();
@@ -178,13 +187,16 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
             aliases           = copyCollection(object.getAliases(), InternationalString.class);
             elementNames      = copyCollection(object.getElementNames(), TypeName.class);
             definition        = object.getDefinition();
-            description       = object.getDescription();
+            descriptions      =  copyCollection(object.getDescriptions(), MeasureDescription.class);
             valueType         = object.getValueType();
             valueStructure    = object.getValueStructure();
-            examples          = copyCollection(object.getExamples(), Description.class);
+            examples          = copyCollection(object.getExamples(), MeasureDescription.class);
             basicMeasure      = object.getBasicMeasure();
             sourceReferences  = copyCollection(object.getSourceReferences(), SourceReference.class);
             parameters        = copyCollection(object.getParameters(), (Class) ParameterDescriptor.class);
+            // this field is deprecated. The following instruction is kept only for retro-compatibility.
+            //todo : needs clarification on relationship between Measure and QualityMeasure
+//            description       = object.getDescription();
         }
     }
 
@@ -197,7 +209,7 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      *   <li>Otherwise if the given object is already an instance of
      *       {@code DefaultQualityMeasure}, then it is returned unchanged.</li>
      *   <li>Otherwise a new {@code DefaultQualityMeasure} instance is created using the
-     *       {@linkplain #DefaultQualityMeasure(Measure) copy constructor} and returned.
+     *       {@linkplain #DefaultQualityMeasure(QualityMeasure) copy constructor} and returned.
      *       Note that this is a <em>shallow</em> copy operation, because the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -206,7 +218,7 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static DefaultQualityMeasure castOrCopy(final Measure object) {
+    public static DefaultQualityMeasure castOrCopy(final QualityMeasure object) {
         if (object instanceof DefaultQualityMeasure) {
             return (DefaultQualityMeasure) object;
         }
@@ -341,15 +353,44 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
     }
 
     /**
+     * Descriptions of the data quality measure.
+     * Includes methods of calculation, with all formulae and/or illustrations
+     * needed to establish the result of applying the measure.
+     *
+     * @return descriptions of data quality measure.
+     *
+     * @since 4.0.
+     */
+    @Override
+    public Collection<MeasureDescription> getDescriptions() {
+        return descriptions = nonNullCollection(descriptions, MeasureDescription.class);
+    }
+
+    /**
+     * Sets the description of the data quality measure.
+     *
+     * @param  newValues  the new measure description.
+     *
+     * @since 4.0.
+     */
+    public void setDescriptions(final Collection<MeasureDescription>  newValues)  {
+        descriptions = writeCollection(newValues, descriptions, MeasureDescription.class);
+    }
+
+    /**
      * Description of the data quality measure.
      * Includes methods of calculation, with all formulae and/or illustrations
      * needed to establish the result of applying the measure.
      *
      * @return description of data quality measure, or {@code null} if none.
+     *
+     * @deprecated Replaced by {@link #getDescriptions()} as of ISO 19157:2023.
      */
-    @Override
+    @Deprecated
+    //todo : needs clarification on relationship between Measure and QualityMeasure
+//    @Override
     @XmlElement(name = "description")
-    public Description getDescription() {
+    public MeasureDescription getDescription() {
        return description;
     }
 
@@ -357,8 +398,11 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      * Sets the description of the data quality measure.
      *
      * @param  newValue  the new measure description.
+     *
+     * @deprecated Replaced by {@link #setDescriptions} as of ISO 19157:2023.
      */
-    public void setDescription(final Description newValue)  {
+    @Deprecated
+    public void setDescription(final MeasureDescription newValue)  {
         checkWritePermission(description);
         description = newValue;
     }
@@ -459,8 +503,8 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      */
     @Override
     @XmlElement(name = "example")
-    public Collection<Description> getExamples() {
-        return examples = nonNullCollection(examples, Description.class);
+    public Collection<MeasureDescription> getExamples() {
+        return examples = nonNullCollection(examples, MeasureDescription.class);
     }
 
     /**
@@ -468,7 +512,7 @@ public class DefaultQualityMeasure extends ISOMetadata implements Measure {
      *
      * @param  newValues  the new examples.
      */
-    public void setExamples(final Collection<? extends Description> newValues) {
-        examples = writeCollection(newValues, examples, Description.class);
+    public void setExamples(final Collection<? extends MeasureDescription> newValues) {
+        examples = writeCollection(newValues, examples, MeasureDescription.class);
     }
 }

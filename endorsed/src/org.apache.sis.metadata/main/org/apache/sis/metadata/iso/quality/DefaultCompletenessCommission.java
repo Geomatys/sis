@@ -42,14 +42,17 @@ import org.opengis.metadata.quality.CompletenessCommission;
  * @author  Touraïvane (IRD)
  * @version 1.4
  * @since   0.3
+ *
+ * @deprecated Renamed {@link DefaultCommission}.
  */
+@Deprecated
 @XmlType(name = "DQ_CompletenessCommission_Type")
 @XmlRootElement(name = "DQ_CompletenessCommission")
-public class DefaultCompletenessCommission extends AbstractCompleteness implements CompletenessCommission {
+public class DefaultCompletenessCommission extends DefaultCommission implements CompletenessCommission {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 1941293019209523920L;
+    private static final long serialVersionUID = 8128142321534802557L;
 
     /**
      * Constructs an initially empty completeness commission.

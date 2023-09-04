@@ -35,7 +35,7 @@ import org.apache.sis.util.iso.Names;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import org.opengis.coverage.Coverage;
-import org.opengis.metadata.quality.Description;
+import org.opengis.metadata.quality.MeasureDescription;
 import org.opengis.metadata.quality.ValueStructure;
 
 
@@ -74,7 +74,7 @@ public final class QualityParameter extends Parameter {
     /**
      * For cross-version compatibility.
      */
-    private static final long serialVersionUID = 4333632866772665659L;
+    private static final long serialVersionUID = -1233789311236243730L;
 
     /**
      * Name of the data quality parameter, to be represented as identifier code.
@@ -101,7 +101,7 @@ public final class QualityParameter extends Parameter {
      */
     @XmlElement
     @SuppressWarnings("serial")                 // Most Apache SIS implementations are serializable.
-    public Description description;
+    public MeasureDescription description;
 
     /**
      * Value type of the data quality parameter (shall be one of the data types defined in ISO/TS 19103:2005).
@@ -186,7 +186,7 @@ public final class QualityParameter extends Parameter {
      */
     @Override
     public InternationalString getDescription() {
-        final Description description = this.description;
+        final MeasureDescription description = this.description;
         return (description != null) ? description.getTextDescription() : null;
     }
 

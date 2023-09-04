@@ -19,13 +19,20 @@ package org.apache.sis.metadata.iso.quality;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
+import org.opengis.annotation.UML;
+import org.opengis.metadata.quality.FormulaType;
 import org.opengis.util.InternationalString;
 import org.opengis.metadata.identification.BrowseGraphic;
 import org.apache.sis.util.iso.Types;
 import org.apache.sis.xml.Namespaces;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.Description;
+import org.opengis.metadata.quality.MeasureDescription;
+
+import java.util.Collection;
+
+import static org.opengis.annotation.Obligation.OPTIONAL;
+import static org.opengis.annotation.Specification.ISO_19157;
 
 
 /**
@@ -54,11 +61,11 @@ import org.opengis.metadata.quality.Description;
     "extendedDescription"
 })
 @XmlRootElement(name = "DQM_Description", namespace = Namespaces.DQM)
-public class DefaultMeasureDescription extends ISOMetadata implements Description {
+public class DefaultMeasureDescription extends ISOMetadata implements MeasureDescription {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = 4878784271547209576L;
+    private static final long serialVersionUID = -5092727354241829494L;
 
     /**
      * Text description.
@@ -71,6 +78,15 @@ public class DefaultMeasureDescription extends ISOMetadata implements Descriptio
      */
     @SuppressWarnings("serial")
     private BrowseGraphic extendedDescription;
+
+    /**
+     * Description of formulas used for quality measure.
+     *
+     * @since 4.0
+     */
+    @SuppressWarnings("serial")
+    private Collection<FormulaType> formulas;
+
 
     /**
      * Constructs an initially empty description.
@@ -94,13 +110,14 @@ public class DefaultMeasureDescription extends ISOMetadata implements Descriptio
      *
      * @param object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(Description)
+     * @see #castOrCopy(MeasureDescription)
      */
-    public DefaultMeasureDescription(final Description object) {
+    public DefaultMeasureDescription(final MeasureDescription object) {
         super(object);
         if (object != null) {
             textDescription     = object.getTextDescription();
             extendedDescription = object.getExtendedDescription();
+            formulas            = copyCollection(object.getFormulas(), FormulaType.class);
         }
     }
 
@@ -113,7 +130,7 @@ public class DefaultMeasureDescription extends ISOMetadata implements Descriptio
      *   <li>Otherwise if the given object is already an instance of
      *       {@code DefaultMeasureDescription}, then it is returned unchanged.</li>
      *   <li>Otherwise a new {@code DefaultMeasureDescription} instance is created using the
-     *       {@linkplain #DefaultMeasureDescription(Description) copy constructor} and returned.
+     *       {@linkplain #DefaultMeasureDescription(MeasureDescription) copy constructor} and returned.
      *       Note that this is a <em>shallow</em> copy operation, because the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -122,7 +139,7 @@ public class DefaultMeasureDescription extends ISOMetadata implements Descriptio
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static DefaultMeasureDescription castOrCopy(final Description object) {
+    public static DefaultMeasureDescription castOrCopy(final MeasureDescription object) {
         if (object == null || object instanceof DefaultMeasureDescription) {
             return (DefaultMeasureDescription) object;
         }
@@ -170,4 +187,28 @@ public class DefaultMeasureDescription extends ISOMetadata implements Descriptio
         checkWritePermission(extendedDescription);
         extendedDescription = newValue;
     }
+
+    /**
+     * Returns the description of formulas used for quality measure.
+     *
+     * @return formulas description, or {@code null} if none.
+     *
+     * @since 4.0
+     */
+    @Override
+    public Collection<FormulaType> getFormulas() {
+        return formulas = nonNullCollection(formulas, FormulaType.class);
+    }
+
+    /**
+     * Sets the description of formulas used for quality measure.
+     *
+     * @param  newValues  new formula description, or {@code null} if none.
+     *
+     * @since 4.0
+     */
+    public void setFormulas(Collection<FormulaType> newValues) {
+        formulas = writeCollection(newValues, formulas, FormulaType.class);
+    }
+
 }

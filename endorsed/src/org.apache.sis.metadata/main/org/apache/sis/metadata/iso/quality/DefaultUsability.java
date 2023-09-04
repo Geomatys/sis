@@ -35,7 +35,7 @@ import org.apache.sis.xml.util.LegacyNamespaces;
 @Deprecated(since="1.3")
 @XmlType(name = "QE_Usability_Type", namespace = LegacyNamespaces.GMI)
 @XmlRootElement(name = "QE_Usability", namespace = LegacyNamespaces.GMI)
-public class DefaultUsability extends AbstractElement implements Usability {
+public class DefaultUsability extends AbstractQualityElement implements Usability {
     /**
      * Serial number for inter-operability with different versions.
      */

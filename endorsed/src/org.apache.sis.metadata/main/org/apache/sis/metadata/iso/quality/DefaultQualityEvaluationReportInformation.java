@@ -19,17 +19,17 @@ package org.apache.sis.metadata.iso.quality;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import org.opengis.metadata.quality.QualityEvaluationReportInformation;
 import org.opengis.util.InternationalString;
 import org.opengis.metadata.citation.Citation;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.StandaloneQualityReportInformation;
+import org.opengis.metadata.quality.QualityEvaluationReportInformation;
+import java.util.Collection;
 
 
 /**
- * Reference to an external standalone quality report.
- * See the {@link StandaloneQualityReportInformation} GeoAPI interface for more details.
+ * Reference to an quality evaluation report.
+ * See the {@link QualityEvaluationReportInformation} GeoAPI interface for more details.
  * The following property is mandatory in a well-formed metadata according ISO 19157:
  *
  * <div class="preformat">{@code DQ_Element}
@@ -49,37 +49,47 @@ import org.opengis.metadata.quality.StandaloneQualityReportInformation;
  * @author  Martin Desruisseaux (Geomatys)
  * @version 1.4
  * @since   1.3
- *
- * @deprecated Renamed {@link DefaultQualityEvaluationReportInformation}.
  */
-@Deprecated
 @XmlType(name = "DQ_StandaloneQualityReportInformation_Type", propOrder = {
-        "reportReference",
-        "abstract"
+    "reportReference",
+    "abstract"
 })
 @XmlRootElement(name = "DQ_StandaloneQualityReportInformation")
-public class DefaultEvaluationReportInformation extends ISOMetadata implements StandaloneQualityReportInformation {
+public class DefaultQualityEvaluationReportInformation extends ISOMetadata implements QualityEvaluationReportInformation {
     /**
      * Serial number for inter-operability with different versions.
      */
-    private static final long serialVersionUID = -6646482698986737797L;
+    private static final long serialVersionUID = -5457365506126993719L;
 
     /**
-     * Reference to the associated standalone quality report.
+     * Reference to the associated quality evaluation report.
      */
     @SuppressWarnings("serial")
     private Citation reportReference;
 
     /**
-     * Abstract for the associated standalone quality report.
+     * Abstract for the associated quality evaluation report.
      */
     @SuppressWarnings("serial")
     private InternationalString summary;
 
     /**
-     * Constructs an initially empty standalone quality report information.
+     * Reference to original results in the associated quality evaluation report.
+     *
+     * @since 4.0
+     *
+     * @return details of the quality evaluation report, or {@code null} if none.
      */
-    public DefaultEvaluationReportInformation() {
+
+//    todo: there is a discrepancy in the spec between UML and Annex table. This field is tagged as a single value in
+//    todo: the UML and as a collection in the table. Here we follow the API, Annex examples (section D.3.5) are not really clear.
+    Collection<InternationalString> qualityEvaluationReportDetails;
+
+
+    /**
+     * Constructs an initially empty quality evaluation report information.
+     */
+    public DefaultQualityEvaluationReportInformation() {
     }
 
     /**
@@ -89,13 +99,14 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
      *
      * @param object  the metadata to copy values from, or {@code null} if none.
      *
-     * @see #castOrCopy(StandaloneQualityReportInformation)
+     * @see #castOrCopy(QualityEvaluationReportInformation)
      */
-    public DefaultEvaluationReportInformation(final StandaloneQualityReportInformation object) {
+    public DefaultQualityEvaluationReportInformation(final QualityEvaluationReportInformation object) {
         super(object);
         if (object != null) {
             reportReference  = object.getReportReference();
             summary          = object.getAbstract();
+            qualityEvaluationReportDetails = copyCollection(object.getQualityEvaluationReportDetails(), InternationalString.class);
         }
     }
 
@@ -106,9 +117,9 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
      * <ul>
      *   <li>If the given object is {@code null}, then this method returns {@code null}.</li>
      *   <li>Otherwise if the given object is already an instance of
-     *       {@code DefaultEvaluationReportInformation}, then it is returned unchanged.</li>
-     *   <li>Otherwise a new {@code DefaultEvaluationReportInformation} instance is created using the
-     *       {@linkplain #DefaultEvaluationReportInformation(StandaloneQualityReportInformation) copy constructor}
+     *       {@code DefaultQualityEvaluationReportInformation}, then it is returned unchanged.</li>
+     *   <li>Otherwise a new {@code DefaultQualityEvaluationReportInformation} instance is created using the
+     *       {@linkplain #DefaultQualityEvaluationReportInformation(QualityEvaluationReportInformation) copy constructor}
      *       and returned. Note that this is a <em>shallow</em> copy operation, because the other
      *       metadata contained in the given object are not recursively copied.</li>
      * </ul>
@@ -117,17 +128,17 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
      * @return a SIS implementation containing the values of the given object (may be the
      *         given object itself), or {@code null} if the argument was null.
      */
-    public static DefaultEvaluationReportInformation castOrCopy(final StandaloneQualityReportInformation object) {
-        if (object instanceof StandaloneQualityReportInformation) {
-            return DefaultEvaluationReportInformation.castOrCopy((DefaultEvaluationReportInformation) object);
+    public static DefaultQualityEvaluationReportInformation castOrCopy(final QualityEvaluationReportInformation object) {
+        if (object instanceof QualityEvaluationReportInformation) {
+            return DefaultQualityEvaluationReportInformation.castOrCopy((DefaultQualityEvaluationReportInformation) object);
         }
-        return new DefaultEvaluationReportInformation(object);
+        return new DefaultQualityEvaluationReportInformation(object);
     }
 
     /**
-     * Returns the reference to the associated standalone quality report.
+     * Returns the reference to the associated quality evaluation report.
      *
-     * @return reference of the standalone quality report.
+     * @return reference of the quality evaluation report.
      */
     @Override
     @XmlElement(name = "reportReference", required = true)
@@ -136,7 +147,7 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
     }
 
     /**
-     * Sets the reference to the associated standalone quality report.
+     * Sets the reference to the associated quality evaluation report.
      *
      * @param  newValue  the new reference.
      */
@@ -146,9 +157,9 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
     }
 
     /**
-     * Returns the abstract for the standalone quality report.
+     * Returns the abstract for the quality evaluation report.
      *
-     * @return abstract of the standalone quality report.
+     * @return abstract of the quality evaluation report.
      */
     @Override
     @XmlElement(name = "abstract", required = true)
@@ -157,7 +168,7 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
     }
 
     /**
-     * Sets the abstract for the associated standalone quality report.
+     * Sets the abstract for the associated quality evaluation report.
      *
      * @param  newValue  the new abstract.
      */
@@ -165,4 +176,29 @@ public class DefaultEvaluationReportInformation extends ISOMetadata implements S
         checkWritePermission(summary);
         summary = newValue;
     }
+
+    /**
+     * Returns the reference to original results in the associated quality evaluation report.
+     *
+     * @since 4.0
+     *
+     * @return details of the quality evaluation report, or {@code null} if none.
+     */
+    @Override
+    public Collection<InternationalString> getQualityEvaluationReportDetails() {
+        return qualityEvaluationReportDetails;
+    }
+
+    /**
+     * Sets the reference to original results in the associated quality evaluation report.
+     *
+     * @param  newValues  the new quality evaluation report details.
+     *
+     * @since 4.0
+     */
+    public void getQualityEvaluationReportDetails(Collection<InternationalString> newValues) {
+        checkWritePermission(qualityEvaluationReportDetails);
+        qualityEvaluationReportDetails = writeCollection(newValues, qualityEvaluationReportDetails, InternationalString.class);
+    }
+
 }

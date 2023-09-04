@@ -287,13 +287,13 @@ public abstract class AnnotationConsistencyCheck extends TestCase {
             case "evaluationMethodType":
             case "evaluationMethodDescription":
             case "evaluationProcedure": {
-                if (org.opengis.metadata.quality.Element.class.isAssignableFrom(impl)) {
+                if (org.opengis.metadata.quality.QualityElement.class.isAssignableFrom(impl)) {
                     return LegacyNamespaces.GMD;            // Deprecated properties after upgrade to ISO 19157.
                 }
                 break;
             }
             case "dateTime": {
-                if (org.opengis.metadata.quality.Element.class.isAssignableFrom(impl)) {
+                if (org.opengis.metadata.quality.QualityElement.class.isAssignableFrom(impl)) {
                     return LegacyNamespaces.GMD;
                 }
                 break;
@@ -424,7 +424,7 @@ public abstract class AnnotationConsistencyCheck extends TestCase {
                 break;
             }
             case "valueType": {
-                if (org.opengis.metadata.quality.Result.class.isAssignableFrom(enclosing)) {
+                if (org.opengis.metadata.quality.QualityResult.class.isAssignableFrom(enclosing)) {
                     return "valueRecordType";
                 }
                 break;
@@ -601,7 +601,7 @@ public abstract class AnnotationConsistencyCheck extends TestCase {
              * GeoAPI addition, not in standard model.
              */
             case "getMeasure": {
-                return org.opengis.metadata.quality.Element.class.isAssignableFrom(method.getDeclaringClass());
+                return org.opengis.metadata.quality.QualityElement.class.isAssignableFrom(method.getDeclaringClass());
             }
             /*
              * Standard Java methods overridden in some GeoAPI interfaces for Javadoc purposes.

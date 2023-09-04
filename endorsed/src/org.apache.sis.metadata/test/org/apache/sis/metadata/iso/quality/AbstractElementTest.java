@@ -40,9 +40,9 @@ public final class AbstractElementTest extends TestCase {
      */
     public AbstractElementTest() {
     }
-
+//todo : needs clarification on relationship between Element and QualityElement
     /**
-     * Tests {@link Element#getDates()}.
+     * Tests {@link AbstractElement#getDates()}.
      */
     @Test
     public void testGetDates() {
