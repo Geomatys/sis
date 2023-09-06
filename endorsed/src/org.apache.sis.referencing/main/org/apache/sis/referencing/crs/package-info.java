@@ -79,6 +79,7 @@
 @XmlSchema(location = "http://schemas.opengis.net/gml/3.2.1/coordinateReferenceSystems.xsd",
            elementFormDefault = XmlNsForm.QUALIFIED, namespace = Namespaces.GML, xmlns =
 {
+    @XmlNs(prefix = "gsp", namespaceURI = Namespaces.GSP),
     @XmlNs(prefix = "gml", namespaceURI = Namespaces.GML),
     @XmlNs(prefix = "xsi", namespaceURI = Namespaces.XSI)
 })
@@ -102,6 +103,7 @@
     @XmlJavaTypeAdapter(CD_ParametricDatum.class),
     @XmlJavaTypeAdapter(CD_TemporalDatum.class),
     @XmlJavaTypeAdapter(CD_VerticalDatum.class),
+    @XmlJavaTypeAdapter(CD_InertialDatum.class),
     @XmlJavaTypeAdapter(CS_CartesianCS.class),      // Must be before CS_AffineCS.
     @XmlJavaTypeAdapter(CS_AffineCS.class),
     @XmlJavaTypeAdapter(CS_CylindricalCS.class),
@@ -115,6 +117,7 @@
     @XmlJavaTypeAdapter(CS_VerticalCS.class),
     @XmlJavaTypeAdapter(CC_Conversion.class),
     @XmlJavaTypeAdapter(SC_GeographicCRS.class),
+    @XmlJavaTypeAdapter(CS_MinkowskiCS.class),
     @XmlJavaTypeAdapter(StringAdapter.class),
     @XmlJavaTypeAdapter(InternationalStringConverter.class)
 })

@@ -16,24 +16,26 @@
  */
 package org.apache.sis.xml.bind.referencing;
 
-import jakarta.xml.bind.annotation.XmlElementRef;
-import org.opengis.referencing.datum.Ellipsoid;
+import jakarta.xml.bind.annotation.XmlElement;
+import org.opengis.referencing.cs.MinkowskiCS;
+import org.apache.sis.referencing.cs.DefaultMinkowskiCS;
 import org.apache.sis.xml.bind.gco.PropertyType;
-import org.apache.sis.referencing.datum.DefaultEllipsoid;
+import org.apache.sis.xml.Namespaces;
 
 
 /**
  * JAXB adapter mapping implementing class to the GeoAPI interface. See
  * package documentation for more information about JAXB and interface.
  *
- * @author  Cédric Briançon (Geomatys)
  * @author  Martin Desruisseaux (Geomatys)
+ * @version Testbed-19
+ * @since   Testbed-19
  */
-public final class CD_Ellipsoid extends PropertyType<CD_Ellipsoid, Ellipsoid> {
+public final class CS_MinkowskiCS extends PropertyType<CS_MinkowskiCS, MinkowskiCS> {
     /**
      * Empty constructor for JAXB only.
      */
-    public CD_Ellipsoid() {
+    public CS_MinkowskiCS() {
     }
 
     /**
@@ -41,52 +43,50 @@ public final class CD_Ellipsoid extends PropertyType<CD_Ellipsoid, Ellipsoid> {
      * This method is indirectly invoked by the private constructor
      * below, so it shall not depend on the state of this object.
      *
-     * @return {@code Ellipsoid.class}
+     * @return {@code MinkowskiCS.class}
      */
     @Override
-    protected Class<Ellipsoid> getBoundType() {
-        return Ellipsoid.class;
+    protected Class<MinkowskiCS> getBoundType() {
+        return MinkowskiCS.class;
     }
 
     /**
      * Constructor for the {@link #wrap} method only.
      */
-    private CD_Ellipsoid(final Ellipsoid ellipsoid) {
-        super(ellipsoid);
+    private CS_MinkowskiCS(final MinkowskiCS cs) {
+        super(cs);
     }
 
     /**
      * Invoked by {@link PropertyType} at marshalling time for wrapping the given value
-     * in a {@code <gml:Ellipsoid>} XML element.
+     * in a {@code <gsp:MinkowskiCS>} XML element.
      *
-     * @param  ellipsoid  the element to marshal.
+     * @param  cs  the element to marshal.
      * @return a {@code PropertyType} wrapping the given the element.
      */
     @Override
-    protected CD_Ellipsoid wrap(final Ellipsoid ellipsoid) {
-        return new CD_Ellipsoid(ellipsoid);
+    protected CS_MinkowskiCS wrap(final MinkowskiCS cs) {
+        return new CS_MinkowskiCS(cs);
     }
 
     /**
      * Invoked by JAXB at marshalling time for getting the actual element to write
-     * inside the {@code <gml:Ellipsoid>} XML element.
+     * inside the {@code <gsp:MinkowskiCS>} XML element.
      * This is the value or a copy of the value given in argument to the {@code wrap} method.
      *
      * @return the element to be marshalled.
      */
-    @XmlElementRef
-    public DefaultEllipsoid getElement() {
-        return DefaultEllipsoid.castOrCopy(metadata);
+    @XmlElement(name = "MinkowskiCS", namespace = Namespaces.GSP)
+    public DefaultMinkowskiCS getElement() {
+        return DefaultMinkowskiCS.castOrCopy(metadata);
     }
 
     /**
      * Invoked by JAXB at unmarshalling time for storing the result temporarily.
      *
-     * @param  ellipsoid  the unmarshalled element.
+     * @param  cs  the unmarshalled element.
      */
-    public void setElement(final DefaultEllipsoid ellipsoid) {
-        metadata = ellipsoid;
-        if (!(ellipsoid.getSemiMajorAxis() > 0)) incomplete("semiMajorAxis");   // Use '!' for catching NaN.
-        if (!(ellipsoid.getSemiMinorAxis() > 0)) incomplete("semiMinorAxis");
+    public void setElement(final DefaultMinkowskiCS cs) {
+        metadata = cs;
     }
 }

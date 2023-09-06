@@ -55,6 +55,7 @@ public final class StoreProvider extends AbstractProvider {
     public StoreProvider() {
         super(null,
               Map.of(      Namespaces.GML,       "application/gml+xml",
+                           Namespaces.GSP,       "application/gml+xml",
                            Namespaces.CSW,       "application/vnd.ogc.csw_xml",
                      LegacyNamespaces.CSW,       "application/vnd.ogc.csw_xml",
                      LegacyNamespaces.GMD,       "application/vnd.iso.19139+xml",

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
+<gsp:InertialCRS xsi:schemaLocation = "http://www.opengis.net/gsp/1.0 https://gitlab.ogc.org/ogc/T19-Geospatial_in_Space/-/raw/main/D001/standard-schema-proposal/geospatialInSpace.xsd"
+                 xmlns:gsp          = "http://www.opengis.net/gsp/1.0"
+                 xmlns:gml          = "http://www.opengis.net/gml/3.2"
+                 xmlns:xsi          = "http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xlink        = "http://www.w3.org/1999/xlink"
+                 gml:id             = "DimorphosCRS">
+
+  <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:crs:JPL::120065803</gml:identifier>
+  <gml:name codeSpace="JPL:HORIZONS">Dimorphos satellite (inertial)</gml:name>
+  <gml:scope>For use with the reconstructed trajectory of the Didymos system.</gml:scope>
+  <gml:cartesianCS>
+    <gml:CartesianCS gml:id="DimorphosCS">
+      <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:cs:JPL::ICRF</gml:identifier>
+      <gml:name>Cartesian 3D CS (km).</gml:name>
+      <gml:axis>
+        <gml:CoordinateSystemAxis gml:id="axisX" uom="urn:ogc:def:uom:EPSG::9036">
+          <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:axis:JPL::ICRF-X</gml:identifier>
+          <gml:name>X</gml:name>
+          <gml:axisAbbrev>X</gml:axisAbbrev>
+          <gml:axisDirection codeSpace="JPL:HORIZONS">X</gml:axisDirection>
+        </gml:CoordinateSystemAxis>
+      </gml:axis>
+      <gml:axis>
+        <gml:CoordinateSystemAxis gml:id="axisY" uom="urn:ogc:def:uom:EPSG::9036">
+          <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:axis:JPL::ICRF-Y</gml:identifier>
+          <gml:name>Y</gml:name>
+          <gml:axisAbbrev>Y</gml:axisAbbrev>
+          <gml:axisDirection codeSpace="JPL:HORIZONS">Y</gml:axisDirection>
+        </gml:CoordinateSystemAxis>
+      </gml:axis>
+      <gml:axis>
+        <gml:CoordinateSystemAxis gml:id="axisZ" uom="urn:ogc:def:uom:EPSG::9036">
+          <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:axis:JPL::ICRF-Z</gml:identifier>
+          <gml:name>Z</gml:name>
+          <gml:axisAbbrev>Z</gml:axisAbbrev>
+          <gml:axisDirection codeSpace="JPL:HORIZONS">Z</gml:axisDirection>
+        </gml:CoordinateSystemAxis>
+      </gml:axis>
+    </gml:CartesianCS>
+  </gml:cartesianCS>
+  <gsp:inertialReferenceFrame>
+    <gsp:InertialReferenceFrame gml:id="DimorphosDatum">
+      <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:datum:JPL::120065803</gml:identifier>
+      <gml:name>Dimorphos inertial reference frame</gml:name>
+      <gml:scope>For orbit positionning.</gml:scope>
+      <gsp:celestialBody>
+        <gsp:CelestialBody gml:id="Dimorphos">
+          <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:body:JPL::120065803</gml:identifier>
+          <gml:name>Dimorphos</gml:name>
+        </gsp:CelestialBody>
+      </gsp:celestialBody>
+      <gml:ellipsoid>
+        <gsp:TriaxialEllipsoid gml:id="DimorphosEllipsoid">
+          <gml:identifier codeSpace="JPL:HORIZONS">urn:ogc:def:ellipsoid:JPL::120065803</gml:identifier>
+          <gml:name>Dimorphos ellipsoid</gml:name>
+          <gml:semiMajorAxis uom="urn:ogc:def:uom:EPSG::9001">88.5</gml:semiMajorAxis>
+          <gml:secondDefiningParameter>
+            <gml:SecondDefiningParameter>
+              <gml:semiMinorAxis uom="urn:ogc:def:uom:EPSG::9001">58</gml:semiMinorAxis>
+            </gml:SecondDefiningParameter>
+          </gml:secondDefiningParameter>
+          <gsp:semiMedianAxis uom="urn:ogc:def:uom:EPSG::9001">87</gsp:semiMedianAxis>
+        </gsp:TriaxialEllipsoid>
+      </gml:ellipsoid>
+      <gsp:primeDirection>
+        <gml:PrimeMeridian gml:id="MarchEquinox">
+          <gml:identifier codeSpace="IAU:MarchEquinox">urn:ogc:def:meridian:IAU::MarchEquinox</gml:identifier>
+          <gml:name>March equinox</gml:name>
+          <gml:greenwichLongitude uom="urn:ogc:def:uom:EPSG::9102">0</gml:greenwichLongitude>
+        </gml:PrimeMeridian>
+      </gsp:primeDirection>
+    </gsp:InertialReferenceFrame>
+  </gsp:inertialReferenceFrame>
+</gsp:InertialCRS>

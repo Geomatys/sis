@@ -88,6 +88,7 @@ import static org.apache.sis.util.ArgumentChecks.*;
 @XmlSeeAlso({
     DefaultAffineCS.class,
     DefaultCartesianCS.class,               // Not an AffineCS subclass in GML schema.
+    DefaultMinkowskiCS.class,
     DefaultSphericalCS.class,
     DefaultEllipsoidalCS.class,
     DefaultCylindricalCS.class,

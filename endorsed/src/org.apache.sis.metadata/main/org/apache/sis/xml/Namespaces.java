@@ -482,6 +482,21 @@ public final class Namespaces extends Static {
 
     /**
      * The <code>{@value}</code> URL.
+     * The usual prefix for this namespace is {@code "gsp"}.
+     *
+     * <p>History</p>
+     * <table class="sis">
+     *   <caption>Change log</caption>
+     *   <tr><th>SIS version</th> <th>URL</th></tr>
+     *   <tr><td>Testbed-19</td>  <td>http://www.opengis.net/gsp/1.0</td></tr>
+     * </table>
+     *
+     * @category OGC
+     */
+    public static final String GSP = "http://www.opengis.net/gsp/1.0";
+
+    /**
+     * The <code>{@value}</code> URL.
      * The usual prefix for this namespace is {@code "csw"}.
      *
      * <p>History</p>

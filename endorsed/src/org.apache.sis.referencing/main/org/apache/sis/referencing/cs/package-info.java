@@ -39,6 +39,7 @@
 @XmlSchema(location = "http://schemas.opengis.net/gml/3.2.1/coordinateSystems.xsd",
            elementFormDefault = XmlNsForm.QUALIFIED, namespace = Namespaces.GML, xmlns =
 {
+    @XmlNs(prefix = "gsp", namespaceURI = Namespaces.GSP),
     @XmlNs(prefix = "gml", namespaceURI = Namespaces.GML),
     @XmlNs(prefix = "xsi", namespaceURI = Namespaces.XSI)
 })

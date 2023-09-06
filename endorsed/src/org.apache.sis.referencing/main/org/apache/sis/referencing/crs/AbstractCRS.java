@@ -90,6 +90,7 @@ import org.opengis.metadata.Identifier;
 @XmlRootElement(name = "AbstractCRS")
 @XmlSeeAlso({
     AbstractDerivedCRS.class,
+    DefaultInertialCRS.class,
     DefaultGeodeticCRS.class,
     DefaultVerticalCRS.class,
     DefaultTemporalCRS.class,

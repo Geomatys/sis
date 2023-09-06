@@ -23,6 +23,7 @@ import jakarta.xml.bind.Unmarshaller;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlSeeAlso;
 import javax.measure.Unit;
 import javax.measure.UnitConverter;
 import javax.measure.quantity.Length;
@@ -105,7 +106,7 @@ import org.opengis.metadata.Identifier;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Cédric Briançon (Geomatys)
- * @version 1.4
+ * @version 1.5
  *
  * @see org.apache.sis.referencing.CommonCRS#ellipsoid()
  * @see org.apache.sis.referencing.factory.GeodeticAuthorityFactory#createEllipsoid(String)
@@ -115,6 +116,9 @@ import org.opengis.metadata.Identifier;
 @XmlType(name = "EllipsoidType", propOrder = {
     "semiMajorAxisMeasure",
     "secondDefiningParameter"
+})
+@XmlSeeAlso({
+    TriaxialEllipsoid.class
 })
 @XmlRootElement(name = "Ellipsoid")
 public class DefaultEllipsoid extends AbstractIdentifiedObject implements Ellipsoid {
@@ -699,7 +703,7 @@ public class DefaultEllipsoid extends AbstractIdentifiedObject implements Ellips
      * <strong>This is not a valid object.</strong> This constructor is strictly
      * reserved to JAXB, which will assign values to the fields using reflection.
      */
-    private DefaultEllipsoid() {
+    DefaultEllipsoid() {
         super(org.apache.sis.referencing.util.NilReferencingObject.INSTANCE);
         /*
          * We need to let the DefaultEllipsoid fields unitialized because afterUnmarshal(…)

@@ -56,7 +56,7 @@ import org.apache.sis.measure.Angle;
  * constants.
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
- * @version 1.5
+ * @version Testbed-19
  *
  * @see org.apache.sis.referencing.factory.GeodeticAuthorityFactory#createCartesianCS(String)
  *
@@ -135,11 +135,25 @@ public class DefaultCartesianCS extends DefaultAffineCS implements CartesianCS {
     }
 
     /**
+     * Creates a Cartesian coordinate system with an arbitrary number of axes.
+     * This constructor is for subclasses defining a generalization of Cartesian CS in more dimensions.
+     *
+     * @param  properties  the properties to be given to the identified object.
+     * @param  axes        the sequence of axes.
+     * @throws IllegalArgumentException if an axis has an illegal direction or an illegal unit of measurement.
+     *
+     * @since Testbed-19
+     */
+    protected DefaultCartesianCS(final Map<String,?> properties, final CoordinateSystemAxis[] axes) {
+        super(properties, axes);
+    }
+
+    /**
      * Creates a new CS derived from the specified one, but with different axis order or unit.
      *
      * @see #createForAxes(String, CoordinateSystemAxis[])
      */
-    private DefaultCartesianCS(DefaultCartesianCS original, String name, CoordinateSystemAxis[] axes) {
+    DefaultCartesianCS(DefaultCartesianCS original, String name, CoordinateSystemAxis[] axes) {
         super(original, name, axes);
     }
 
@@ -232,7 +246,7 @@ public class DefaultCartesianCS extends DefaultAffineCS implements CartesianCS {
      * Returns a coordinate system with different axes.
      */
     @Override
-    final AbstractCS createForAxes(final String name, final CoordinateSystemAxis[] axes) {
+    AbstractCS createForAxes(final String name, final CoordinateSystemAxis[] axes) {
         switch (axes.length) {
             case 1: return SubTypes.createOneDimensional(this, name, axes);
             case 2: // Fall through
@@ -262,6 +276,6 @@ public class DefaultCartesianCS extends DefaultAffineCS implements CartesianCS {
      * <strong>This is not a valid object.</strong> This constructor is strictly reserved to JAXB,
      * which will assign values to the fields using reflection.
      */
-    private DefaultCartesianCS() {
+    DefaultCartesianCS() {
     }
 }

@@ -91,6 +91,14 @@ public final class WKTKeywords extends Static {
             ToWGS84       = "ToWGS84";
 
     /**
+     * Related to {@link org.apache.sis.referencing.crs.DefaultInertialCRS}.
+     */
+    public static final String
+            CelestialBody = "CelestialBody",
+            InertialCRS   = "InertialCRS",
+            InertialDatum = "InertialDatum";
+
+    /**
      * Related to {@link org.apache.sis.referencing.crs.DefaultGeocentricCRS}
      * and {@link org.apache.sis.referencing.crs.DefaultGeographicCRS}.
      */

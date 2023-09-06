@@ -142,6 +142,7 @@ import org.opengis.referencing.ObjectDomain;
     org.apache.sis.referencing.datum.AbstractDatum.class,
     org.apache.sis.referencing.datum.DefaultEllipsoid.class,
     org.apache.sis.referencing.datum.DefaultPrimeMeridian.class,
+    org.apache.sis.referencing.datum.DefaultCelestialBody.class,
     org.apache.sis.referencing.cs.AbstractCS.class
 })
 @UseLegacyMetadata

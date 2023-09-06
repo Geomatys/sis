@@ -19,6 +19,7 @@ package org.apache.sis.referencing.datum;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlSchemaType;
 import jakarta.xml.bind.annotation.XmlElement;
@@ -39,11 +40,15 @@ import org.apache.sis.metadata.internal.ImplementationHelper;
 import org.apache.sis.metadata.iso.citation.Citations;
 import org.apache.sis.io.wkt.ElementKind;
 import org.apache.sis.io.wkt.Formatter;
+import org.apache.sis.xml.Namespaces;
+
 import static org.apache.sis.util.Utilities.deepEquals;
 import static org.apache.sis.util.collection.Containers.property;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import org.opengis.metadata.Identifier;
+import org.opengis.referencing.datum.CelestialBody;
+import org.apache.sis.referencing.util.WKTUtilities;
 
 
 /**
@@ -73,11 +78,13 @@ import org.opengis.metadata.Identifier;
  */
 @XmlType(name = "AbstractDatumType", propOrder = {
     "anchorPoint",
-    "realizationEpoch"
+    "realizationEpoch",
+    "body"
 })
 @XmlRootElement(name = "AbstractDatum")
 @XmlSeeAlso({
     DefaultGeodeticDatum.class,
+    DefaultInertialDatum.class,
     DefaultVerticalDatum.class,
     DefaultTemporalDatum.class,
     DefaultParametricDatum.class,
@@ -89,6 +96,18 @@ public class AbstractDatum extends AbstractIdentifiedObject implements Datum {
      * Serial number for inter-operability with different versions.
      */
     private static final long serialVersionUID = -729506171131910731L;
+
+    /**
+     * Identification of the star, planet, asteroid or other celestial body for which this datum is defined.
+     * May be {@code null} if this information is not provided.
+     *
+     * <p><b>Consider this field as final!</b>
+     * This field is modified only at unmarshalling time by {@link #setBody(CelestialBody)}</p>
+     *
+     * @see #getCelestialBody()
+     */
+    @SuppressWarnings("serial")                     // Most SIS implementations are serializable.
+    private CelestialBody celestialBody;
 
     /**
      * Description, possibly including coordinates, of the point or points used to anchor the datum
@@ -124,6 +143,10 @@ public class AbstractDatum extends AbstractIdentifiedObject implements Datum {
      *     <th>Property name</th>
      *     <th>Value type</th>
      *     <th>Returned by</th>
+     *   </tr><tr>
+     *     <td>{@value org.opengis.referencing.datum.Datum#CELESTIAL_BODY_KEY}</td>
+     *     <td>{@link CelestialBody}</td>
+     *     <td>{@link #getCelestialBody()}</td>
      *   </tr><tr>
      *     <td>{@value org.opengis.referencing.datum.Datum#ANCHOR_POINT_KEY}</td>
      *     <td>{@link InternationalString} or {@link String}</td>
@@ -161,6 +184,7 @@ public class AbstractDatum extends AbstractIdentifiedObject implements Datum {
      */
     public AbstractDatum(final Map<String,?> properties) {
         super(properties);
+        celestialBody    = property(properties, CELESTIAL_BODY_KEY, CelestialBody.class);
         realizationEpoch = ImplementationHelper.toMilliseconds(property(properties, REALIZATION_EPOCH_KEY, Date.class));
         anchorDefinition = Types.toInternationalString(properties, ANCHOR_POINT_KEY);
     }
@@ -221,6 +245,18 @@ public class AbstractDatum extends AbstractIdentifiedObject implements Datum {
     @Override
     public Class<? extends Datum> getInterface() {
         return Datum.class;
+    }
+
+    /**
+     * Returns identification of the star, planet, asteroid or other celestial body for which this datum is defined.
+     *
+     * @return star, planet, asteroid or other celestial body for which this datum is defined.
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public Optional<CelestialBody> getCelestialBody() {
+        return Optional.ofNullable(celestialBody);
     }
 
     /**
@@ -401,6 +437,10 @@ public class AbstractDatum extends AbstractIdentifiedObject implements Datum {
             }
         }
         formatter.append(name, ElementKind.DATUM);
+        getCelestialBody().ifPresent((celestialBody) -> {
+            formatter.newLine();
+            formatter.append(WKTUtilities.toFormattable(celestialBody));
+        });
         return null;
     }
 
@@ -428,6 +468,28 @@ public class AbstractDatum extends AbstractIdentifiedObject implements Datum {
     AbstractDatum() {
         super(org.apache.sis.referencing.util.NilReferencingObject.INSTANCE);
         realizationEpoch = Long.MIN_VALUE;
+    }
+
+    /**
+     * Invoked by JAXB only at marshalling time.
+     * This property is defined only in the "Non-Terresterial Geospatial" extension.
+     * We nevertheless provides this property in this base class as an extension,
+     * for avoiding to restrict this property to {@link DefaultInertialDatum}.
+     */
+    @XmlElement(name = "celestialBody", namespace = Namespaces.GSP)
+    private CelestialBody getBody() {
+        return getCelestialBody().orElse(null);
+    }
+
+    /**
+     * Invoked by JAXB only at unmarshalling time.
+     */
+    private void setBody(final CelestialBody value) {
+        if (celestialBody == null) {
+            celestialBody = value;
+        } else {
+            ImplementationHelper.propertyAlreadySet(AbstractDatum.class, "setBody", "celestialBody");
+        }
     }
 
     /**

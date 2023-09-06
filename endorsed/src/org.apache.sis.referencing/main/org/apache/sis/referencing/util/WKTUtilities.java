@@ -64,6 +64,8 @@ import org.apache.sis.math.Vector;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import org.opengis.metadata.Identifier;
+import org.opengis.referencing.datum.CelestialBody;
+import org.apache.sis.referencing.datum.DefaultCelestialBody;
 
 
 /**
@@ -188,6 +190,20 @@ public final class WKTUtilities extends Static {
             return (FormattableObject) object;
         } else {
             return DefaultGeodeticDatum.castOrCopy(object);
+        }
+    }
+
+    /**
+     * Returns the celestial body as a formattable object.
+     *
+     * @param  object  the celestial body, or {@code null}.
+     * @return the given celestial body as a formattable object, or {@code null}.
+     */
+    public static FormattableObject toFormattable(final CelestialBody object) {
+        if (object instanceof FormattableObject) {
+            return (FormattableObject) object;
+        } else {
+            return DefaultCelestialBody.castOrCopy(object);
         }
     }
 

@@ -59,6 +59,7 @@
 @XmlSchema(location = "http://schemas.opengis.net/gml/3.2.1/datums.xsd",
            elementFormDefault = XmlNsForm.QUALIFIED, namespace = Namespaces.GML, xmlns =
 {
+    @XmlNs(prefix = "gsp", namespaceURI = Namespaces.GSP),
     @XmlNs(prefix = "gml", namespaceURI = Namespaces.GML),
     @XmlNs(prefix = "gmd", namespaceURI = LegacyNamespaces.GMD),
     @XmlNs(prefix = "gco", namespaceURI = Namespaces.GCO),
@@ -67,6 +68,7 @@
 @XmlAccessorType(XmlAccessType.NONE)
 @XmlJavaTypeAdapters({
     @XmlJavaTypeAdapter(EX_Extent.class),
+    @XmlJavaTypeAdapter(CD_CelestialBody.class),
     @XmlJavaTypeAdapter(CD_Ellipsoid.class),
     @XmlJavaTypeAdapter(CD_PrimeMeridian.class),
     @XmlJavaTypeAdapter(CD_VerticalDatumType.class),

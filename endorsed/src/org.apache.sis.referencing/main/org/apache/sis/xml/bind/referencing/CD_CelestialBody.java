@@ -16,24 +16,26 @@
  */
 package org.apache.sis.xml.bind.referencing;
 
-import jakarta.xml.bind.annotation.XmlElementRef;
-import org.opengis.referencing.datum.Ellipsoid;
+import jakarta.xml.bind.annotation.XmlElement;
+import org.opengis.referencing.datum.CelestialBody;
+import org.apache.sis.referencing.datum.DefaultCelestialBody;
 import org.apache.sis.xml.bind.gco.PropertyType;
-import org.apache.sis.referencing.datum.DefaultEllipsoid;
+import org.apache.sis.xml.Namespaces;
 
 
 /**
  * JAXB adapter mapping implementing class to the GeoAPI interface. See
  * package documentation for more information about JAXB and interface.
  *
- * @author  Cédric Briançon (Geomatys)
  * @author  Martin Desruisseaux (Geomatys)
+ * @version Testbed-19
+ * @since   Testbed-19
  */
-public final class CD_Ellipsoid extends PropertyType<CD_Ellipsoid, Ellipsoid> {
+public final class CD_CelestialBody extends PropertyType<CD_CelestialBody, CelestialBody> {
     /**
      * Empty constructor for JAXB only.
      */
-    public CD_Ellipsoid() {
+    public CD_CelestialBody() {
     }
 
     /**
@@ -41,52 +43,50 @@ public final class CD_Ellipsoid extends PropertyType<CD_Ellipsoid, Ellipsoid> {
      * This method is indirectly invoked by the private constructor
      * below, so it shall not depend on the state of this object.
      *
-     * @return {@code Ellipsoid.class}
+     * @return {@code CelestialBody.class}
      */
     @Override
-    protected Class<Ellipsoid> getBoundType() {
-        return Ellipsoid.class;
+    protected Class<CelestialBody> getBoundType() {
+        return CelestialBody.class;
     }
 
     /**
      * Constructor for the {@link #wrap} method only.
      */
-    private CD_Ellipsoid(final Ellipsoid ellipsoid) {
-        super(ellipsoid);
+    private CD_CelestialBody(final CelestialBody datum) {
+        super(datum);
     }
 
     /**
      * Invoked by {@link PropertyType} at marshalling time for wrapping the given value
-     * in a {@code <gml:Ellipsoid>} XML element.
+     * in a {@code <gsp:CelestialBody>} XML element.
      *
-     * @param  ellipsoid  the element to marshal.
+     * @param  datum  the element to marshal.
      * @return a {@code PropertyType} wrapping the given the element.
      */
     @Override
-    protected CD_Ellipsoid wrap(final Ellipsoid ellipsoid) {
-        return new CD_Ellipsoid(ellipsoid);
+    protected CD_CelestialBody wrap(final CelestialBody datum) {
+        return new CD_CelestialBody(datum);
     }
 
     /**
      * Invoked by JAXB at marshalling time for getting the actual element to write
-     * inside the {@code <gml:Ellipsoid>} XML element.
+     * inside the {@code <gsp:CelestialBody>} XML element.
      * This is the value or a copy of the value given in argument to the {@code wrap} method.
      *
      * @return the element to be marshalled.
      */
-    @XmlElementRef
-    public DefaultEllipsoid getElement() {
-        return DefaultEllipsoid.castOrCopy(metadata);
+    @XmlElement(name = "CelestialBody", namespace = Namespaces.GSP)
+    public DefaultCelestialBody getElement() {
+        return DefaultCelestialBody.castOrCopy(metadata);
     }
 
     /**
      * Invoked by JAXB at unmarshalling time for storing the result temporarily.
      *
-     * @param  ellipsoid  the unmarshalled element.
+     * @param  datum  the unmarshalled element.
      */
-    public void setElement(final DefaultEllipsoid ellipsoid) {
-        metadata = ellipsoid;
-        if (!(ellipsoid.getSemiMajorAxis() > 0)) incomplete("semiMajorAxis");   // Use '!' for catching NaN.
-        if (!(ellipsoid.getSemiMinorAxis() > 0)) incomplete("semiMinorAxis");
+    public void setElement(final DefaultCelestialBody datum) {
+        metadata = datum;
     }
 }

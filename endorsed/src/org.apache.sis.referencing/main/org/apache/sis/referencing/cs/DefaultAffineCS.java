@@ -51,7 +51,7 @@ import org.apache.sis.measure.Units;
  * constants.
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
- * @version 1.5
+ * @version Testbed-19
  * @since   0.4
  */
 @XmlType(name = "AffineCSType")
@@ -126,6 +126,20 @@ public class DefaultAffineCS extends AbstractCS implements AffineCS {
     }
 
     /**
+     * Creates an affine coordinate system with an arbitrary number of axes.
+     * This constructor is for subclasses defining a generalization of affine CS in more dimensions.
+     *
+     * @param  properties  the properties to be given to the identified object.
+     * @param  axes        the sequence of axes.
+     * @throws IllegalArgumentException if an axis has an illegal direction or an illegal unit of measurement.
+     *
+     * @since Testbed-19
+     */
+    protected DefaultAffineCS(final Map<String,?> properties, final CoordinateSystemAxis[] axes) {
+        super(properties, axes);
+    }
+
+    /**
      * Creates a new CS derived from the specified one, but with different axis order or unit.
      *
      * @see #createForAxes(String, CoordinateSystemAxis[])
@@ -182,7 +196,7 @@ public class DefaultAffineCS extends AbstractCS implements AffineCS {
      * later are used for grid and display coordinates.</p>
      */
     @Override
-    final int validateAxis(final AxisDirection direction, final Unit<?> unit) {
+    int validateAxis(final AxisDirection direction, final Unit<?> unit) {
         if (!AxisDirections.isSpatialOrUserDefined(direction, true)) {
             return INVALID_DIRECTION;
         }
