@@ -96,7 +96,7 @@ import org.apache.sis.system.Shutdown;
  * Subclasses should select the interfaces that they choose to implement.
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
- * @version 1.4
+ * @version Testbed-19
  *
  * @param <DAO>  the type of factory used as Data Access Object (DAO).
  *
@@ -944,6 +944,31 @@ public abstract class ConcurrentAuthorityFactory<DAO extends GeodeticAuthorityFa
     }
 
     /**
+     * Returns an inertial coordinate reference system from a code.
+     * The default implementation performs the following steps:
+     * <ul>
+     *   <li>Return the cached instance for the given code if such instance already exists.</li>
+     *   <li>Otherwise if the Data Access Object (DAO) overrides the {@code createInertialCRS(String)}
+     *       method, invoke that method and cache the result for future use.</li>
+     *   <li>Otherwise delegate to the {@link GeodeticAuthorityFactory#createInertialCRS(String)}
+     *       method in the parent class. This allows to check if the more generic
+     *       {@link #createCoordinateReferenceSystem(String)} method cached a value before to try that method.</li>
+     * </ul>
+     *
+     * @return the coordinate reference system for the given code.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public InertialCRS createInertialCRS(final String code) throws FactoryException {
+        if (isDefault(InertialCRS.class)) {
+            return super.createInertialCRS(code);
+        }
+        return create(AuthorityFactoryProxy.INERTIAL_CRS, code);
+    }
+
+    /**
      * Returns a 2-dimensional coordinate reference system used to approximate the shape of the earth on a planar surface.
      * The default implementation performs the following steps:
      * <ul>
@@ -1293,6 +1318,56 @@ public abstract class ConcurrentAuthorityFactory<DAO extends GeodeticAuthorityFa
     }
 
     /**
+     * Returns a datum defining the origin of an inertial coordinate reference system.
+     * The default implementation performs the following steps:
+     * <ul>
+     *   <li>Return the cached instance for the given code if such instance already exists.</li>
+     *   <li>Otherwise if the Data Access Object (DAO) overrides the {@code createInertialReferenceFrame(String)}
+     *       method, invoke that method and cache the result for future use.</li>
+     *   <li>Otherwise delegate to the {@link GeodeticAuthorityFactory#createInertialReferenceFrame(String)}
+     *       method in the parent class. This allows to check if the more generic
+     *       {@link #createDatum(String)} method cached a value before to try that method.</li>
+     * </ul>
+     *
+     * @return the datum for the given code.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public InertialReferenceFrame createInertialReferenceFrame(final String code) throws FactoryException {
+        if (isDefault(InertialReferenceFrame.class)) {
+            return super.createInertialReferenceFrame(code);
+        }
+        return create(AuthorityFactoryProxy.INERTIAL_DATUM, code);
+    }
+
+    /**
+     * Returns a celestial body identification.
+     * The default implementation performs the following steps:
+     * <ul>
+     *   <li>Return the cached instance for the given code if such instance already exists.</li>
+     *   <li>Otherwise if the Data Access Object (DAO) overrides the {@code createCelestialBody(String)}
+     *       method, invoke that method and cache the result for future use.</li>
+     *   <li>Otherwise delegate to the {@link GeodeticAuthorityFactory#createCelestialBody(String)}
+     *       method in the parent class. This allows to check if the more generic
+     *       {@link #createObject(String)} method cached a value before to try that method.</li>
+     * </ul>
+     *
+     * @return the celestial body for the given code.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public CelestialBody createCelestialBody(final String code) throws FactoryException {
+        if (isDefault(CelestialBody.class)) {
+            return super.createCelestialBody(code);
+        }
+        return create(AuthorityFactoryProxy.CELESTIAL_BODY, code);
+    }
+
+    /**
      * Returns a geometric figure that can be used to describe the approximate shape of the earth.
      * The default implementation performs the following steps:
      * <ul>
@@ -1475,6 +1550,28 @@ public abstract class ConcurrentAuthorityFactory<DAO extends GeodeticAuthorityFa
             return super.createParametricCS(code);
         }
         return create(AuthorityFactoryProxy.PARAMETRIC_CS, code);
+    }
+
+    /**
+     * Returns a 4-dimensional Minkowski coordinate system from a code.
+     * The default implementation performs the following steps:
+     * <ul>
+     *   <li>Return the cached instance for the given code if such instance already exists.</li>
+     *   <li>Otherwise if the Data Access Object (DAO) overrides the {@code createMinkowskiCS(String)}
+     *       method, invoke that method and cache the result for future use.</li>
+     *   <li>Otherwise delegate to the {@link GeodeticAuthorityFactory#createMinkowskiCS(String)}
+     *
+     * @return the coordinate system for the given code.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public MinkowskiCS createMinkowskiCS(final String code) throws FactoryException {
+        if (isDefault(MinkowskiCS.class)) {
+            return super.createMinkowskiCS(code);
+        }
+        return create(AuthorityFactoryProxy.MINKOWSKI_CS, code);
     }
 
     /**

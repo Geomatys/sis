@@ -39,7 +39,10 @@ import org.apache.sis.xml.Namespaces;
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version Testbed-19
- * @since   Testbed-19
+ *
+ * @see org.apache.sis.referencing.factory.GeodeticAuthorityFactory#createMinkowskiCS(String)
+ *
+ * @since Testbed-19
  */
 @XmlType(name = "MinkowskiCSType", namespace = Namespaces.GSP)
 @XmlRootElement(name = "MinkowskiCS", namespace = Namespaces.GSP)

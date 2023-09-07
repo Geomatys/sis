@@ -234,6 +234,16 @@ abstract class AuthorityFactoryProxy<T> {
             }
     };
 
+    static final AuthorityFactoryProxy<InertialReferenceFrame> INERTIAL_DATUM =
+        new AuthorityFactoryProxy<InertialReferenceFrame>(InertialReferenceFrame.class, AuthorityFactoryIdentifier.DATUM) {
+            @Override InertialReferenceFrame create(GeodeticAuthorityFactory factory, String code) throws FactoryException {
+                return factory.createInertialReferenceFrame(code);
+            }
+            @Override InertialReferenceFrame createFromAPI(AuthorityFactory factory, String code) throws FactoryException {
+                return datumFactory(factory).createInertialReferenceFrame(code);
+            }
+    };
+
     static final AuthorityFactoryProxy<VerticalDatum> VERTICAL_DATUM =
         new AuthorityFactoryProxy<VerticalDatum>(VerticalDatum.class, AuthorityFactoryIdentifier.DATUM) {
             @Override VerticalDatum create(GeodeticAuthorityFactory factory, String code) throws FactoryException {
@@ -261,6 +271,16 @@ abstract class AuthorityFactoryProxy<T> {
             }
             @Override GeodeticDatum createFromAPI(AuthorityFactory factory, String code) throws FactoryException {
                 return datumFactory(factory).createGeodeticDatum(code);
+            }
+    };
+
+    static final AuthorityFactoryProxy<CelestialBody> CELESTIAL_BODY =
+        new AuthorityFactoryProxy<CelestialBody>(CelestialBody.class, AuthorityFactoryIdentifier.DATUM) {
+            @Override CelestialBody create(GeodeticAuthorityFactory factory, String code) throws FactoryException {
+                return factory.createCelestialBody(code);
+            }
+            @Override CelestialBody createFromAPI(AuthorityFactory factory, String code) throws FactoryException {
+                return datumFactory(factory).createCelestialBody(code);
             }
     };
 
@@ -384,6 +404,16 @@ abstract class AuthorityFactoryProxy<T> {
             }
     };
 
+    static final AuthorityFactoryProxy<MinkowskiCS> MINKOWSKI_CS =
+        new AuthorityFactoryProxy<MinkowskiCS>(MinkowskiCS.class, AuthorityFactoryIdentifier.CS) {
+            @Override MinkowskiCS create(GeodeticAuthorityFactory factory, String code) throws FactoryException {
+                return factory.createMinkowskiCS(code);
+            }
+            @Override MinkowskiCS createFromAPI(AuthorityFactory factory, String code) throws FactoryException {
+                return csFactory(factory).createMinkowskiCS(code);
+            }
+    };
+
     static final AuthorityFactoryProxy<CoordinateSystemAxis> AXIS =
         new AuthorityFactoryProxy<CoordinateSystemAxis>(CoordinateSystemAxis.class, AuthorityFactoryIdentifier.CS) {
             @Override CoordinateSystemAxis create(GeodeticAuthorityFactory factory, String code) throws FactoryException {
@@ -462,6 +492,16 @@ abstract class AuthorityFactoryProxy<T> {
             }
             @Override GeocentricCRS createFromAPI(AuthorityFactory factory, String code) throws FactoryException {
                 return crsFactory(factory).createGeocentricCRS(code);
+            }
+    };
+
+    static final AuthorityFactoryProxy<InertialCRS> INERTIAL_CRS =
+        new AuthorityFactoryProxy<InertialCRS>(InertialCRS.class, AuthorityFactoryIdentifier.CRS) {
+            @Override InertialCRS create(GeodeticAuthorityFactory factory, String code) throws FactoryException {
+                return factory.createInertialCRS(code);
+            }
+            @Override InertialCRS createFromAPI(AuthorityFactory factory, String code) throws FactoryException {
+                return crsFactory(factory).createInertialCRS(code);
             }
     };
 

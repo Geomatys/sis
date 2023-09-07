@@ -44,7 +44,10 @@ import org.apache.sis.xml.Namespaces;
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version Testbed-19
- * @since   Testbed-19
+ *
+ * @see org.apache.sis.referencing.factory.GeodeticAuthorityFactory#createInertialReferenceFrame(String)
+ *
+ * @since Testbed-19
  */
 @XmlType(name = "InertialReferenceFrameType", namespace = Namespaces.GSP, propOrder = {
     "ellipsoid",

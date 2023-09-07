@@ -64,7 +64,7 @@ import org.apache.sis.util.resources.Errors;
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Johann Sorel (Geomatys)
- * @version 1.5
+ * @version Testbed-19
  * @since   0.7
  */
 public abstract class GeodeticAuthorityFactory extends AbstractFactory implements AuthorityFactory {
@@ -312,6 +312,26 @@ public abstract class GeodeticAuthorityFactory extends AbstractFactory implement
      */
     public GeocentricCRS createGeocentricCRS(final String code) throws NoSuchAuthorityCodeException, FactoryException {
         return cast(GeocentricCRS.class, createCoordinateReferenceSystem(code), code);
+    }
+
+    /**
+     * Creates an inertial coordinate reference system from a code.
+     *
+     * <h4>Default implementation</h4>
+     * The default implementation delegates to {@link #createCoordinateReferenceSystem(String)} and casts the result.
+     * If the result cannot be casted, then a {@link NoSuchAuthorityCodeException} is thrown.
+     *
+     * @param  code  value allocated by authority.
+     * @return the coordinate reference system for the given code.
+     * @throws NoSuchAuthorityCodeException if the specified {@code code} was not found.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @see org.apache.sis.referencing.crs.DefaultInertialCRS
+     *
+     * @since Testbed-19
+     */
+    public InertialCRS createInertialCRS(final String code) throws FactoryException {
+        return cast(InertialCRS.class, createCoordinateReferenceSystem(code), code);
     }
 
     /**
@@ -712,6 +732,46 @@ public abstract class GeodeticAuthorityFactory extends AbstractFactory implement
     }
 
     /**
+     * Creates an inertial reference frame from a code.
+     *
+     * <h4>Default implementation</h4>
+     * The default implementation delegates to {@link #createDatum(String)} and casts the result.
+     * If the result cannot be casted, then a {@link NoSuchAuthorityCodeException} is thrown.
+     *
+     * @param  code  value allocated by authority.
+     * @return the datum for the given code.
+     * @throws NoSuchAuthorityCodeException if the specified {@code code} was not found.
+     * @throws FactoryException if the object creation failed for some other reason.
+     *
+     * @see org.apache.sis.referencing.datum.DefaultInertialDatum
+     *
+     * @since Testbed-19
+     */
+    public InertialReferenceFrame createInertialReferenceFrame(final String code) throws FactoryException {
+        return cast(InertialReferenceFrame.class, createDatum(code), code);
+    }
+
+    /**
+     * Creates a celestial body identification.
+     *
+     * <h4>Default implementation</h4>
+     * The default implementation delegates to {@link #createObject(String)} and casts the result.
+     * If the result cannot be casted, then a {@link NoSuchAuthorityCodeException} is thrown.
+     *
+     * @param  code  value allocated by authority.
+     * @return the celestial body for the given code.
+     * @throws NoSuchAuthorityCodeException if the specified {@code code} was not found.
+     * @throws FactoryException if the object creation failed for some other reason.
+     *
+     * @see org.apache.sis.referencing.datum.DefaultCelestialBody
+     *
+     * @since Testbed-19
+     */
+    public CelestialBody createCelestialBody(final String code) throws NoSuchAuthorityCodeException, FactoryException {
+        return cast(CelestialBody.class, createObject(code), code);
+    }
+
+    /**
      * Creates a geometric figure that can be used to describe the approximate shape of the earth.
      * In mathematical terms, it is a surface formed by the rotation of an ellipse about its minor axis.
      *
@@ -943,6 +1003,26 @@ public abstract class GeodeticAuthorityFactory extends AbstractFactory implement
      */
     public ParametricCS createParametricCS(final String code) throws NoSuchAuthorityCodeException, FactoryException {
         return cast(ParametricCS.class, createCoordinateSystem(code), code);
+    }
+
+    /**
+     * Creates a 4-dimensional Minkowski coordinate system from a code.
+     *
+     * <h4>Default implementation</h4>
+     * The default implementation delegates to {@link #createCoordinateSystem(String)} and casts the result.
+     * If the result cannot be casted, then a {@link NoSuchAuthorityCodeException} is thrown.
+     *
+     * @param  code  value allocated by authority.
+     * @return the coordinate system for the given code.
+     * @throws NoSuchAuthorityCodeException if the specified {@code code} was not found.
+     * @throws FactoryException if the object creation failed for some other reason.
+     *
+     * @see org.apache.sis.referencing.cs.DefaultMinkowskiCS
+     *
+     * @since Testbed-19
+     */
+    public MinkowskiCS createMinkowskiCS(final String code) throws FactoryException {
+        return cast(MinkowskiCS.class, createCoordinateSystem(code), code);
     }
 
     /**

@@ -177,7 +177,7 @@ import org.apache.sis.xml.XML;
  * @author  Martin Desruisseaux (IRD, Geomatys)
  * @author  Guilhem Legal (Geomatys)
  * @author  Johann Sorel (Geomatys)
- * @version 1.4
+ * @version Testbed-19
  * @since   0.6
  */
 public class GeodeticObjectFactory extends AbstractFactory implements CRSFactory, CSFactory, DatumFactory, Parser {
@@ -747,6 +747,30 @@ public class GeodeticObjectFactory extends AbstractFactory implements CRSFactory
     }
 
     /**
+     * Creates a celestial body identification.
+     *
+     * <p>The default implementation creates a {@link DefaultCelestialBody} instance.</p>
+     *
+     * @param  properties   name and other properties to give to the new object.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @see DefaultCelestialBody#DefaultCelestialBody(Map)
+     * @see GeodeticAuthorityFactory#createCelestialBody(String)
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public CelestialBody createCelestialBody(final Map<String,?> properties) throws FactoryException {
+        final DefaultCelestialBody body;
+        try {
+            body = new DefaultCelestialBody(complete(properties));
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidGeodeticParameterException(exception);
+        }
+        return unique("createCelestialBody", body);
+    }
+
+    /**
      * Creates a projected coordinate reference system from a conversion.
      * Projected CRS are used to approximate the shape of the earth on a planar surface in such a way
      * that the distortion that is inherent to the approximation is controlled and known.
@@ -1154,6 +1178,127 @@ public class GeodeticObjectFactory extends AbstractFactory implements CRSFactory
             throw new InvalidGeodeticParameterException(exception);
         }
         return unique("createParametricCS", cs);
+    }
+
+    /**
+     * Creates an inertial coordinate reference system.
+     * Inertial CRS have axes at fixed position relative to stars.
+     *
+     * <h4>Dependencies</h4>
+     * The components needed by this method can be created by the following methods:
+     * <ol>
+     *   <li>{@link #createCoordinateSystemAxis(Map, String, AxisDirection, Unit)}</li>
+     *   <li>One of:<ul>
+     *     <li>{@link #createCartesianCS(Map, CoordinateSystemAxis, CoordinateSystemAxis, CoordinateSystemAxis)}</li>
+     *     <li>{@link #createSphericalCS(Map, CoordinateSystemAxis, CoordinateSystemAxis, CoordinateSystemAxis)}</li>
+     *     <li>{@link #createMinkowskiCS(Map, CoordinateSystemAxis, CoordinateSystemAxis, CoordinateSystemAxis, CoordinateSystemAxis)}</li>
+     *   </ul></li>
+     *   <li>{@link #createInertialReferenceFrame(Map, Ellipsoid, PrimeMeridian)}</li>
+     * </ol>
+     *
+     * The default implementation creates a {@link DefaultInertialCRS} instance.
+     *
+     * @param  properties  name and other properties to give to the new object.
+     * @param  datum       the inertial datum to use in created CRS.
+     * @param  cs          the coordinate system for the created CRS.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @see DefaultInertialCRS#DefaultInertialCRS(Map, InertialReferenceFrame, CoordinateSystem)
+     * @see GeodeticAuthorityFactory#createInertialCRS(String)
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public InertialCRS createInertialCRS(Map<String,?> properties,
+                                          InertialReferenceFrame datum,
+                                          CoordinateSystem cs) throws FactoryException
+    {
+        final DefaultInertialCRS crs;
+        try {
+            crs = new DefaultInertialCRS(complete(properties), datum, cs);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidGeodeticParameterException(exception);
+        }
+        return unique("createInertialCRS", crs);
+    }
+
+    /**
+     * Creates an inertial datum from an ellipsoid.
+     *
+     * <h4>Dependencies</h4>
+     * The components needed by this method can be created by the following methods:
+     * <ol>
+     *   <li>One of:<ul>
+     *     <li>{@link #createEllipsoid(Map, double, double, Unit)}</li>
+     *     <li>{@link #createFlattenedSphere(Map, double, double, Unit)}</li>
+     *   </ul></li>
+     *   <li>{@link #createPrimeMeridian(Map, double, Unit)}</li>
+     * </ol>
+     *
+     * The default implementation creates a {@link DefaultInertialDatum} instance.
+     *
+     * @param  properties     name and other properties to give to the new object.
+     * @param  ellipsoid      the ellipsoid to use in new inertial datum.
+     * @param  primeMeridian  the prime meridian to use in new inertial datum.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @see DefaultInertialDatum#DefaultInertialDatum(Map, Ellipsoid, PrimeMeridian)
+     * @see GeodeticAuthorityFactory#createInertialReferenceFrame(String)
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public InertialReferenceFrame createInertialReferenceFrame(final Map<String,?> properties,
+            final Ellipsoid ellipsoid, final PrimeMeridian primeMeridian) throws FactoryException
+    {
+        final DefaultInertialDatum datum;
+        try {
+            datum = new DefaultInertialDatum(complete(properties), ellipsoid, primeMeridian);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidGeodeticParameterException(exception);
+        }
+        return unique("createInertialReferenceFrame", datum);
+    }
+
+    /**
+     * Creates a four-dimensional Minkowski coordinate system.
+     * The coordinate system has three spatial axes and one temporal axis,
+     * with time expressed by the distance travelled by light in vacuum during the ellapsed time.
+     *
+     * <h4>Dependencies</h4>
+     * The components needed by this method can be created by the following methods:
+     * <ol>
+     *   <li>{@link #createCoordinateSystemAxis(Map, String, AxisDirection, Unit)}</li>
+     * </ol>
+     *
+     * The default implementation creates a {@link DefaultMinkowskiCS} instance.
+     *
+     * @param  properties  name and other properties to give to the new object.
+     * @param  axis0       the first  axis.
+     * @param  axis1       the second axis.
+     * @param  axis2       the third  axis.
+     * @param  axis3       the fourth axis.
+     * @throws FactoryException if the object creation failed.
+     *
+     * @see DefaultMinkowskiCS#DefaultMinkowskiCS(Map, CoordinateSystemAxis, CoordinateSystemAxis, CoordinateSystemAxis)
+     * @see GeodeticAuthorityFactory#createMinkowskiCS(String)
+     *
+     * @since Testbed-19
+     */
+    @Override
+    public MinkowskiCS createMinkowskiCS(final Map<String,?> properties,
+            final CoordinateSystemAxis axis0,
+            final CoordinateSystemAxis axis1,
+            final CoordinateSystemAxis axis2,
+            final CoordinateSystemAxis axis3) throws FactoryException
+    {
+        final DefaultMinkowskiCS cs;
+        try {
+            cs = new DefaultMinkowskiCS(complete(properties), axis0, axis1, axis2, axis3);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidGeodeticParameterException(exception);
+        }
+        return unique("createMinkowskiCS", cs);
     }
 
     /**

@@ -50,7 +50,10 @@ import org.apache.sis.metadata.internal.ImplementationHelper;
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version Testbed-19
- * @since   Testbed-19
+ *
+ * @see org.apache.sis.referencing.factory.GeodeticAuthorityFactory#createInertialCRS(String)
+ *
+ * @since Testbed-19
  */
 @XmlType(name = "InertialCRSType", namespace = Namespaces.GSP, propOrder = {
     "ellipsoidalCS",

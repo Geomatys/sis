@@ -37,7 +37,10 @@ import org.apache.sis.xml.Namespaces;
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version Testbed-19
- * @since   Testbed-19
+ *
+ * @see org.apache.sis.referencing.factory.GeodeticAuthorityFactory#createCelestialBody(String)
+ *
+ * @since Testbed-19
  */
 @XmlType(name = "CelestialBodyType", namespace = Namespaces.GSP)
 @XmlRootElement(name = "CelestialBody", namespace = Namespaces.GSP)
