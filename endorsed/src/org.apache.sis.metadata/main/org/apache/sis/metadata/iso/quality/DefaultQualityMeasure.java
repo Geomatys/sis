@@ -71,7 +71,7 @@ import org.apache.sis.xml.Namespaces;
     "parameters"
 })
 @XmlRootElement(name = "DQM_Measure", namespace = Namespaces.DQM)
-public class DefaultQualityMeasure extends ISOMetadata implements QualityMeasure {
+public class DefaultQualityMeasure extends ISOMetadata implements Measure, QualityMeasure {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -124,7 +124,7 @@ public class DefaultQualityMeasure extends ISOMetadata implements QualityMeasure
      */
     @Deprecated
     @SuppressWarnings("serial")
-    private MeasureDescription description;
+    private Description description;
 
     /**
      * Descriptions of the data quality measure.
@@ -195,8 +195,8 @@ public class DefaultQualityMeasure extends ISOMetadata implements QualityMeasure
             sourceReferences  = copyCollection(object.getSourceReferences(), SourceReference.class);
             parameters        = copyCollection(object.getParameters(), (Class) ParameterDescriptor.class);
             // this field is deprecated. The following instruction is kept only for retro-compatibility.
-            //todo : needs clarification on relationship between Measure and QualityMeasure
-//            description       = object.getDescription();
+//            todo : needs clarification on relationship between Measure and QualityMeasure
+            description       = ((Measure) object).getDescription();
         }
     }
 
@@ -390,8 +390,8 @@ public class DefaultQualityMeasure extends ISOMetadata implements QualityMeasure
     //todo : needs clarification on relationship between Measure and QualityMeasure
 //    @Override
     @XmlElement(name = "description")
-    public MeasureDescription getDescription() {
-       return description;
+    public Description getDescription() {
+       return (Description) description;
     }
 
     /**
@@ -402,7 +402,7 @@ public class DefaultQualityMeasure extends ISOMetadata implements QualityMeasure
      * @deprecated Replaced by {@link #setDescriptions} as of ISO 19157:2023.
      */
     @Deprecated
-    public void setDescription(final MeasureDescription newValue)  {
+    public void setDescription(final Description newValue)  {
         checkWritePermission(description);
         description = newValue;
     }

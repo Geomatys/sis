@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.function.Function;
 import java.util.function.BiConsumer;
 import java.time.temporal.Temporal;
+
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
@@ -29,14 +30,7 @@ import jakarta.xml.bind.annotation.XmlSeeAlso;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import org.opengis.metadata.Identifier;
 import org.opengis.metadata.citation.Citation;
-import org.opengis.metadata.quality.QualityResult;
-import org.opengis.metadata.quality.QualityElement;
-import org.opengis.metadata.quality.Usability;
-import org.opengis.metadata.quality.Completeness;
-import org.opengis.metadata.quality.ThematicAccuracy;
-import org.opengis.metadata.quality.PositionalAccuracy;
-import org.opengis.metadata.quality.LogicalConsistency;
-import org.opengis.metadata.quality.EvaluationMethodType;
+import org.opengis.metadata.quality.*;
 import org.opengis.util.InternationalString;
 import org.apache.sis.xml.bind.FilterByVersion;
 import org.apache.sis.xml.bind.gco.InternationalStringAdapter;
@@ -48,10 +42,6 @@ import org.apache.sis.xml.util.LegacyNamespaces;
 import static org.apache.sis.util.collection.Containers.isNullOrEmpty;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.TemporalQuality;
-import org.opengis.metadata.quality.EvaluationMethod;
-import org.opengis.metadata.quality.MeasureReference;
-import org.opengis.metadata.quality.Metaquality;
 
 
 /**
@@ -78,33 +68,33 @@ import org.opengis.metadata.quality.Metaquality;
  * @version 1.4
  * @since   0.3
  */
-@XmlType(name = "AbstractDQ_Element_Type", propOrder = {
-    "standaloneQualityReportDetails",
-    "measureReference",
-    "evaluationMethod",
-    "namesOfMeasure",
-    "measureIdentification",
-    "measureDescription",
-    "evaluationMethodType",
-    "evaluationMethodDescription",
-    "evaluationProcedure",
-    "dates",
-    "results",
-    "derivedElement"
-})
-@XmlRootElement(name = "AbstractDQ_Element")
-@XmlSeeAlso({
-    AbstractCompleteness.class,
-    AbstractLogicalConsistency.class,
-    AbstractPositionalAccuracy.class,
-    AbstractThematicAccuracy.class,
-    AbstractTemporalQuality.class,
-    DefaultUsability.class,
-    AbstractMetaquality.class,
-    DefaultQualityMeasure.class     // Not a subclass, but "weakly" associated.
-})
+//@XmlType(name = "AbstractDQ_Element_Type", propOrder = {
+//    "standaloneQualityReportDetails",
+//    "measureReference",
+//    "evaluationMethod",
+//    "namesOfMeasure",
+//    "measureIdentification",
+//    "measureDescription",
+//    "evaluationMethodType",
+//    "evaluationMethodDescription",
+//    "evaluationProcedure",
+//    "dates",
+//    "results",
+//    "derivedElement"
+//})
+//@XmlRootElement(name = "AbstractDQ_Element")
+//@XmlSeeAlso({
+//    AbstractCompleteness.class,
+//    AbstractLogicalConsistency.class,
+//    AbstractPositionalAccuracy.class,
+//    AbstractThematicAccuracy.class,
+//    AbstractTemporalQuality.class,
+//    DefaultUsability.class,
+//    AbstractMetaquality.class,
+//    DefaultQualityMeasure.class     // Not a subclass, but "weakly" associated.
+//})
 @SuppressWarnings("deprecation")
-public class AbstractQualityElement extends ISOMetadata implements QualityElement {
+public class AbstractQualityElement extends ISOMetadata implements Element, QualityElement {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -147,6 +137,16 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
     private Collection<QualityResult> results;
 
     /**
+     * Value (or set of values) obtained from applying a data quality measure.
+     *
+     * @deprecated Replaced by {@link #getQualityResults()}.
+     *
+     */
+    @SuppressWarnings("serial")
+    private Collection<Result> oldResults;
+
+
+    /**
      * In case of aggregation or derivation, indicates the original element.
      */
     @SuppressWarnings("serial")
@@ -183,15 +183,17 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
            if ((measureReference = object.getMeasureReference()) == null) {
                 DefaultMeasureReference candidate = new DefaultMeasureReference();
                //todo : needs clarification on relationship between Element and QualityElement
-//                if (candidate.setLegacy(object)) measureReference = candidate;
+                if (candidate.setLegacy((AbstractElement) object)) measureReference = candidate;
             }
             evaluationMethods = copyCollection(object.getEvaluationMethods(), EvaluationMethod.class);
             results          = copyCollection(object.getQualityResults(), QualityResult.class);
-            derivedElements  = copyCollection(object.getDerivedElements(), QualityElement.class);
+            derivedElements  = copyCollection(object.getDerivedQualityElements(), QualityElement.class);
 
             // these two field are deprecated. The following instructions are kept only for retro-compatibility.
-//            standaloneQualityReportDetails = object.getStandaloneQualityReportDetails();
-//            evaluationMethod = object.getEvaluationMethod();
+            if (object instanceof EvaluationMethod) {
+                standaloneQualityReportDetails = ((Element) object).getStandaloneQualityReportDetails();
+                evaluationMethod = ((Element) object).getEvaluationMethod();
+            }
         }
     }
 
@@ -307,7 +309,7 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
      * Returns the value of a {@link #measureReference} property.
      * This is used only for deprecated setter methods from older ISO 19115 version.
      *
-     * @see #getEvaluationMethodProperty(Function)
+//     * @see #getEvaluationMethodProperty(Function)
      */
     private <V> V getMeasureReferenceProperty(final Function<MeasureReference,V> getter) {
         final MeasureReference m = getMeasureReference();
@@ -318,7 +320,7 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
      * Sets the value of a {@link #measureReference} property.
      * This is used only for deprecated setter methods from older ISO 19115 version.
      *
-     * @see #setEvaluationMethodProperty(BiConsumer, Object)
+//     * @see #setEvaluationMethodProperty(BiConsumer, Object)
      */
     private <V> void setMeasureReferenceProperty(final BiConsumer<DefaultMeasureReference,V> setter, final V newValue) {
         if (newValue != null) {
@@ -639,6 +641,28 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
      */
     @Override
 //    @XmlElement(name = "result", required = true)
+    public Collection<Result> getResults() {
+        return oldResults = nonNullCollection(oldResults, Result.class);
+    }
+
+    /**
+     * Sets the value(s) obtained from applying a data quality measure.
+     *
+     * @param  newValues  the new set of value.
+     */
+    public void setResults(final Collection<? extends Result> newValues) {
+        oldResults = writeCollection(newValues, oldResults, Result.class);
+    }
+
+    /**
+     * Returns the value(s) obtained from applying a data quality measure.
+     * May be an outcome of evaluating the obtained value (or set of values)
+     * against a specified acceptable conformance quality level.
+     *
+     * @return set of values obtained from applying a data quality measure.
+     */
+    @Override
+//    @XmlElement(name = "result", required = true)
     public Collection<QualityResult> getQualityResults() {
         return results = nonNullCollection(results, QualityResult.class);
     }
@@ -661,7 +685,7 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
      */
     @Override
     // @XmlElement at the end of this class.
-    public Collection<QualityElement> getDerivedElements() {
+    public Collection<QualityElement> getDerivedQualityElements() {
         return derivedElements = nonNullCollection(derivedElements, QualityElement.class);
     }
 
@@ -672,7 +696,7 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
      *
      * @since 1.3
      */
-    public void setDerivedElements(final Collection<? extends QualityElement> newValues) {
+    public void setDerivedQualityElements(final Collection<? extends QualityElement> newValues) {
         derivedElements = writeCollection(newValues, derivedElements, QualityElement.class);
     }
 
@@ -697,6 +721,6 @@ public class AbstractQualityElement extends ISOMetadata implements QualityElemen
      */
     @XmlElement(name = "derivedElement")
     private Collection<QualityElement> getDerivedElement() {
-        return FilterByVersion.CURRENT_METADATA.accept() ? getDerivedElements() : null;
+        return FilterByVersion.CURRENT_METADATA.accept() ? getDerivedQualityElements() : null;
     }
 }

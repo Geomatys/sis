@@ -29,14 +29,7 @@ import jakarta.xml.bind.annotation.XmlSeeAlso;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import org.opengis.metadata.Identifier;
 import org.opengis.metadata.citation.Citation;
-import org.opengis.metadata.quality.Result;
-import org.opengis.metadata.quality.Element;
-import org.opengis.metadata.quality.Usability;
-import org.opengis.metadata.quality.Completeness;
-import org.opengis.metadata.quality.ThematicAccuracy;
-import org.opengis.metadata.quality.PositionalAccuracy;
-import org.opengis.metadata.quality.LogicalConsistency;
-import org.opengis.metadata.quality.EvaluationMethodType;
+import org.opengis.metadata.quality.*;
 import org.opengis.util.InternationalString;
 import org.apache.sis.xml.bind.FilterByVersion;
 import org.apache.sis.xml.bind.gco.InternationalStringAdapter;
@@ -48,10 +41,6 @@ import org.apache.sis.xml.util.LegacyNamespaces;
 import static org.apache.sis.util.collection.Containers.isNullOrEmpty;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.TemporalQuality;
-import org.opengis.metadata.quality.EvaluationMethod;
-import org.opengis.metadata.quality.MeasureReference;
-import org.opengis.metadata.quality.Metaquality;
 
 
 /**
@@ -173,11 +162,11 @@ public class AbstractElement extends AbstractQualityElement implements Element {
             if ((measureReference = object.getMeasureReference()) == null) {
                 DefaultMeasureReference candidate = new DefaultMeasureReference();
                 //todo : needs clarification on relationship between Element and QualityElement
-//                if (candidate.setLegacy(object)) measureReference = candidate;
+                if (candidate.setLegacy((AbstractElement) object)) measureReference = candidate;
             }
             evaluationMethod = object.getEvaluationMethod();
             results          = copyCollection(object.getResults(), Result.class);
-//            derivedElements  = copyCollection(object.getDerivedElements(), Element.class);
+            derivedElements  = copyCollection(object.getDerivedElements(), Element.class);
         }
     }
 
@@ -260,6 +249,11 @@ public class AbstractElement extends AbstractQualityElement implements Element {
     public void setStandaloneQualityReportDetails(final InternationalString newValue)  {
         checkWritePermission(standaloneQualityReportDetails);
         standaloneQualityReportDetails = newValue;
+    }
+
+    @Override
+    public QualityMeasure getMeasure() {
+        return super.getMeasure();
     }
 
     /**
@@ -609,29 +603,29 @@ public class AbstractElement extends AbstractQualityElement implements Element {
     }
 //todo : needs clarification on relationship between Element and QualityElement
 
-//    /**
-//     * Returns the original elements in case of aggregation or derivation.
-//     *
-//     * @return original element(s) when there is an aggregation or derivation.
-//     *
-//     * @since 1.3
-//     */
-//    @Override
-//    // @XmlElement at the end of this class.
-//    public Collection<Element> getDerivedElements() {
-//        return derivedElements = nonNullCollection(derivedElements, Element.class);
-//    }
-//
-//    /**
-//     * Sets the original elements in case of aggregation or derivation.
-//     *
-//     * @param  newValues  the new elements.
-//     *
-//     * @since 1.3
-//     */
-//    public void setDerivedElements(final Collection<? extends Element> newValues) {
-//        derivedElements = writeCollection(newValues, derivedElements, Element.class);
-//    }
+    /**
+     * Returns the original elements in case of aggregation or derivation.
+     *
+     * @return original element(s) when there is an aggregation or derivation.
+     *
+     * @since 1.3
+     */
+    @Override
+    // @XmlElement at the end of this class.
+    public Collection<Element> getDerivedElements() {
+        return derivedElements = nonNullCollection(derivedElements, Element.class);
+    }
+
+    /**
+     * Sets the original elements in case of aggregation or derivation.
+     *
+     * @param  newValues  the new elements.
+     *
+     * @since 1.3
+     */
+    public void setDerivedElements(final Collection<? extends Element> newValues) {
+        derivedElements = writeCollection(newValues, derivedElements, Element.class);
+    }
 
 
 
@@ -647,11 +641,11 @@ public class AbstractElement extends AbstractQualityElement implements Element {
     ////////                                                                                  ////////
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Invoked by JAXB at both marshalling and unmarshalling time.
-     * This attribute has been added by ISO 19157:2013 standard.
-     * If (and only if) marshalling an older standard version, we omit this attribute.
-     */
+//    /**
+//     * Invoked by JAXB at both marshalling and unmarshalling time.
+//     * This attribute has been added by ISO 19157:2013 standard.
+//     * If (and only if) marshalling an older standard version, we omit this attribute.
+//     */
 //    @XmlElement(name = "derivedElement")
 //    private Collection<Element> getDerivedElement() {
 //        return FilterByVersion.CURRENT_METADATA.accept() ? getDerivedElements() : null;

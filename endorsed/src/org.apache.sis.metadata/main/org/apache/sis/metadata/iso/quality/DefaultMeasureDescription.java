@@ -20,6 +20,7 @@ import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import org.opengis.annotation.UML;
+import org.opengis.metadata.quality.Description;
 import org.opengis.metadata.quality.FormulaType;
 import org.opengis.util.InternationalString;
 import org.opengis.metadata.identification.BrowseGraphic;
@@ -61,7 +62,7 @@ import static org.opengis.annotation.Specification.ISO_19157;
     "extendedDescription"
 })
 @XmlRootElement(name = "DQM_Description", namespace = Namespaces.DQM)
-public class DefaultMeasureDescription extends ISOMetadata implements MeasureDescription {
+public class DefaultMeasureDescription extends ISOMetadata implements Description, MeasureDescription {
     /**
      * Serial number for inter-operability with different versions.
      */

@@ -72,18 +72,6 @@ public class AbstractResult extends AbstractQualityResult implements Result {
      */
     private static final long serialVersionUID = 3510023908820052467L;
     //todo : needs clarification on relationship between Result and QualityResult
-//
-//    /**
-//     * Scope of the result.
-//     */
-//    @SuppressWarnings("serial")
-//    private Scope resultScope;
-//
-//    /**
-//     * Date when the result was generated, or {@code null} if none.
-//     */
-//    @SuppressWarnings("serial")
-//    private Temporal dateTime;
 
     /**
      * Constructs an initially empty result.
@@ -103,10 +91,6 @@ public class AbstractResult extends AbstractQualityResult implements Result {
      */
     public AbstractResult(final Result object) {
         super(object);
-//        if (object != null) {
-//            resultScope = object.getResultScope();
-//            dateTime    = object.getDateTime();
-//        }
     }
 
     /**
@@ -151,58 +135,5 @@ public class AbstractResult extends AbstractQualityResult implements Result {
 //            return (AbstractResult) object;
 //        }
 //        return new AbstractResult(object);
-//    }
-
-//    /**
-//     * Returns the scope of the result.
-//     *
-//     * @return scope of the result, or {@code null} if unspecified.
-//     *
-//     * @since 1.3
-//     */
-//    @Override
-//    @XmlElement(name = "resultScope")
-//    @XmlJavaTypeAdapter(MD_Scope.Since2014.class)
-//    public Scope getResultScope() {
-//        return resultScope;
-//    }
-//
-//    /**
-//     * Sets the scope of the result.
-//     *
-//     * @param  newValue  the new evaluation procedure.
-//     *
-//     * @since 1.3
-//     */
-//    public void setResultScope(final Scope newValue) {
-//        resultScope = newValue;
-//    }
-//
-//    /**
-//     * Returns the date when the result was generated.
-//     * This is typically a {@link java.time.LocalDate}, {@link java.time.LocalDateTime}
-//     * or {@link java.time.ZonedDateTime} depending on whether the hour of the day and
-//     * the time zone are provided.
-//     *
-//     * @return date of the result, or {@code null} if none.
-//     *
-//     * @since 1.3
-//     */
-//    @Override
-//    @XmlElement(name = "dateTime")
-//    @XmlJavaTypeAdapter(GO_Temporal.Since2014.class)
-//    public Temporal getDateTime() {
-//        return dateTime;
-//    }
-//
-//    /**
-//     * Sets the date when the result was generated.
-//     *
-//     * @param  newValue  the new date, or {@code null}.
-//     *
-//     * @since 1.3
-//     */
-//    public void setDateTime(final Temporal newValue) {
-//        dateTime = newValue;
 //    }
 }

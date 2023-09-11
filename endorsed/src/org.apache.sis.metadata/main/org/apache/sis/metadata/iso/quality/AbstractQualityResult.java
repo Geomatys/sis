@@ -22,15 +22,11 @@ import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlSeeAlso;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-import org.opengis.metadata.quality.QualityResult;
-import org.opengis.metadata.quality.CoverageResult;
-import org.opengis.metadata.quality.ConformanceResult;
-import org.opengis.metadata.quality.QuantitativeResult;
+import org.opengis.metadata.quality.*;
 import org.apache.sis.xml.bind.metadata.MD_Scope;
 import org.apache.sis.xml.bind.gco.GO_Temporal;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.metadata.quality.DescriptiveResult;
 import org.opengis.metadata.maintenance.Scope;
 
 
@@ -52,18 +48,18 @@ import org.opengis.metadata.maintenance.Scope;
  * @version 1.4
  * @since   0.3
  */
-@XmlType(name = "AbstractDQ_Result_Type", propOrder = {
-    "resultScope",
-    "dateTime"
-})
-@XmlRootElement(name = "AbstractDQ_Result")
-@XmlSeeAlso({
-    DefaultConformanceResult.class,
-    DefaultQuantitativeResult.class,
-    DefaultDescriptiveResult.class,
-    DefaultCoverageResult.class
-})
-public class AbstractQualityResult extends ISOMetadata implements QualityResult {
+//@XmlType(name = "AbstractDQ_Result_Type", propOrder = {
+//    "resultScope",
+//    "dateTime"
+//})
+//@XmlRootElement(name = "AbstractDQ_Result")
+//@XmlSeeAlso({
+//    DefaultConformanceResult.class,
+//    DefaultQuantitativeResult.class,
+//    DefaultDescriptiveResult.class,
+//    DefaultCoverageResult.class
+//})
+public class AbstractQualityResult extends ISOMetadata implements Result, QualityResult {
     /**
      * Serial number for inter-operability with different versions.
      */
@@ -155,8 +151,8 @@ public class AbstractQualityResult extends ISOMetadata implements QualityResult 
      * @since 1.3
      */
     @Override
-    @XmlElement(name = "resultScope")
-    @XmlJavaTypeAdapter(MD_Scope.Since2014.class)
+//    @XmlElement(name = "resultScope")
+//    @XmlJavaTypeAdapter(MD_Scope.Since2014.class)
     public Scope getResultScope() {
         return resultScope;
     }
@@ -183,8 +179,8 @@ public class AbstractQualityResult extends ISOMetadata implements QualityResult 
      * @since 1.3
      */
     @Override
-    @XmlElement(name = "dateTime")
-    @XmlJavaTypeAdapter(GO_Temporal.Since2014.class)
+//    @XmlElement(name = "dateTime")
+//    @XmlJavaTypeAdapter(GO_Temporal.Since2014.class)
     public Temporal getDateTime() {
         return dateTime;
     }

@@ -44,8 +44,8 @@ import org.opengis.metadata.quality.QualityResult;
  * @version 1.4
  * @since   0.3
  */
-@XmlType(name = "DQ_AbsoluteExternalPositionalAccuracy_Type")
-@XmlRootElement(name = "DQ_AbsoluteExternalPositionalAccuracy")
+//@XmlType(name = "DQ_AbsoluteExternalPositionalAccuracy_Type")
+//@XmlRootElement(name = "DQ_AbsoluteExternalPositionalAccuracy")
 public class DefaultAbsolutePositionalAccuracy extends AbstractPositionalAccuracy
         implements PositionalAccuracy
 {

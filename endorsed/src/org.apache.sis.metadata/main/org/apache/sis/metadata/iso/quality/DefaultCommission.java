@@ -43,8 +43,8 @@ import org.opengis.metadata.quality.Commission;
  * @version 1.4
  * @since   0.3
  */
-@XmlType(name = "DQ_CompletenessCommission_Type")
-@XmlRootElement(name = "DQ_CompletenessCommission")
+//@XmlType(name = "DQ_CompletenessCommission_Type")
+//@XmlRootElement(name = "DQ_CompletenessCommission")
 public class DefaultCommission extends AbstractCompleteness implements Commission {
     /**
      * Serial number for inter-operability with different versions.

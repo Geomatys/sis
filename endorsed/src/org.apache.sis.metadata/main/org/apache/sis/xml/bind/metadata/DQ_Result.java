@@ -18,7 +18,8 @@ package org.apache.sis.xml.bind.metadata;
 
 import jakarta.xml.bind.annotation.XmlElementRef;
 import org.apache.sis.metadata.iso.quality.AbstractQualityResult;
-import org.opengis.metadata.quality.QualityResult;
+import org.apache.sis.metadata.iso.quality.AbstractResult;
+import org.opengis.metadata.quality.Result;
 import org.apache.sis.xml.bind.gco.PropertyType;
 
 
@@ -31,7 +32,7 @@ import org.apache.sis.xml.bind.gco.PropertyType;
  * @version 1.4
  * @since   0.3
  */
-public final class DQ_Result extends PropertyType<DQ_Result, QualityResult> {
+public final class DQ_Result extends PropertyType<DQ_Result, Result> {
     /**
      * Empty constructor for JAXB only.
      */
@@ -46,14 +47,14 @@ public final class DQ_Result extends PropertyType<DQ_Result, QualityResult> {
      * @return {@code Result.class}
      */
     @Override
-    protected Class<QualityResult> getBoundType() {
-        return QualityResult.class;
+    protected Class<Result> getBoundType() {
+        return Result.class;
     }
 
     /**
      * Constructor for the {@link #wrap} method only.
      */
-    private DQ_Result(final QualityResult value) {
+    private DQ_Result(final Result value) {
         super(value);
     }
 
@@ -65,7 +66,7 @@ public final class DQ_Result extends PropertyType<DQ_Result, QualityResult> {
      * @return a {@code PropertyType} wrapping the given the metadata element.
      */
     @Override
-    protected DQ_Result wrap(final QualityResult value) {
+    protected DQ_Result wrap(final Result value) {
         return new DQ_Result(value);
     }
 
