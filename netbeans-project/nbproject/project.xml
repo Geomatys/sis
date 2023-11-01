@@ -15,7 +15,7 @@
     <type>org.netbeans.modules.java.j2semodule</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/j2se-modular-project/1">
-            <name>Apache SIS on GeoAPI 4.0</name>
+            <name>Apache SIS for TestBed-19</name>
             <source-roots>
                 <root id="src.dir" pathref="src.dir.path"/>
                 <root id="optional.main.dir" pathref="optional.main.dir.path"/>
