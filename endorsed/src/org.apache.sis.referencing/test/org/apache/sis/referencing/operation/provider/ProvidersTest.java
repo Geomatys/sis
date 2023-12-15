@@ -229,6 +229,9 @@ public final class ProvidersTest extends TestCase {
             if (method instanceof ProviderMock) {
                 continue;                           // Skip the methods that were defined only for test purpose.
             }
+            if (!(method instanceof AbstractProvider)) {
+                continue;
+            }
             final AbstractProvider provider = (AbstractProvider) method;
             final Integer sourceDimensions = provider.getSourceDimensions();
             final Integer targetDimensions = provider.getTargetDimensions();

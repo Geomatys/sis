@@ -189,6 +189,9 @@ module org.apache.sis.referencing {
             org.apache.sis.portrayal,
             org.apache.sis.gui;                             // In the "optional" sub-project.
 
+    exports org.apache.sis.referencing.operation.gridded to
+            org.apache.sis.storage;
+
     exports org.apache.sis.referencing.operation.provider to
             org.apache.sis.referencing.gazetteer,
             org.apache.sis.storage.geotiff,

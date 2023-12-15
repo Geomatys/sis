@@ -29,6 +29,8 @@ module org.apache.sis.storage {
     requires jakarta.xml.bind;
     requires transitive org.apache.sis.feature;
 
+    requires static org.locationtech.jts;       // Temporary dependency for TestBed-19 (TODO: need to leave choice to user).
+
     provides java.nio.file.spi.FileTypeDetector
         with org.apache.sis.storage.services.StoreTypeDetector;
 
@@ -41,6 +43,9 @@ module org.apache.sis.storage {
              org.apache.sis.storage.xml.StoreProvider,
              org.apache.sis.storage.wkt.StoreProvider,
              org.apache.sis.storage.folder.StoreProvider;
+
+    provides org.opengis.referencing.operation.OperationMethod
+        with org.apache.sis.storage.services.MovingFrame;
 
     exports org.apache.sis.storage;
     exports org.apache.sis.storage.event;
