@@ -34,6 +34,7 @@ module org.apache.sis.console {
     requires            org.apache.sis.feature;
     requires            org.apache.sis.storage;
     requires            org.apache.sis.storage.xml;     // Because of GPX in `OutputFormat`.
+    requires            org.locationtech.jts;           // For Testbed-19 demonstration.
 
     provides org.apache.sis.setup.InstallationResources
         with org.apache.sis.console.ResourcesDownloader;

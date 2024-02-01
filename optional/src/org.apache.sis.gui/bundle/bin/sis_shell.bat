@@ -20,6 +20,6 @@ SET SIS_HOME=%~dp0\..
 SET SIS_DATA=%SIS_HOME%\data
 
 jshell --module-path "%SIS_HOME%\lib;%SIS_HOME%\lib\app\org.apache.sis.console.jar"^
-       --add-module org.apache.sis.console^
+       --add-module org.locationtech.jts,org.apache.sis.console^
        --startup "%SIS_HOME%\conf\imports.jsh"^
        %*
