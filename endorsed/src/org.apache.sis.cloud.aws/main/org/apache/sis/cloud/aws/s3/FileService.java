@@ -203,6 +203,8 @@ public class FileService extends FileSystemProvider {
     @Override
     public FileSystem newFileSystem(final URI uri, final Map<String,?> properties) throws IOException {
         final String accessKey = getAccessKey(uri);
+        final String host = uri.getHost();
+        final int port = uri.getPort();
         final String secret;
         if (accessKey == null || (secret = Containers.property(properties, AWS_SECRET_ACCESS_KEY, String.class)) == null) {
             throw new IllegalArgumentException(Resources.format(Resources.Keys.MissingAccessKey_2, (accessKey == null) ? 0 : 1, uri));
@@ -215,7 +217,7 @@ public class FileService extends FileSystemProvider {
             /** Invoked if the map does not already contains the file system. */
             @Override public ClientFileSystem apply(final String key) {
                 created = true;
-                return new ClientFileSystem(FileService.this, region, key, secret, separator);
+                return new ClientFileSystem(FileService.this, region, host, port, key, secret, separator);
             }
         }
         final Creator c = new Creator();
@@ -282,14 +284,16 @@ public class FileService extends FileSystemProvider {
     @Override
     public Path getPath(final URI uri) {
         final String accessKey = getAccessKey(uri);
+        String host = uri.getHost();
+        final int port = uri.getPort();
         final ClientFileSystem fs;
         if (accessKey == null) {
             fs = getDefaultFileSystem();
         } else {
             // TODO: we may need a way to get password here.
-            fs = fileSystems.computeIfAbsent(accessKey, (key) -> new ClientFileSystem(FileService.this, null, key, null, null));
+            String finalHost = host;
+            fs = fileSystems.computeIfAbsent(accessKey, (key) -> new ClientFileSystem(FileService.this, null, finalHost, port, key, null, null));
         }
-        String host = uri.getHost();
         if (host == null) {
             /*
              * The host is null if the authority contains characters that are invalid for a host name.
@@ -301,7 +305,17 @@ public class FileService extends FileSystemProvider {
             if (host == null) host = uri.toString();
             throw new IllegalArgumentException(Resources.format(Resources.Keys.InvalidBucketName_1, host));
         }
-        final String path = uri.getPath();
+        String path = uri.getPath();
+
+        if (fs.host != null) {
+            path = path.substring(1);
+            String[] parts = path.split("/", 2);
+            if (parts.length >= 2) {
+                host = parts[0];
+                path = "/" + parts[1];
+            }
+        }
+
         return new KeyPath(fs, host, (path != null) ? new String[] {path} : CharSequences.EMPTY_ARRAY, true);
     }
 

@@ -704,7 +704,13 @@ search:     if (key != null) {
             if (isDirectory) sb.append('/');
             path = sb.toString();
         }
+
         try {
+            if (fs != null && fs.host != null) {
+                int port = (fs.port != null ? fs.port : -1);
+                return new URI(SCHEME, fs.accessKey, fs.host, port, "/"+bucket+path, null, null);
+            }
+
             return new URI(SCHEME, fs.accessKey, bucket, -1, path, null, null);
         } catch (URISyntaxException e) {
             throw new IllegalStateException(e.getMessage(), e);
@@ -725,6 +731,15 @@ search:     if (key != null) {
             if (fs.accessKey != null) {
                 sb.append(fs.accessKey).append('@');
             }
+
+            if(fs.host != null) {
+                if(fs.port != null) {
+                    sb.append(fs.host).append(":").append(fs.port).append("/");
+                } else {
+                    sb.append(fs.host).append("/");
+                }
+            }
+
             sb.append(bucket);
         }
         if (key != null) {
