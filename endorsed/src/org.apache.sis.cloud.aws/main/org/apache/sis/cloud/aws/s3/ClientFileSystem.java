@@ -50,6 +50,7 @@ import software.amazon.awssdk.services.s3.endpoints.S3EndpointProvider;
  * which is kept ready-to-use until the file system is {@linkplain #close closed}.
  *
  * @author  Martin Desruisseaux (Geomatys)
+ * @author  Quentin Bialota (Geomatys)
  */
 final class ClientFileSystem extends FileSystem {
     /**
@@ -69,9 +70,9 @@ final class ClientFileSystem extends FileSystem {
     final String host;
 
     /**
-     * The S3 port (if not stored on Amazon Infrastructure), or {@code null} if none.
+     * The S3 port (if not stored on Amazon Infrastructure), or {@code -1} if none.
      */
-    final Integer port;
+    final int port;
 
     /**
      * The provider of this file system.
@@ -96,16 +97,46 @@ final class ClientFileSystem extends FileSystem {
     final String duplicatedSeparator;
 
     /**
-     * Creates a file system with default credential and default separator.
+     * Creates a file system with default credential, default hostname and default separator.
      */
     ClientFileSystem(final FileService provider, final S3Client client) {
         this.provider  = provider;
         this.client    = client;
         this.accessKey = null;
         this.host = null;
-        this.port = null;
+        this.port = -1;
         this.separator = DEFAULT_SEPARATOR;
         duplicatedSeparator = DEFAULT_SEPARATOR + DEFAULT_SEPARATOR;
+    }
+
+    /**
+     * Creates a file system with default hostname and default separator.
+     */
+    ClientFileSystem(final FileService provider, final S3Client client, String accessKey) {
+        this.provider  = provider;
+        this.client    = client;
+        this.accessKey = accessKey;
+        this.host = null;
+        this.port = -1;
+        this.separator = DEFAULT_SEPARATOR;
+        duplicatedSeparator = DEFAULT_SEPARATOR + DEFAULT_SEPARATOR;
+    }
+
+    /**
+     * Creates a file system with default credential and default separator.
+     */
+    ClientFileSystem(final FileService provider, String host, int port) {
+        this.provider  = provider;
+        this.accessKey = null;
+        this.host = host;
+        this.port = port;
+        this.separator = DEFAULT_SEPARATOR;
+        duplicatedSeparator = DEFAULT_SEPARATOR + DEFAULT_SEPARATOR;
+
+        String hostname = (port > -1 ? host+":"+port : host);
+        this.client = S3Client.builder().endpointOverride(URI.create("http://"+hostname))
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                .build();
     }
 
     /**
@@ -119,7 +150,7 @@ final class ClientFileSystem extends FileSystem {
      * @param secret      the password.
      * @param separator   the separator in paths, or {@code null} for the default value.
      */
-    ClientFileSystem(final FileService provider, final Region region, final String host, final Integer port, final String accessKey, final String secret,
+    ClientFileSystem(final FileService provider, final Region region, final String host, final int port, final String accessKey, final String secret,
                      String separator)
     {
         if (separator == null) {
@@ -136,7 +167,7 @@ final class ClientFileSystem extends FileSystem {
         this.host = host;
         this.port = port;
         if (host != null) {
-            String hostname = (port != null ? host+":"+port : host);
+            String hostname = (port > -1 ? host+":"+port : host);
             builder = builder.endpointOverride(URI.create("http://"+hostname))
                     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
         }
@@ -173,7 +204,7 @@ final class ClientFileSystem extends FileSystem {
         final S3Client c = client;
         client = null;
         if (c != null) try {
-            provider.dispose(accessKey);
+            provider.dispose(new ClientFileSystemKey(accessKey, host, port));
             c.close();
         } catch (SdkException e) {
             throw new IOException(e);

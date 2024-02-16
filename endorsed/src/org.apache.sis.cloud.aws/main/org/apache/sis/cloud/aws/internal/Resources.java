@@ -29,8 +29,10 @@ import org.apache.sis.util.resources.IndexedResourceBundle;
  * all modules in the Apache SIS project, see {@code org.apache.sis.util.resources} package.
  *
  * @author  Martin Desruisseaux (Geomatys)
+ * @author  Quentin Bialota (Geomatys)
  */
 public class Resources extends IndexedResourceBundle {
+
     /**
      * Resource keys. This class is used when compiling sources, but no dependencies to
      * {@code Keys} should appear in any resulting class files. Since the Java compiler
@@ -177,5 +179,26 @@ public class Resources extends IndexedResourceBundle {
                                 final Object arg1) throws MissingResourceException
     {
         return forLocale(null).getString(key, arg0, arg1);
+    }
+
+    /**
+     * Gets a string for the given key and replaces all occurrence of "{0}",
+     * "{1}", with values of {@code arg0}, {@code arg1}.
+     *
+     * @param  key   the key for the desired string.
+     * @param  arg0  value to substitute to "{0}".
+     * @param  arg1  value to substitute to "{1}".
+     * @param  arg2  value to substitute to "{2}".
+     * @param  arg3  value to substitute to "{3}".
+     * @return the formatted string for the given key.
+     * @throws MissingResourceException if no object for the given key can be found.
+     */
+    public static String format(final short  key,
+                                final Object arg0,
+                                final Object arg1,
+                                final Object arg2,
+                                final Object arg3) throws MissingResourceException
+    {
+        return forLocale(null).getString(key, arg0, arg1, arg2, arg3);
     }
 }

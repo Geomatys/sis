@@ -48,6 +48,7 @@ import org.apache.sis.cloud.aws.internal.Resources;
  * The interpretation of {@link ClientFileSystem#separator} as a path separator is done by this class.</p>
  *
  * @author  Martin Desruisseaux (Geomatys)
+ * @author  Quentin Bialota (Geomatys)
  */
 final class KeyPath implements Path {
     /**
@@ -706,11 +707,12 @@ search:     if (key != null) {
         }
 
         try {
-            if (fs != null && fs.host != null) {
-                int port = (fs.port != null ? fs.port : -1);
-                return new URI(SCHEME, fs.accessKey, fs.host, port, "/"+bucket+path, null, null);
+            //Case : s3://accessKey@host:port/bucket/key (self-hosted path)
+            if (fs != null && fs.host != null && fs.port != -1) {
+                return new URI(SCHEME, fs.accessKey, fs.host, fs.port, "/"+bucket+path, null, null);
             }
 
+            //Case : s3://accessKey@bucket/key (aws path)
             return new URI(SCHEME, fs.accessKey, bucket, -1, path, null, null);
         } catch (URISyntaxException e) {
             throw new IllegalStateException(e.getMessage(), e);
@@ -733,7 +735,7 @@ search:     if (key != null) {
             }
 
             if(fs.host != null) {
-                if(fs.port != null) {
+                if(fs.port > -1) {
                     sb.append(fs.host).append(":").append(fs.port).append("/");
                 } else {
                     sb.append(fs.host).append("/");
