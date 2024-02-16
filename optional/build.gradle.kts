@@ -66,8 +66,13 @@ dependencies {
     runtimeOnly   (files("${mainDepPath}/org.apache.sis.storage.geotiff"))
     runtimeOnly   (files("${mainDepPath}/org.apache.sis.storage.earthobservation"))
     api           (files("${mainDepPath}/org.apache.sis.portrayal"))
+    api           (files("${mainDepPath}/org.apache.sis.cloud.aws"))        // Specific to the RESTEC branch.
     runtimeOnly   (drivers.derby.core)
     runtimeOnly   (drivers.derby.tools)
+
+    // Specific to the RESTEC branch
+    runtimeOnly(libs.aws.s3)
+    runtimeOnly(libs.ucar)
 
     // Test dependencies
     testImplementation(tests.junit5)

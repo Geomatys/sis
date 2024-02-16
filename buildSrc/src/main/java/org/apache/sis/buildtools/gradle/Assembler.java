@@ -70,9 +70,7 @@ final class Assembler extends ZipWriter.Apache implements FileFilter {
     /**
      * Modules to exclude from the {@link #LIB_DIRECTORY}, not counting applications.
      */
-    private static final Set<String> EXCLUDES = Set.of(
-            "org.apache.sis.profile.japan",             // For avoiding UCAR dependencies.
-            "org.apache.sis.cloud.aws");                // For avoiding UCAR dependencies.
+    private static final Set<String> EXCLUDES = Set.of();
 
     /**
      * Suffix of JAR files. This is the part to remove from filenames for getting the module names.

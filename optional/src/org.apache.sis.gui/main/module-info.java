@@ -43,6 +43,7 @@ module org.apache.sis.gui {
     requires transitive org.apache.sis.storage;
     requires            org.apache.sis.storage.xml;         // Those formats have special handling in `DataViewer`.
     requires transitive org.apache.sis.portrayal;
+    requires            org.apache.sis.cloud.aws;           // Specific to RESTEC branch.
 
     provides org.apache.sis.setup.InstallationResources
         with org.apache.sis.gui.internal.io.OptionalDataDownloader;
