@@ -175,6 +175,30 @@ publishing {
                 description = "Read and write files in the Shapefile format."
             }
         }
+        create<MavenPublication>("storage.geopackage") {
+            var module = "org.apache.sis.storage.geopackage"
+            groupId    = "org.apache.sis.storage"
+            artifactId = "sis-geopackage"
+            artifact(layout.buildDirectory.file("libs/${module}.jar"))
+            artifact(layout.buildDirectory.file("docs/${module}-sources.jar")) {classifier = "sources"}
+            artifact(layout.buildDirectory.file("docs/${module}-javadoc.jar")) {classifier = "javadoc"}
+            pom {
+                name        = "Apache SIS GeoPackage storage"
+                description = "Read and write files in the GeoPackage format."
+            }
+        }
+        create<MavenPublication>("storage.geojson") {
+            var module = "org.apache.sis.storage.geojson"
+            groupId    = "org.apache.sis.storage"
+            artifactId = "sis-geojson"
+            artifact(layout.buildDirectory.file("libs/${module}.jar"))
+            artifact(layout.buildDirectory.file("docs/${module}-sources.jar")) {classifier = "sources"}
+            artifact(layout.buildDirectory.file("docs/${module}-javadoc.jar")) {classifier = "javadoc"}
+            pom {
+                name        = "Apache SIS GeoJSON storage"
+                description = "Read and write files in the GeoJSON format."
+            }
+        }
         create<MavenPublication>("storage.coveragejson") {
             var module = "org.apache.sis.storage.coveragejson"
             groupId    = "org.apache.sis.storage"
