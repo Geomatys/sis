@@ -14,23 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.sis.storage.geopackage.featureset;
 
 /**
- * GeoPackage store.
+ * Table 1. GeoPackage Data Types
  *
  * @author Johann Sorel (Geomatys)
  */
-module org.apache.sis.storage.geopackage {
-    // Dependencies used in public API.
-    requires transitive org.apache.sis.referencing;
-    requires transitive org.apache.sis.storage;
-    requires transitive org.apache.sis.storage.sql;
-    requires transitive com.zaxxer.hikari;
-    //requires org.sqlite;
-    //requires org.sqlite.javax;
+public enum GpkgDataTypes {
 
-    exports org.apache.sis.storage.geopackage;
-
-    provides org.apache.sis.storage.DataStoreProvider
-            with org.apache.sis.storage.geopackage.GpkgProvider;
+    BOOLEAN,
+    TINYINT,
+    SMALLINT,
+    MEDIUMINT,
+    INT,
+    FLOAT,
+    DOUBLE,
+    TEXT,
+    BLOB,
+    GEOMETRY,
+    DATE,
+    DATETIME
 }

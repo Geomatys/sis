@@ -14,23 +14,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.sis.storage.geopackage;
+
+import org.apache.sis.storage.DataStoreException;
 
 /**
- * GeoPackage store.
+ * Geopackage extension.
  *
  * @author Johann Sorel (Geomatys)
  */
-module org.apache.sis.storage.geopackage {
-    // Dependencies used in public API.
-    requires transitive org.apache.sis.referencing;
-    requires transitive org.apache.sis.storage;
-    requires transitive org.apache.sis.storage.sql;
-    requires transitive com.zaxxer.hikari;
-    //requires org.sqlite;
-    //requires org.sqlite.javax;
+public abstract class GpkgExtension {
 
-    exports org.apache.sis.storage.geopackage;
+    protected final GpkgStore store;
 
-    provides org.apache.sis.storage.DataStoreProvider
-            with org.apache.sis.storage.geopackage.GpkgProvider;
+    public GpkgExtension(GpkgStore store) {
+        this.store = store;
+    }
+
+    /**
+     * @return true if extension is installed in the database
+     * @throws DataStoreException if extension detection failed
+     */
+    public abstract boolean isInstalled() throws DataStoreException;
+
+    /**
+     * Install or declare the extension in the database.
+     *
+     * @throws DataStoreException if an error occured while installing the extension
+     */
+    public abstract void install() throws DataStoreException;
+
 }
