@@ -26,8 +26,7 @@ module org.apache.sis.storage.geopackage {
     requires transitive org.apache.sis.storage;
     requires transitive org.apache.sis.storage.sql;
     requires transitive com.zaxxer.hikari;
-    //requires org.sqlite;
-    //requires org.sqlite.javax;
+    requires org.xerial.sqlitejdbc;
 
     exports org.apache.sis.storage.geopackage;
 
