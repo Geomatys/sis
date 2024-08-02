@@ -202,6 +202,19 @@ publishing {
                 description = "Read and write files in the GeoPackage format."
             }
         }
+        create<MavenPublication>("storage.gdal") {
+            var module = "org.apache.sis.storage.gdal"
+            groupId    = "org.apache.sis.storage"
+            artifactId = "sis-gdal"
+            artifact(layout.buildDirectory.file("libs/${module}.jar"))
+            artifact(layout.buildDirectory.file("docs/${module}-sources.jar")) {classifier = "sources"}
+            artifact(layout.buildDirectory.file("docs/${module}-javadoc.jar")) {classifier = "javadoc"}
+            pom {
+                name        = "Apache SIS storage using GDAL through Panama"
+                description = "Read and write files using the GDAL library. " +
+                              "This module assumes that GDAL is pre-installed."
+            }
+        }
         create<MavenPublication>("storage.gsf") {
             var module = "org.apache.sis.storage.gsf"
             groupId    = "org.apache.sis.storage"
