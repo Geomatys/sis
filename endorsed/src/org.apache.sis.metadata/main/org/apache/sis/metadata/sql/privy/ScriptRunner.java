@@ -328,7 +328,7 @@ public class ScriptRunner implements AutoCloseable {
         if (!isEnumTypeSupported) {
             addStatementToSkip("CREATE\\s+(?:TYPE|CAST)\\s+.*");
         }
-        if (!isGrantOnSchemaSupported || !isGrantOnTableSupported) {
+        if (!(isGrantOnSchemaSupported & isGrantOnTableSupported)) {
             addStatementToSkip("GRANT\\s+\\w+\\s+ON\\s+");
             if (isGrantOnSchemaSupported) {
                 regexOfStmtToSkip.append("TABLE");
@@ -487,7 +487,7 @@ public class ScriptRunner implements AutoCloseable {
         int     statementCount     = 0;         // For informative purpose only.
         int     posOpeningQuote    = -1;        // -1 if we are not inside a text.
         boolean isInsideIdentifier = false;
-        final StringBuilder buffer = new StringBuilder();
+        final var buffer = new StringBuilder();
         String line;
         while ((line = in.readLine()) != null) {
             /*

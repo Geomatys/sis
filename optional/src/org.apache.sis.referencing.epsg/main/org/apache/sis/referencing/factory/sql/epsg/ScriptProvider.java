@@ -48,7 +48,7 @@ public class ScriptProvider extends InstallationScriptProvider {
      * Creates a new EPSG scripts provider.
      */
     public ScriptProvider() {
-        super(Constants.EPSG, PREPARE, "Tables.sql", "Data.sql", "FKeys.sql", FINISH);
+        super(Constants.EPSG, "Enumerations.sql", "Tables.sql", "Data.sql", "FKeys.sql", FINISH);
     }
 
     /**

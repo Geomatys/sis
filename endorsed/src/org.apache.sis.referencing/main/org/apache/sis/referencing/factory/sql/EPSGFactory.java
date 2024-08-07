@@ -75,7 +75,7 @@ import org.apache.sis.util.resources.Messages;
  * subclass.
  *
  * @author  Martin Desruisseaux (Geomatys)
- * @version 1.4
+ * @version 1.5
  *
  * @see EPSGDataAccess
  * @see SQLTranslator

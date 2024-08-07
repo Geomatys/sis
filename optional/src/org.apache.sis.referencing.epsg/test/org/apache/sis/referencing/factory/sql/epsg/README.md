@@ -2,23 +2,18 @@
 
 The `org.apache.sis.referencing.factory.sql.epsg` package in the `non-free:sis-epsg` Maven artifact
 provides SQL scripts for installing a local copy of the [EPSG geodetic dataset](https://epsg.org/).
-This dataset provides definitions for thousands of Coordinate Reference Systems (CRS),
+That dataset provides definitions for thousands of Coordinate Reference Systems (CRS),
 together with parameter values for thousands of Coordinate Operations between various pairs of CRS.
 EPSG is maintained by the [International Association of Oil and Gas Producers](https://www.iogp.org/) (IOGP)
 Surveying & Positioning Committee and is subject to [EPSG terms of use](https://epsg.org/terms-of-use.html).
-Because of incompatibilities between EPSG terms of use and Apache 2 license, the EPSG geodetic dataset is not distributed
-by default with Apache SIS. A copy of the dataset is provided in a separated module in a separated source code repository.
-The Maven identifier of that module is `org.apache.sis.non-free:sis-epsg` and the source repository is located at
-http://svn.apache.org/repos/asf/sis/data/non-free/sis-epsg.
-The EPSG scripts are copied in that module with identical content, but in a more compact format.
-
-This `org.apache.sis.referencing.factory.sql.epsg` package in `endorsed/org.opengis.sis.referencing` module
-contains only tools for maintaining the `non-free/org.apache.sis.referencing.epsg` module.
-This package is provided only in the **test** directory, not in the main directory, because the
-`org.apache.sis.referencing.factory.sql.epsg` package name is reserved by the `non-free/org.apache.sis.referencing.epsg` module.
-The `endorsed/org.apache.sis.referencing` module should not distribute anything in packages owned by other modules.
-However, it is okay to use those package names in directories that are not part of the distribution, like tests.
-We put those tools here for easier maintainance when the core of Apache SIS is modified.
+Because of incompatibilities between EPSG terms of use and Apache 2 license,
+the EPSG geodetic dataset is not distributed with Apache SIS source code or other bundles released on Apache web sites.
+A modified copy of the dataset is provided in a [separated source code repository](http://svn.apache.org/repos/asf/sis/data/non-free/sis-epsg)
+for inclusion in the `org.apache.sis.non-free:sis-epsg` artifact only if links are provided as
+[described in the main module](../../../../../../../../main/org/apache/sis/referencing/factory/sql/epsg/README.md).
+The copy has the same content as the original EPSG scripts, but more compact and sometime with accent characters added.
+Column order may also differ because when new columns were added in EPSG schema revisions, the scripts in this directory
+try to insert them at some proper location instead of appending all new columns at the end.
 
 
 ## How to apply EPSG geodetic dataset updates
@@ -31,7 +26,7 @@ No data value should be altered. Steps to follow:
 Download the latest SQL scripts for PostgreSQL from https://epsg.org/ (require registration).
 Unzip in the directory of your choice and remember the path to that directory:
 
-```
+```bash
 unzip EPSG-PSQL-export-_<version>_.zip
 export EPSG_SCRIPTS=$PWD
 ```
@@ -39,7 +34,7 @@ export EPSG_SCRIPTS=$PWD
 If a copy of the original SQL scripts (as downloaded from EPSG) for the previous version is still available,
 and if the following commands report no difference, then jump to "execute main" step.
 
-```
+```bash
 cd _<directory containing EPSG scripts of previous version>_
 diff PostgreSQL_Table_Script.sql $EPSG_SCRIPTS/PostgreSQL_Table_Script.sql
 diff PostgreSQL_FKey_Script.sql  $EPSG_SCRIPTS/PostgreSQL_FKey_Script.sql
@@ -47,14 +42,15 @@ diff PostgreSQL_FKey_Script.sql  $EPSG_SCRIPTS/PostgreSQL_FKey_Script.sql
 
 Otherwise, move to the directory which contains the Apache SIS scripts:
 
-```
-cd <SIS_HOME>/non-free/sis-epsg/src/main/resources/org/apache/sis/referencing/factory/sql/epsg/
+```bash
+cd <path to a local copy of http://svn.apache.org/repos/asf/sis/data/non-free/EPSG>
+export NON_FREE_DIR=$PWD
 ```
 
 Overwrite `Tables.sql` and `FKeys.sql` with the new SQL scripts.
 Do not overwrite `Data.sql` and `Indexes.sql`:
 
-```
+```bash
 cp $EPSG_SCRIPTS/PostgreSQL_Table_Script.sql Tables.sql
 cp $EPSG_SCRIPTS/PostgreSQL_FKey_Script.sql  FKeys.sql
 ```
@@ -72,10 +68,15 @@ Open the `Tables.sql` file for edition:
 * Change the type of `ellipsoid_shape`, `reverse_op`, `param_sign_reversal`
   `show_crs`, `show_operation` and all `deprecated` fields from `SMALLINT`
   (or sometimes `VARCHAR(3)`) to `BOOLEAN`.
+* Change all `FLOAT` types to `DOUBLE PRECISION` because Apache SIS read all numbers as `double` type.
+  It avoids spurious digits in the conversions from `float` to `double`.
+* Change the type of `epsg_usage` column from `SERIAL` to `INTEGER NOT NULL`.
 * Change the type of every `table_name` columns from `VARCHAR(80)` to `epsg_table_name`.
 * Change the type of `coord_ref_sys_kind` column from `VARCHAR(24)` to `epsg_crs_kind`.
 * Change the type of `coord_sys_type` column from `VARCHAR(24)` to `epsg_cs_kind`.
 * Change the type of `datum_type` column from `VARCHAR(24)` to `epsg_datum_kind`.
+* Suppress trailing `NULL` (not to be confused with `NOT NULL`) as they are implicit.
+* Changes column order to match the order in `Tables.sql`.
 * Suppress trailing spaces and save.
 
 Usually this results in no change at all compared to the previous script (ignoring white spaces),
@@ -86,24 +87,30 @@ Then open the `FKeys.sql` file for edition:
 * Suppress trailing spaces and save.
 
 In most cases this results in unmodified `FKeys.sql` file compared to the previous version.
+However if some changes are found in the schema, then hard-coded values in the `DataScriptFormatter`
+class may need to be modified, in particular the  `booleanColumns` and `doubleColumns` collections.
 
 
 ### Main
 Execute the `main` method of the `org.apache.sis.referencing.factory.sql.epsg.DataScriptFormatter` class
-located in the test directory of `sis-referencing` module
-(adjust version numbers as needed; we may provide an easier way after migration to Jigsaw modules):
+located in the test directory of the `non-free:sis-epsg` module.
+Adjust version numbers as needed in the following commands:
 
-```
+```bash
 cd _<path to SIS project directory>_
-mvn clean install
+gradle clean test jar
 export CLASSPATH=~/.m2/repository/org/apache/derby/derby/10.14.2.0/derby-10.14.2.0.jar
-export CLASSPATH=$PWD/core/sis-metadata/target/test-classes:$CLASSPATH
-export CLASSPATH=$PWD/target/binaries/sis-referencing-2.0-SNAPSHOT.jar:$CLASSPATH
-export CLASSPATH=$PWD/core/sis-metadata/target/test-classes:$CLASSPATH
-export CLASSPATH=$PWD/core/sis-referencing/target/test-classes:$CLASSPATH
-cd <path to local copy of http://svn.apache.org/repos/asf/sis/data/non-free/>
-java org.apache.sis.referencing.factory.sql.epsg.DataScriptFormatter $EPSG_SCRIPTS/PostgreSQL_Data_Script.sql \
-     sis-epsg/src/main/resources/org/apache/sis/referencing/factory/sql/epsg/Data.sql
+export CLASSPATH=~/.m2/repository/javax/measure/unit-api/2.1.3/unit-api-2.1.3.jar:$CLASSPATH
+export CLASSPATH=$PWD/geoapi/snapshot/geoapi/target/geoapi-4.0-SNAPSHOT.jar:$CLASSPATH
+export CLASSPATH=$PWD/endorsed/build/libs/org.apache.sis.referencing.jar:$CLASSPATH
+export CLASSPATH=$PWD/endorsed/build/libs/org.apache.sis.metadata.jar:$CLASSPATH
+export CLASSPATH=$PWD/endorsed/build/libs/org.apache.sis.util.jar:$CLASSPATH
+export CLASSPATH=$PWD/endorsed/build/classes/java/test/org.apache.sis.referencing:$CLASSPATH
+export CLASSPATH=$PWD/endorsed/build/classes/java/test/org.apache.sis.metadata:$CLASSPATH
+export CLASSPATH=$PWD/optional/build/classes/java/test/org.apache.sis.referencing.epsg:$CLASSPATH
+
+# From any directory
+java org.apache.sis.referencing.factory.sql.epsg.DataScriptFormatter $EPSG_SCRIPTS/PostgreSQL_Data_Script.sql $NON_FREE_DIR/Data.sql
 ```
 
 Run the tests. It it convenient to run `org.apache.sis.referencing.factory.sql.EPSGInstallerTest`
@@ -111,7 +118,7 @@ in an IDE first, for easier debugging if some changes in database structure or c
 Then the whole Apache SIS project should be [tested extensively](https://sis.apache.org/source.html#tests),
 preferably with a PostgreSQL server ready to accept local connections to `SpatialMetadataTest` database:
 
-```
+```bash
 EXPORT SIS_TEST_OPTIONS=extensive,postgresql
 gradle test
 ```

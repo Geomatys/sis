@@ -11,13 +11,23 @@ current directory:
 # Execute the following in a separated directory.
 svn checkout https://svn.apache.org/repos/asf/sis/data/non-free/
 cd non-free
-export NON_FREE_DIR=`pwd`
+export NON_FREE_DIR=$PWD
 
 # Execute the following in the directory of this `README.md` file.
-ln --symbolic $NON_FREE_DIR/EPSG/LICENSE.txt
-ln --symbolic $NON_FREE_DIR/EPSG/LICENSE.html
-ln --symbolic $NON_FREE_DIR/EPSG/Tables.sql
-ln --symbolic $NON_FREE_DIR/EPSG/Data.sql
-ln --symbolic $NON_FREE_DIR/EPSG/FKeys.sql
+ln --symbolic $NON_FREE_DIR/LICENSE.txt
+ln --symbolic $NON_FREE_DIR/LICENSE.html
+ln --symbolic $NON_FREE_DIR/Tables.sql
+ln --symbolic $NON_FREE_DIR/Data.sql
+ln --symbolic $NON_FREE_DIR/FKeys.sql
 cd -
+```
+
+For removing the links (cleanup):
+
+```shell
+rm LICENSE.txt
+rm LICENSE.html
+rm Tables.sql
+rm Data.sql
+rm FKeys.sql
 ```

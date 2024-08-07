@@ -62,18 +62,10 @@ import org.apache.sis.util.privy.Constants;
  * </ol>
  *
  * @author  Martin Desruisseaux (Geomatys)
- * @version 1.4
+ * @version 1.5
  * @since   0.7
  */
 public abstract class InstallationScriptProvider extends InstallationResources {
-    /**
-     * A sentinel value for the content of the script to execute before the SQL scripts provided by the authority.
-     * This is an Apache SIS build-in script for constraining the values of some {@code VARCHAR} columns
-     * to enumerations of values recognized by {@link EPSGDataAccess}. Those enumerations are not required
-     * for proper working of {@link EPSGFactory}, but can improve data integrity.
-     */
-    protected static final String PREPARE = "Prepare";
-
     /**
      * A sentinel value for the content of the script to execute after the SQL scripts provided by the authority.
      * This is an Apache SIS build-in script for creating indexes or performing any other manipulation that help
@@ -105,7 +97,7 @@ public abstract class InstallationScriptProvider extends InstallationResources {
      *   </tr><tr>
      *     <td>{@code EPSG}</td>
      *     <td class="sep"><code>
-     *       {{@linkplain #PREPARE}, "EPSG_Tables.sql", "EPSG_Data.sql", "EPSG_FKeys.sql", {@linkplain #FINISH}}
+     *       {"Tables.sql", "Data.sql", "FKeys.sql", {@linkplain #FINISH}}
      *     </code></td>
      *   </tr>
      * </table>
@@ -173,23 +165,23 @@ public abstract class InstallationScriptProvider extends InstallationResources {
      *
      * <h4>EPSG case</h4>
      * In the EPSG dataset case, the iterator should return {@code BufferedReader} instances for the following files
-     * (replace {@code <version>} by the EPSG version number and {@code <product>} by the target database) in same order.
+     * (replace {@code <product>} by the target database) in same order.
      * The first and last files are provided by Apache SIS.
      * All other files can be downloaded from <a href="https://epsg.org/">https://epsg.org/</a>.
      *
      * <ol>
-     *   <li>Content of {@link #PREPARE}, an optional data definition script that define the enumerations expected by {@link EPSGDataAccess}.</li>
-     *   <li>Content of {@code "EPSG_<version>.mdb_Tables_<product>.sql"}, a data definition script that create empty tables.</li>
-     *   <li>Content of {@code "EPSG_<version>.mdb_Data_<product>.sql"}, a data manipulation script that populate the tables.</li>
-     *   <li>Content of {@code "EPSG_<version>.mdb_FKeys_<product>.sql"}, a data definition script that create foreigner key constraints.</li>
+     *   <li>Content of {@code "<product>_Tables_Script.sql"}, a data definition script that create empty tables.</li>
+     *   <li>Content of {@code "<product>_Data_Script.sql"}, a data manipulation script that populate the tables.</li>
+     *   <li>Content of {@code "<product>_FKeys_Script.sql"}, a data definition script that create foreigner key constraints.</li>
      *   <li>Content of {@link #FINISH}, an optional data definition and data control script that create indexes and set permissions.</li>
      * </ol>
      *
      * Implementers are free to return a different set of scripts with equivalent content.
      *
      * <h4>Default implementation</h4>
-     * The default implementation invokes {@link #openStream(String)} – except for {@link #PREPARE} and {@link #FINISH}
-     * in which case an Apache SIS build-in script is used – and wrap the result in a {@link LineNumberReader}.
+     * The default implementation delegates to {@link #openStream(String)}
+     * except for {@link #FINISH} (the latter is an Apache SIS build-in scripts).
+     * The input stream returned by {@code openStream(…)} is wrapped in a {@link LineNumberReader}.
      * The file encoding is UTF-8 (the encoding used in the scripts distributed by EPSG since version 9.4).
      *
      * @param  authority  the value given at construction time (e.g. {@code "EPSG"}).
@@ -209,12 +201,11 @@ public abstract class InstallationScriptProvider extends InstallationResources {
         }
         String name = resources[resource];
         final InputStream in;
-        if (PREPARE.equals(name) || FINISH.equals(name)) {
+        if (FINISH.equals(name)) {
             name = authority + '_' + name + ".sql";
             in = InstallationScriptProvider.class.getResourceAsStream(name);
         } else {
             in = openStream(name);
-            name = name.concat(".sql");
         }
         if (in == null) {
             throw new FileNotFoundException(Errors.format(Errors.Keys.FileNotFound_1, name));
@@ -225,7 +216,7 @@ public abstract class InstallationScriptProvider extends InstallationResources {
     /**
      * Opens the input stream for the SQL script of the given name.
      * This method is invoked by the default implementation of {@link #openScript(String, int)}
-     * for all scripts except {@link #PREPARE} and {@link #FINISH}.
+     * for all scripts except {@link #FINISH}.
      * The returned input stream does not need to be buffered.
      *
      * <h4>Example 1</h4>
@@ -287,35 +278,23 @@ public abstract class InstallationScriptProvider extends InstallationResources {
         private Path directory;
 
         /**
-         * Index of the first real file in the array given to the constructor.
-         * We set the value to 1 for skipping the {@code PREPARE} pseudo-file.
-         */
-        private static final int FIRST_FILE = 1;
-
-        /**
          * Creates a default provider.
          *
          * @param locale  the locale for warning messages, if any.
          */
         Default(final Locale locale) throws IOException {
-            super(Constants.EPSG,
-                    PREPARE,
-                    "Tables",
-                    "Data",
-                    "FKeys",
-                    FINISH);
-
+            super(Constants.EPSG, "Tables", "Data", "FKeys", FINISH);
             Path dir = DataDirectory.DATABASES.getDirectory();
             if (dir != null) {
                 dir = dir.resolve("ExternalSources");
                 if (Files.isDirectory(dir)) {
                     final String[] resources = super.resources;
-                    final String[] found = new String[resources.length - FIRST_FILE - 1];
+                    final String[] found = new String[resources.length - 1];    // -1 is for omitting `FINISH`.
                     try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "EPSG_*.sql")) {
                         for (final Path path : stream) {
                             final String name = path.getFileName().toString();
                             for (int i=0; i<found.length; i++) {
-                                final String part = resources[FIRST_FILE + i];
+                                final String part = resources[i];
                                 if (name.contains(part)) {
                                     if (found[i] != null) {
                                         log(Errors.forLocale(locale)
@@ -330,7 +309,7 @@ public abstract class InstallationScriptProvider extends InstallationResources {
                     for (int i=0; i<found.length; i++) {
                         final String file = found[i];
                         if (file != null) {
-                            resources[FIRST_FILE + i] = file;
+                            resources[i] = file;
                         } else {
                             dir = null;
                         }

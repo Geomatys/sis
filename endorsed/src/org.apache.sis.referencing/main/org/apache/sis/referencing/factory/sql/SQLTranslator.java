@@ -60,9 +60,10 @@ import org.apache.sis.metadata.sql.privy.SQLUtilities;
  * </ul>
  *
  * <h2>ANSI SQL</h2>
- * In addition to the file in MS-Access format, EPSG also provides the dataset as SQL files for PostgreSQL,
- * MySQL and Oracle databases. Those SQL files are used as both <i>Data Description Language</i> (DDL)
- * and <i>Data Manipulation Language</i> (DML).
+ * In addition to the file in MS-Access format, EPSG also provides the dataset as <abbr>SQL</abbr>
+ * files for PostgreSQL, MySQL and Oracle databases. Those <abbr>SQL</abbr> files are used as both
+ * <dfn>Data Description Language</dfn> (<abbr>DDL</abbr>) and
+ * <dfn>Data Manipulation Language</dfn> (<abbr>DML</abbr>).
  * But the table names and some column names in those scripts differ from the ones used in the MS-Access database.
  * The following table summarizes the name changes:
  *
@@ -70,7 +71,7 @@ import org.apache.sis.metadata.sql.privy.SQLUtilities;
  *   <caption>Table and column names</caption>
  *   <tr><th>Element</th><th>Name in MS-Access database</th>                    <th>Name in SQL scripts</th></tr>
  *   <tr><td>Table</td>  <td>{@code Alias}</td>                                 <td>{@code epsg_alias}</td></tr>
- *   <tr><td>Table</td>  <td>{@code Area}</td>                                  <td>{@code epsg_area}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code ConventionalRS}</td>                        <td>{@code epsg_conventionalrs}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Coordinate Axis}</td>                       <td>{@code epsg_coordinateaxis}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Coordinate Axis Name}</td>                  <td>{@code epsg_coordinateaxisname}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Coordinate_Operation}</td>                  <td>{@code epsg_coordoperation}</td></tr>
@@ -82,11 +83,19 @@ import org.apache.sis.metadata.sql.privy.SQLUtilities;
  *   <tr><td>Table</td>  <td>{@code Coordinate Reference System}</td>           <td>{@code epsg_coordinatereferencesystem}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Coordinate System}</td>                     <td>{@code epsg_coordinatesystem}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Datum}</td>                                 <td>{@code epsg_datum}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code DatumEnsemble}</td>                         <td>{@code epsg_datumensemble}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code DatumEnsembleMember}</td>                   <td>{@code epsg_datumensemblemember}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code DatumRealizationMethod}</td>                <td>{@code epsg_datumrealizationmethod}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code DefiningOperation}</td>                     <td>{@code epsg_definingoperation}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code Deprecation}</td>                           <td>{@code epsg_deprecation}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Ellipsoid}</td>                             <td>{@code epsg_ellipsoid}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code Extent}</td>                                <td>{@code epsg_extent}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Naming System}</td>                         <td>{@code epsg_namingsystem}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Prime Meridian}</td>                        <td>{@code epsg_primemeridian}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code Scope}</td>                                 <td>{@code epsg_scope}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Supersession}</td>                          <td>{@code epsg_supersession}</td></tr>
  *   <tr><td>Table</td>  <td>{@code Unit of Measure}</td>                       <td>{@code epsg_unitofmeasure}</td></tr>
+ *   <tr><td>Table</td>  <td>{@code Usage}</td>                                 <td>{@code epsg_usage}</td></tr>
  *   <tr><td>Column</td> <td>{@code ORDER}</td>                                 <td>{@code coord_axis_order}</td></tr>
  * </table>
  *

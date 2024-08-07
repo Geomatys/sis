@@ -1350,7 +1350,7 @@ codes:  for (int i=0; i<codes.length; i++) {
                       " COORD_REF_SYS_KIND,"          +     // [ 7]
                       " COORD_SYS_CODE,"              +     // [ 8] Null for CompoundCRS
                       " DATUM_CODE,"                  +     // [ 9] Null for ProjectedCRS
-                      " SOURCE_GEOGCRS_CODE,"         +     // [10] For ProjectedCRS
+                      " BASE_CRS_CODE,"               +     // [10] For ProjectedCRS
                       " PROJECTION_CONV_CODE,"        +     // [11] For ProjectedCRS
                       " CMPD_HORIZCRS_CODE,"          +     // [12] For CompoundCRS only
                       " CMPD_VERTCRS_CODE"            +     // [13] For CompoundCRS only
@@ -3051,7 +3051,7 @@ next:                   while (r.next()) {
                     key = "ConversionFromCRS";
                     sql = "SELECT PROJECTION_CONV_CODE" +
                           " FROM [Coordinate Reference System]" +
-                          " WHERE SOURCE_GEOGCRS_CODE = ?" +
+                          " WHERE BASE_CRS_CODE = ?" +
                             " AND COORD_REF_SYS_CODE = ?";
                 }
                 final Integer targetKey = searchTransformations ? null : pair[1];
