@@ -703,11 +703,19 @@ search:     if (key != null) {
             if (isDirectory) sb.append('/');
             path = sb.toString();
         }
+
         try {
+            //Case : s3://accessKey@host:port/bucket/key (self-hosted path)
+            if (fs != null && fs.host != null && fs.port != null) {
+                return new URI(SCHEME, fs.accessKey, fs.host, fs.port, "/"+bucket+path, null, null);
+            }
+
+            //Case : s3://accessKey@bucket/key (aws path)
             return new URI(SCHEME, fs.accessKey, bucket, -1, path, null, null);
         } catch (URISyntaxException e) {
             throw new IllegalStateException(e.getMessage(), e);
         }
+
     }
 
     /**
@@ -724,6 +732,15 @@ search:     if (key != null) {
             if (fs.accessKey != null) {
                 sb.append(fs.accessKey).append('@');
             }
+
+            if(fs.host != null) {
+                if(fs.port != null) {
+                    sb.append(fs.host).append(":").append(fs.port).append("/");
+                } else {
+                    sb.append(fs.host).append("/");
+                }
+            }
+
             sb.append(bucket);
         }
         if (key != null) {
@@ -733,6 +750,7 @@ search:     if (key != null) {
             sb.append(key);
         }
         return sb.toString();
+
     }
 
     /**

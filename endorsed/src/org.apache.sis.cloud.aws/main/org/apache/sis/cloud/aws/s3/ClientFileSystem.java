@@ -16,6 +16,7 @@
  */
 package org.apache.sis.cloud.aws.s3;
 
+import java.net.URI;
 import java.util.Set;
 import java.util.Collections;
 import java.util.regex.PatternSyntaxException;
@@ -38,13 +39,14 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import org.apache.sis.util.ArgumentChecks;
 import org.apache.sis.util.privy.Strings;
-
+import software.amazon.awssdk.services.s3.S3Configuration;
 
 /**
  * File system wrapping a S3 client. This class wraps an Amazon {@link S3Client},
  * which is kept ready-to-use until the file system is {@linkplain #close closed}.
  *
  * @author  Martin Desruisseaux (Geomatys)
+ * @author  Quentin Bialota (Geomatys)
  */
 final class ClientFileSystem extends FileSystem {
     /**
@@ -57,6 +59,21 @@ final class ClientFileSystem extends FileSystem {
      * Also used as key of this file system in the {@link FileService#fileSystems} map.
      */
     final String accessKey;
+
+    /**
+     * The S3 host (if not stored on Amazon Infrastructure), or {@code null} if none.
+     */
+    final String host;
+
+    /**
+     * The S3 port (if not stored on Amazon Infrastructure), or {@code null} if none.
+     */
+    final Integer port;
+
+    /**
+     * Is the S3 HTTP Protocol secure (if not stored on Amazon Infrastructure) (default {@code true)}.
+     */
+    boolean isHttps = true;
 
     /**
      * The provider of this file system.
@@ -87,8 +104,42 @@ final class ClientFileSystem extends FileSystem {
         this.provider  = provider;
         this.client    = client;
         this.accessKey = null;
+        this.host = null;
+        this.port = null;
         this.separator = DEFAULT_SEPARATOR;
         duplicatedSeparator = DEFAULT_SEPARATOR + DEFAULT_SEPARATOR;
+    }
+
+    /**
+     * Creates a file system with default hostname and default separator.
+     */
+    ClientFileSystem(final FileService provider, final S3Client client, String accessKey) {
+        this.provider  = provider;
+        this.client    = client;
+        this.accessKey = accessKey;
+        this.host = null;
+        this.port = null;
+        this.separator = DEFAULT_SEPARATOR;
+        duplicatedSeparator = DEFAULT_SEPARATOR + DEFAULT_SEPARATOR;
+    }
+
+    /**
+     * Creates a file system with default credential and default separator.
+     */
+    ClientFileSystem(final FileService provider, String accessKey, String host, Integer port, boolean isHttps) {
+        this.provider  = provider;
+        this.accessKey = accessKey;
+        this.host = host;
+        this.port = port;
+        this.isHttps = isHttps;
+        this.separator = DEFAULT_SEPARATOR;
+        duplicatedSeparator = DEFAULT_SEPARATOR + DEFAULT_SEPARATOR;
+
+        String hostname = (port != null ? host+":"+port : host);
+        String protocol = (isHttps ? "https" : "http");
+        this.client = S3Client.builder().endpointOverride(URI.create(protocol + "://" + hostname))
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                .build();
     }
 
     /**
@@ -96,11 +147,15 @@ final class ClientFileSystem extends FileSystem {
      *
      * @param provider    the provider creating this file system.
      * @param region      the AWS region, or {@code null} for default.
+     * @param host        the host or {@code null} for aws request
+     * @param port        the port or {@code null} for aws request
+     * @param isHttps     the protocol is secure or not or {@code null} for aws request
      * @param accessKey   the AWS S3 access key for this file system.
      * @param secret      the password.
      * @param separator   the separator in paths, or {@code null} for the default value.
      */
-    ClientFileSystem(final FileService provider, final Region region, final String accessKey, final String secret,
+    ClientFileSystem(final FileService provider, final Region region, final String host, final Integer port,
+                     final Boolean isHttps, final String accessKey, final String secret,
                      String separator)
     {
         if (separator == null) {
@@ -113,6 +168,15 @@ final class ClientFileSystem extends FileSystem {
                 StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secret)));
         if (region != null) {
             builder = builder.region(region);
+        }
+        this.host = host;
+        this.port = port;
+        this.isHttps = (isHttps != null ? isHttps : true);
+        if (host != null) {
+            String hostname = (port != null ? host+":"+port : host);
+            String protocol = (this.isHttps ? "https" : "http");
+            builder = builder.endpointOverride(URI.create(protocol + "://" + hostname))
+                    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
         }
         client = builder.build();
         this.separator = separator;
@@ -147,7 +211,7 @@ final class ClientFileSystem extends FileSystem {
         final S3Client c = client;
         client = null;
         if (c != null) try {
-            provider.dispose(accessKey);
+            provider.dispose(new ClientFileSystemKey(accessKey, host, port, isHttps));
             c.close();
         } catch (SdkException e) {
             throw new IOException(e);
