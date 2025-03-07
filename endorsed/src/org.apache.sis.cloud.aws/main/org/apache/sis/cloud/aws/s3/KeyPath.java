@@ -30,6 +30,9 @@ import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.NoSuchElementException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -158,7 +161,7 @@ final class KeyPath implements Path {
         bucketMetadata   = root.bucketMetadata;
         this.bucket      = root.bucket;
         this.fs          = root.fs;
-        this.key         = key;
+        this.key         = reformatPath(key);
         this.isDirectory = isDirectory;
         assert key == null || !key.isEmpty();
         // Do not copy `objectMetadata` because it is not for the same object.
@@ -175,7 +178,7 @@ final class KeyPath implements Path {
     KeyPath(final ClientFileSystem fs, final String key, final boolean isDirectory) {
         this.fs          = fs;
         this.bucket      = null;
-        this.key         = key;
+        this.key         = reformatPath(key);
         this.isDirectory = isDirectory;
         assert !key.isEmpty();
     }
@@ -199,7 +202,13 @@ final class KeyPath implements Path {
      *                     If {@code false}, will be determined automatically.
      * @throws InvalidPathException if the path uses a protocol other than {@value #SCHEME}.
      */
-    KeyPath(final ClientFileSystem fs, final String first, final String[] more, boolean isAbsolute) {
+    KeyPath(final ClientFileSystem fs, String first, final String[] more, boolean isAbsolute) {
+        Pattern pattern = Pattern.compile("^S3://[^@]+@([^/]+)(/.*)?$");
+        Matcher matcher = pattern.matcher(first);
+        if (matcher.matches()) {
+            first = "S3:/" + matcher.group(2);
+        }
+
         /*
          * Verify if the path start with "S3://" or "/" prefix. In both cases the path is considered absolute
          * and the prefix is skipped. The `start` variable is the index of the first character after prefix,
@@ -265,7 +274,8 @@ final class KeyPath implements Path {
                     throw emptyPath(first, 0);
                 }
                 isDirectory = path.endsWith(fs.separator);
-                key = isDirectory ? path.substring(0, end) : path;
+                String key = isDirectory ? path.substring(0, end) : path;
+                this.key = key.replace("./","/");
                 return;
             }
         }
@@ -313,7 +323,8 @@ final class KeyPath implements Path {
                     }
                     buffer.setLength(i);
                 }
-                key = buffer.toString();
+                String key = buffer.toString();
+                this.key = reformatPath(key);
                 return;
             }
         }
@@ -322,6 +333,16 @@ final class KeyPath implements Path {
         }
         isDirectory = true;
         key = null;
+    }
+
+    /**
+     * Reformat path, replacing "./" by "/"
+     */
+    private static String reformatPath(String path) {
+        if(path != null) {
+            path = path.replace("./","/");
+        }
+        return path;
     }
 
     /**
