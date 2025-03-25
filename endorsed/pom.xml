@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
+<project xmlns              = "http://maven.apache.org/POM/4.1.0"
+         xmlns:xsi          = "http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation = "http://maven.apache.org/POM/4.1.0
+                               http://maven.apache.org/xsd/maven-4.1.0.xsd">
+  <parent>
+    <groupId>org.apache.sis</groupId>
+    <artifactId>parent</artifactId>
+    <version>2.0-SNAPSHOT</version>
+  </parent>
+
+  <groupId>org.apache.sis</groupId>
+  <artifactId>endorsed</artifactId>
+  <version>2.0-SNAPSHOT</version>
+
+  <name>Endorsed modules of Apache SIS</name>
+  <description>
+    Group of modules providing the core of Apache SIS services:
+    metadata, referencing, geometry, feature, coverage, rendering.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.opengis</groupId>
+      <artifactId>geoapi-pending</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
+    </dependency>
+
+    <!-- Optional dependencies -->
+    <dependency>
+      <groupId>com.esri.geometry</groupId>
+      <artifactId>esri-geometry-api</artifactId>
+      <type>modular-jar</type> <!-- Force placement of automatic JAR on the module-path. -->
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.locationtech.jts</groupId>
+      <artifactId>jts-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>edu.ucar</groupId>
+      <artifactId>cdm-core</artifactId>
+      <type>modular-jar</type>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>edu.ucar</groupId>
+      <artifactId>udunits</artifactId>
+      <type>modular-jar</type>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Provided by the container -->
+    <dependency>
+      <groupId>org.libreoffice</groupId>
+      <artifactId>libreoffice</artifactId>
+      <version>7.6.7</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Tests -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.opengis</groupId>
+      <artifactId>geoapi-conformance</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <scope>test-runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>gov.nist.math</groupId>
+      <artifactId>jama</artifactId>
+      <type>modular-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.geographiclib</groupId>
+      <artifactId>GeographicLib-Java</artifactId>
+      <type>modular-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.derby</groupId>
+      <artifactId>derby</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.derby</groupId>
+      <artifactId>derbytools</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.hsqldb</groupId>
+      <artifactId>hsqldb</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <sources>
+      <source>
+        <module>org.apache.sis.util</module>
+        <directory>src/org.apache.sis.util/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.metadata</module>
+        <directory>src/org.apache.sis.metadata/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.referencing</module>
+        <directory>src/org.apache.sis.referencing/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.referencing.gazetteer</module>
+        <directory>src/org.apache.sis.referencing.gazetteer/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.feature</module>
+        <directory>src/org.apache.sis.feature/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.storage</module>
+        <directory>src/org.apache.sis.storage/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.storage.geotiff</module>
+        <directory>src/org.apache.sis.storage.geotiff/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.storage.xml</module>
+        <directory>src/org.apache.sis.storage.xml/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.storage.sql</module>
+        <directory>src/org.apache.sis.storage.sql/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.storage.earthobservation</module>
+        <directory>src/org.apache.sis.storage.earthobservation/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.storage.netcdf</module>
+        <directory>src/org.apache.sis.storage.netcdf/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.profile.japan</module>
+        <directory>src/org.apache.sis.profile.japan/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.profile.france</module>
+        <directory>src/org.apache.sis.profile.france/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.portrayal</module>
+        <directory>src/org.apache.sis.portrayal/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.cloud.aws</module>
+        <directory>src/org.apache.sis.cloud.aws/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.openoffice</module>
+        <directory>src/org.apache.sis.openoffice/main</directory>
+      </source>
+      <source>
+        <module>org.apache.sis.console</module>
+        <directory>src/org.apache.sis.console/main</directory>
+      </source>
+
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.util</module>
+        <directory>src/org.apache.sis.util/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.metadata</module>
+        <directory>src/org.apache.sis.metadata/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.referencing</module>
+        <directory>src/org.apache.sis.referencing/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.referencing.gazetteer</module>
+        <directory>src/org.apache.sis.referencing.gazetteer/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.feature</module>
+        <directory>src/org.apache.sis.feature/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.storage</module>
+        <directory>src/org.apache.sis.storage/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.storage.geotiff</module>
+        <directory>src/org.apache.sis.storage.geotiff/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.storage.xml</module>
+        <directory>src/org.apache.sis.storage.xml/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.storage.sql</module>
+        <directory>src/org.apache.sis.storage.sql/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.storage.earthobservation</module>
+        <directory>src/org.apache.sis.storage.earthobservation/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.storage.netcdf</module>
+        <directory>src/org.apache.sis.storage.netcdf/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.profile.japan</module>
+        <directory>src/org.apache.sis.profile.japan/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.profile.france</module>
+        <directory>src/org.apache.sis.profile.france/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.portrayal</module>
+        <directory>src/org.apache.sis.portrayal/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.cloud.aws</module>
+        <directory>src/org.apache.sis.cloud.aws/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.openoffice</module>
+        <directory>src/org.apache.sis.openoffice/test</directory>
+      </source>
+      <source>
+        <scope>test</scope>
+        <module>org.apache.sis.console</module>
+        <directory>src/org.apache.sis.console/test</directory>
+      </source>
+    </sources>
+  </build>
+
+</project>
