@@ -908,7 +908,7 @@
     <maven.compiler.testRelease>16</maven.compiler.testRelease>
 
     <!-- Following properties are branch-specific -->
-    <geoapi.version>4.0-SNAPSHOT</geoapi.version>
+    <geoapi.version>4.0-M27</geoapi.version>
     <sis.plugin.version>${project.version}</sis.plugin.version>
     <sis.non-free.version>1.4</sis.non-free.version>                <!-- Used only if "non-free" profile is activated. -->
   </properties>
@@ -962,6 +962,14 @@
   </profiles>
 
   <repositories>
+    <repository>
+      <id>geotoolkit.org</id>
+      <name>Geotoolkit.org repository</name>
+      <url>https://maven.geotoolkit.org</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
     <repository>
       <id>UCAR</id>
       <name>UCAR repository</name>
