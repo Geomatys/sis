@@ -17,10 +17,14 @@
 package org.apache.sis.storage.netcdf;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.ZoneOffset;
 import java.time.LocalDateTime;
 import java.time.temporal.Temporal;
 import static java.util.Map.entry;
+
 import org.opengis.metadata.Metadata;
 import org.opengis.metadata.citation.Role;
 import org.opengis.metadata.citation.Citation;
@@ -41,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.apache.sis.storage.DataStoreMock;
 import org.apache.sis.storage.netcdf.base.TestCase;
 import org.apache.sis.storage.netcdf.classic.ChannelDecoderTest;
+import org.apache.sis.storage.netcdf.zarr.ZarrDecoderTest;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import org.opengis.test.dataset.ContentVerifier;
@@ -82,6 +87,15 @@ public final class MetadataReaderTest extends TestCase {
         final Metadata metadata = new MetadataReader(input).read();
         input.close(new DataStoreMock("lock"));
         compareToExpected(metadata, false).assertMetadataEquals();
+    }
+
+    @Test
+    public void testZarr() throws IOException, DataStoreException, URISyntaxException {
+        Path root = Paths.get(NetcdfStoreProviderTest.class.getResource("/org/apache/sis/storage/netcdf/resources/zarr/dggs.zarr").toURI());
+        final Decoder input = ZarrDecoderTest.createZarrDecoder(root);
+        final Metadata metadata = new MetadataReader(input).read();
+        input.close(new DataStoreMock("lock"));
+        compareZarrToExpected(metadata).assertMetadataEquals();
     }
 
     /**
@@ -182,6 +196,42 @@ public final class MetadataReaderTest extends TestCase {
             entry("contentInfo[0].attributeGroup[0].attribute[0].units",                     "°C"),
 
             entry("resourceLineage[0].statement", "Decimated and modified by GeoAPI for inclusion in conformance test suite."));
+
+        return verifier;
+    }
+
+    /**
+     * Creates comparator for the string representation of the given metadata object with the expected one.
+     * The given metadata shall have been created from the "/org/apache/sis/storage/netcdf/resources/zarr/dggs.zarr" dataset.
+     *
+     * @param  actual    the metadata which have been read.
+     */
+    static ContentVerifier compareZarrToExpected(final Metadata actual) {
+        final var verifier = new ContentVerifier();
+        verifier.addPropertyToIgnore(Metadata.class, "metadataStandard");
+        verifier.addPropertyToIgnore(Metadata.class, "referenceSystemInfo");
+        verifier.addPropertyToIgnore(Citation.class, "otherCitationDetails");   // "Read by Foo version XYZ" in format citation.
+        verifier.addPropertyToIgnore(TemporalExtent.class, "extent");
+        verifier.addPropertyToIgnore((path) -> path.equals("identificationInfo[0].resourceFormat[0].formatSpecificationCitation.identifier[0].authority"));
+        verifier.addMetadataToVerify(actual);
+        verifier.addExpectedValues(
+                // Hard-coded
+                entry("identificationInfo[0].resourceFormat[0].formatSpecificationCitation.title", "Zarr"),
+
+                // Read from the file
+                entry("metadataScope[0].resourceScope",                                          ScopeCode.DATASET),
+                entry("identificationInfo[0].citation.title",                                    "dggs"),
+                entry("identificationInfo[0].spatialRepresentationType[0]",                      SpatialRepresentationType.GRID),
+                entry("spatialRepresentationInfo[0].cellGeometry",                               CellGeometry.AREA),
+                entry("spatialRepresentationInfo[0].numberOfDimensions",                         2),
+                entry("spatialRepresentationInfo[0].axisDimensionProperties[1].dimensionName",   DimensionNameType.TIME),
+                entry("spatialRepresentationInfo[0].axisDimensionProperties[0].dimensionSize",   60),
+                entry("spatialRepresentationInfo[0].axisDimensionProperties[1].dimensionSize",   5),
+                entry("spatialRepresentationInfo[0].transformationParameterAvailability",        false),
+
+                entry("contentInfo[0].attributeGroup[0].attribute[0].sequenceIdentifier",        "air"),
+                entry("contentInfo[0].attributeGroup[0].attribute[1].sequenceIdentifier",        "lat"),
+                entry("contentInfo[0].attributeGroup[0].attribute[2].sequenceIdentifier",        "lon"));
 
         return verifier;
     }

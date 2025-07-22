@@ -16,6 +16,12 @@
  */
 package org.apache.sis.storage.netcdf;
 
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.LogRecord;
@@ -25,6 +31,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
+
+import org.apache.sis.storage.netcdf.base.Encoder;
+import org.apache.sis.storage.netcdf.zarr.ZarrDecoder;
+import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
 import org.opengis.parameter.ParameterDescriptorGroup;
 import org.apache.sis.storage.DataStore;
 import org.apache.sis.storage.DataStoreProvider;
@@ -74,8 +84,8 @@ import org.apache.sis.util.internal.shared.Constants;
  * @since 0.3
  */
 @StoreMetadata(formatName    = Constants.NETCDF,
-               fileSuffixes  = "nc",
-               capabilities  = Capability.READ,
+               fileSuffixes  = {"nc", "zarr", "zip"},
+               capabilities  = {Capability.READ, Capability.WRITE},
                resourceTypes = {Aggregate.class, FeatureSet.class, GridCoverageResource.class},
                yieldPriority = true)
 /*
@@ -89,7 +99,12 @@ public class NetcdfStoreProvider extends DataStoreProvider {
     /**
      * The MIME type for netCDF files.
      */
-    static final String MIME_TYPE = "application/x-netcdf";
+    static final String NETCDF_MIME_TYPE = "application/x-netcdf";
+
+    /**
+     * The MIME type for Zarr files.
+     */
+    static final String ZARR_MIME_TYPE = "application/x-zarr";
 
     /**
      * The parameter descriptor to be returned by {@link #getOpenParameters()}.
@@ -218,6 +233,34 @@ public class NetcdfStoreProvider extends DataStoreProvider {
                 isSupported = (version >= 1 && version <= ChannelDecoder.MAX_VERSION);
             }
         }
+
+        /*
+         * Check if the input can be opened using the Zarr decoder.
+         */
+
+        if (!isSupported) {
+            Path inputPath = connector.getStorageAs(Path.class);
+            if (inputPath != null) {
+                try {
+                    if (isZipFile(inputPath)) {
+                        FileSystem zipFs = FileSystems.newFileSystem(inputPath, (ClassLoader) null);
+                        Path zarrRootInZip = findZarrRoot(zipFs); // Finds "/" or first folder with zarr.json
+                        isSupported = ZarrDecoder.isZarr(zarrRootInZip);
+                    } else {
+                        isSupported = ZarrDecoder.isZarr(inputPath);
+                    }
+
+                } catch (IOException e) {
+                    Logging.recoverableException(getLogger(), NetcdfStoreProvider.class, "probeContent", e);
+                    return ProbeResult.UNSUPPORTED_STORAGE;
+                }
+            }
+
+            if (isSupported) {
+                return new ProbeResult(true, ZARR_MIME_TYPE, null);
+            }
+        }
+
         /*
          * If we failed to check using the embedded decoder, tries using the UCAR library.
          * The UCAR library is an optional dependency. If that library is present and the
@@ -271,9 +314,9 @@ public class NetcdfStoreProvider extends DataStoreProvider {
          * is unknown if we are able to open the file only through the UCAR library.
          */
         if (hasVersion) {
-            return new ProbeResult(isSupported, MIME_TYPE, Version.valueOf(version));
+            return new ProbeResult(isSupported, NETCDF_MIME_TYPE, Version.valueOf(version));
         }
-        return isSupported ? new ProbeResult(true, MIME_TYPE, null) : ProbeResult.UNSUPPORTED_STORAGE;
+        return isSupported ? new ProbeResult(true, NETCDF_MIME_TYPE, null) : ProbeResult.UNSUPPORTED_STORAGE;
     }
 
     /**
@@ -302,32 +345,106 @@ public class NetcdfStoreProvider extends DataStoreProvider {
             throws IOException, DataStoreException
     {
         final GeometryLibrary geomlib = connector.getOption(OptionKey.GEOMETRY_LIBRARY);
-        Decoder decoder;
-        Object keepOpen;
+        Decoder decoder = null;
+        Object keepOpen = null;
+
+        // Try raw binary/netCDF first
         final ChannelDataInput input = connector.getStorageAs(ChannelDataInput.class);
-        if (input != null) try {
-            decoder = new ChannelDecoder(input, connector.getOption(OptionKey.ENCODING), geomlib, listeners);
-            keepOpen = input;
-        } catch (DataStoreException | ArithmeticException e) {
-            final String path = connector.getStorageAs(String.class);
-            if (path != null) try {
-                decoder = createByReflection(path, false, geomlib, listeners);
-                keepOpen = path;
-            } catch (IOException | DataStoreException s) {
-                e.addSuppressed(s);
-                throw e;
-            } else {
-                throw e;
+        if (input != null) {
+            try {
+                decoder = new ChannelDecoder(input, connector.getOption(OptionKey.ENCODING), geomlib, listeners);
+                keepOpen = input;
+            } catch (DataStoreException | ArithmeticException e) {
+                // Will try Zarr and fallback approaches below
             }
-        } else {
-            keepOpen = connector.getStorage();
-            decoder = createByReflection(keepOpen, true, geomlib, listeners);
         }
-        connector.closeAllExcept(decoder != null ? keepOpen : null);
+
+        // Fallback: try Zarr (directory or zip), or UCAR
+        if (decoder == null) {
+            Path inputPath = connector.getStorageAs(Path.class);
+
+            if (inputPath != null) {
+                if (isZipFile(inputPath)) {
+                    try {
+                        FileSystem zipFs = FileSystems.newFileSystem(inputPath, (ClassLoader) null);
+                        Path zarrRootInZip = findZarrRoot(zipFs); // Finds "/" or first folder with zarr.json
+                        decoder = new ZarrDecoder(zarrRootInZip, geomlib, listeners);
+                        keepOpen = inputPath;
+                    } catch (Exception zipEx) {
+                        throw new DataStoreException("Cannot open ZIP filesystem for: " + inputPath, zipEx);
+                    }
+                } else {
+                    try {
+                        decoder = new ZarrDecoder(inputPath, geomlib, listeners);
+                        keepOpen = inputPath;
+                    } catch (DataStoreException e) {
+                        // Will try fallback approach below
+                        decoder = null;
+                    }
+                }
+            } else {
+                String path = connector.getStorageAs(String.class);
+                if (path != null) {
+                    decoder = createByReflection(path, false, geomlib, listeners);
+                    keepOpen = path;
+                } else {
+                    // Last resort: try generic storage handle
+                    keepOpen = connector.getStorage();
+                    decoder = createByReflection(keepOpen, true, geomlib, listeners);
+                }
+            }
+        }
+
+//    connector.closeAllExcept(decoder != null ? keepOpen : null);
+
         if (decoder != null) {
             decoder.applyOtherConventions();
         }
         return decoder;
+    }
+
+    private static Path findZarrRoot(FileSystem zipFs) throws IOException {
+        for (Path root : zipFs.getRootDirectories()) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
+                for (Path entry : stream) {
+                    if (Files.isDirectory(entry) && Files.exists(entry.resolve("zarr.json"))) {
+                        return entry;
+                    }
+                }
+            }
+        }
+        // fallback (assume root is zarr if not found)
+        return zipFs.getPath("/");
+    }
+
+    /**
+     * Creates a decoder for the given input. This method invokes
+     * {@link StorageConnector#closeAllExcept(Object)} after the decoder has been created.
+     *
+     * @param  listeners  where to send the warnings.
+     * @param  connector  information about the input (file, input stream, <i>etc.</i>)
+     * @return the decoder for the given input, or {@code null} if the input type is not recognized.
+     * @throws IOException if an error occurred while opening the netCDF file.
+     * @throws DataStoreException if a logical error (other than I/O) occurred.
+     */
+    static Encoder encoder(final StoreListeners listeners, final StorageConnector connector)
+            throws IOException, DataStoreException
+    {
+        final GeometryLibrary geomlib = connector.getOption(OptionKey.GEOMETRY_LIBRARY);
+        Encoder encoder;
+        Object keepOpen;
+
+        final Path inputPath = connector.getStorageAs(Path.class);
+        encoder = new ZarrEncoder(inputPath, new int[]{100,120}, 0, geomlib, listeners);
+        keepOpen = inputPath;
+
+        connector.closeAllExcept(encoder != null ? keepOpen : null);
+        return encoder;
+    }
+
+    private static boolean isZipFile(Path path) {
+        String name = path.toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".zip");
     }
 
     /**

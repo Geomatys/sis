@@ -1535,6 +1535,36 @@ search:     for (;;) {
     }
 
     /**
+     * Copies all values in an array of long integer numbers.
+     *
+     * @return a copy of all long integer values in this vector.
+     *
+     * @see #longValue(int)
+     */
+    public long[] longValues() {
+        final long[] array = new long[size()];
+        for (int i=0; i<array.length; i++) {
+            array[i] = longValue(i);
+        }
+        return array;
+    }
+
+    /**
+     * Copies all values in an array of integer numbers.
+     *
+     * @return a copy of all integer values in this vector.
+     *
+     * @see #intValue(int)
+     */
+    public int[] intValues() {
+        final int[] array = new int[size()];
+        for (int i=0; i<array.length; i++) {
+            array[i] = intValue(i);
+        }
+        return array;
+    }
+
+    /**
      * Returns a copy of this vector. The returned vector is writable, and changes in that vector has no effect
      * on this original vector. The copy is not a clone since it may not be an instance of the same class.
      *

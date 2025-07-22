@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 import java.lang.reflect.Array;
 import java.io.IOException;
 import java.time.Instant;
+
+import org.apache.sis.storage.Resource;
 import ucar.nc2.constants.CDM;      // String constants are copied by the compiler with no UCAR reference left.
 import ucar.nc2.constants.CF;       // idem
 import javax.measure.Unit;
@@ -145,6 +147,23 @@ public abstract class Variable extends Node {
     private GridGeometry gridGeometry;
 
     /**
+     * The resource to write when this variable is used for writing.
+     * -> {@code null} if this variable is read-only.
+     * -> {@code null} if variable is writable but no data has been set yet.
+     * -> {@code null} if variable is not a data variable (for example a coordinate axis).
+     *    (In that case, check {@link #values} field instead.)
+     *
+     * @see RasterResource#setData(Resource, Class)
+     */
+    protected Resource resourceToWrite;
+
+    /**
+     * The sample dimension index in the resource to use for this variable, in the case of a raster resource.
+     * If the variable is not initialized yet, of if this variable is not part of a raster resource, then this field is -1.
+     */
+    protected int sampleDimensionIndex = -1;
+
+    /**
      * Whether {@link #gridGeometry} has been computed. Note that the result may still be {@code null}.
      *
      * @see #gridGeometry
@@ -169,7 +188,7 @@ public abstract class Variable extends Node {
      * @see #read()
      * @see #setValues(Object, boolean)
      */
-    private transient Vector values;
+    protected transient Vector values;
 
     /**
      * The {@linkplain #values} vector as a list of element of any type (not restricted to {@link Number} instances).
@@ -187,12 +206,21 @@ public abstract class Variable extends Node {
     private transient List<?> valuesAnyType;
 
     /**
-     * Creates a new variable.
+     * Creates a new variable (reading mode).
      *
-     * @param decoder  the netCDF file where this variable is stored.
+     * @param decoder the netCDF / zarr file where this variable is stored.
      */
     protected Variable(final Decoder decoder) {
         super(decoder);
+    }
+
+    /**
+     * Creates a new variable (writing mode).
+     *
+     * @param encoder the netCDF / zarr file where this variable will be stored.
+     */
+    protected Variable(final Encoder encoder) {
+        super(encoder);
     }
 
     /**
@@ -288,7 +316,12 @@ public abstract class Variable extends Node {
      * @return name of the netCDF file containing this variable, or {@code null} if unknown.
      */
     public String getFilename() {
-        return decoder.getFilename();
+        if (decoder != null) {
+            return decoder.getFilename();
+        } else if (encoder != null) {
+            return encoder.getFilename();
+        }
+        return null; // Should never happen
     }
 
     /**
@@ -392,6 +425,7 @@ public abstract class Variable extends Node {
                 error = ex;
             }
             if (unit == null) try {
+                assert decoder != null;
                 unit = decoder.convention().getUnitFallback(this);
             } catch (MeasurementParseException ex) {
                 if (error == null) error = ex;
@@ -421,6 +455,7 @@ public abstract class Variable extends Node {
     final boolean hasRealValues() {
         final int n = getDataType().number;
         if (n == Numbers.FLOAT | n == Numbers.DOUBLE) {
+            assert decoder != null;
             final Convention convention = decoder.convention();
             if (convention != Convention.DEFAULT) {
                 return convention.transferFunction(this).isIdentity();
@@ -1120,6 +1155,9 @@ public abstract class Variable extends Node {
                 valuesAnyType = UnmodifiableArrayList.wrap(strings);
                 return;
             }
+        } else if (dataType == DataType.STRING) {
+            values = Vector.create((String[]) array, false);
+            return;
         }
         Vector data = createDecimalVector(array, dataType.isUnsigned);
         /*
@@ -1199,6 +1237,25 @@ public abstract class Variable extends Node {
             return Vector.createForDecimal((float[]) data);
         } else {
             return Vector.create(data, isUnsigned);
+        }
+    }
+
+    /**
+     * Sets the data to write when {@link #write()} will be invoked.
+     * This method accepts either an array of primitive type (for example {@code float[]})
+     * or a {@link Resource} instance. In the later case, the resource will be read only when
+     * {@link #write()} is invoked.
+     *
+     * @param data the data to write
+     */
+    public void setData(final Object data, final Integer sampleDimensionsIndex) {
+        if (data == null) return;
+
+        if (data.getClass().isArray()) {
+            setValues(data, true);
+        } else if (data instanceof Resource) {
+            this.resourceToWrite = (Resource) data;
+            this.sampleDimensionIndex = sampleDimensionsIndex;
         }
     }
 

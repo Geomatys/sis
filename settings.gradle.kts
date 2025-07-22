@@ -59,17 +59,21 @@ dependencyResolutionManagement {
      */
     versionCatalogs {
         create("libs") {
-            library("geoapi",        "org.opengis",            "geoapi-pending")      .version {strictly(geoapiVersion)}
-            library("units",         "javax.measure",          "unit-api")            .version {strictly("[2.1, 3.0[");  prefer("2.1.3")}
-            library("jaxb.api",      "jakarta.xml.bind",       "jakarta.xml.bind-api").version {strictly("[4.0, 5.0[");  prefer("4.0.2")}
-            library("jaxb.impl",     "org.glassfish.jaxb",     "jaxb-runtime")        .version {strictly("[4.0, 5.0[");  prefer("4.0.5")}
-            library("yasson",        "org.eclipse",            "yasson")              .version {strictly("[3.0, 4.0[");  prefer("3.0.4")}
-            library("jts.core",      "org.locationtech.jts",   "jts-core")            .version {strictly("[1.15, 2.0["); prefer("1.20.0")}
-            library("esri.geometry", "com.esri.geometry",      "esri-geometry-api")   .version {strictly("[2.0, 3.0[");  prefer("2.2.4")}
-            library("s2.geometry",   "com.google.geometry",    "s2-geometry")         .version {strictly("[2.0, 3.0[");  prefer("2.0.0")}
-            library("libreoffice",   "org.libreoffice",        "libreoffice")         .version {strictly("[7.0, 8.0[");  prefer("24.8.4")}
-            library("ucar",          "edu.ucar",               "cdm-core")            .version {strictly("[5.0, 6.0[");  prefer("5.5.3")}
-            library("aws.s3",        "software.amazon.awssdk", "s3")                  .version {strictly("[2.0, 3.0[");  prefer("2.33.4")}
+            library("geoapi",        "org.opengis",                 "geoapi-pending")      .version {strictly(geoapiVersion)}
+            library("units",         "javax.measure",               "unit-api")            .version {strictly("[2.1, 3.0[");  prefer("2.1.3")}
+            library("jaxb.api",      "jakarta.xml.bind",            "jakarta.xml.bind-api").version {strictly("[4.0, 5.0[");  prefer("4.0.2")}
+            library("jaxb.impl",     "org.glassfish.jaxb",          "jaxb-runtime")        .version {strictly("[4.0, 5.0[");  prefer("4.0.5")}
+            library("yasson",        "org.eclipse",                 "yasson")              .version {strictly("[3.0, 4.0[");  prefer("3.0.4")}
+            library("jts.core",      "org.locationtech.jts",        "jts-core")            .version {strictly("[1.15, 2.0["); prefer("1.20.0")}
+            library("esri.geometry", "com.esri.geometry",           "esri-geometry-api")   .version {strictly("[2.0, 3.0[");  prefer("2.2.4")}
+            library("s2.geometry",   "com.google.geometry",         "s2-geometry")         .version {strictly("[2.0, 3.0[");  prefer("2.0.0")}
+            library("libreoffice",   "org.libreoffice",             "libreoffice")         .version {strictly("[7.0, 8.0[");  prefer("24.8.4")}
+            library("ucar",          "edu.ucar",                    "cdm-core")            .version {strictly("[5.0, 6.0[");  prefer("5.5.3")}
+            library("aws.s3",        "software.amazon.awssdk",      "s3")                  .version {strictly("[2.0, 3.0[");  prefer("2.31.68")}
+            library("jackson.core",  "com.fasterxml.jackson.core",  "jackson-core")        .version {strictly("[2.18, 3.0["); prefer("2.19.1")}
+            library("jackson.annotations",  "com.fasterxml.jackson.core",  "jackson-annotations").version {strictly("[2.18, 3.0["); prefer("2.19.1")}
+            library("jackson.databind",  "com.fasterxml.jackson.core",  "jackson-databind").version {strictly("[2.18, 3.0["); prefer("2.19.1")}
+            library("zstd.jni", "com.github.luben", "zstd-jni").version {strictly("[1.5.7-1, 1.5.7-4["); prefer("1.5.7-4")}
         }
         create("tests") {
             library("geoapi",        "org.opengis",            "geoapi-conformance")     .version {strictly(geoapiVersion)}

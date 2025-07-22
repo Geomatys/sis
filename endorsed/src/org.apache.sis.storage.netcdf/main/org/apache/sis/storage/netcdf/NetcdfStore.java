@@ -23,6 +23,12 @@ import java.net.URI;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
+
+import org.apache.sis.storage.WritableAggregate;
+import org.apache.sis.storage.netcdf.base.Encoder;
+import org.apache.sis.storage.netcdf.base.Variable;
+import org.apache.sis.storage.netcdf.zarr.ZarrDecoder;
+import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
 import ucar.nc2.constants.ACDD;     // String constants are copied by the compiler with no UCAR reference left.
 import ucar.nc2.constants.CDM;      // idem
 import org.opengis.util.NameSpace;
@@ -56,25 +62,35 @@ import org.apache.sis.util.collection.TreeTable;
 
 
 /**
- * A data store backed by netCDF files.
+ * A data store backed by netCDF and zarr files. (This DataStore is for all files thar follow the CF conventions)
  * Instances of this data store are created by {@link NetcdfStoreProvider#open(StorageConnector)}.
  *
  * @author  Martin Desruisseaux (Geomatys)
+ * @author  Quentin Bialota (Geomatys)
  * @version 1.5
  *
  * @see NetcdfStoreProvider
  *
  * @since 0.3
  */
-public class NetcdfStore extends DataStore implements Aggregate {
+public class NetcdfStore extends DataStore implements WritableAggregate {
     /**
      * The object to use for decoding the netCDF file content. There are two different implementations,
      * depending on whether we are using the embedded SIS decoder or a wrapper around the UCAR library.
      * This is set to {@code null} when the data store is closed.
+     * Can be {@code null} if the data store is write-only
      *
      * @see #decoder()
      */
     private Decoder decoder;
+
+    /**
+     * The object to use for encoding the netCDF file content. (Or Zarr content)
+     * There is only one implementation for Zarr for the moment.
+     * This is set to {@code null} when the data store is closed.
+     * Can be {@code null} if the data store is read-only.
+     */
+    private Encoder encoder;
 
     /**
      * The {@link NetcdfStoreProvider#LOCATION} parameter value, or {@code null} if none.
@@ -114,21 +130,37 @@ public class NetcdfStore extends DataStore implements Aggregate {
         final Path path = connector.getStorageAs(Path.class);
         try {
             decoder = NetcdfStoreProvider.decoder(listeners, connector);
+            if (decoder == null) {
+                encoder = NetcdfStoreProvider.encoder(listeners, connector);
+            }
+            else {
+                encoder = null;
+            }
         } catch (IOException | ArithmeticException e) {
             throw new DataStoreException(e);
         }
-        if (decoder == null) {
+        if (decoder == null && encoder == null) {
             throw new UnsupportedStorageException(super.getLocale(), Constants.NETCDF,
                     connector.getStorage(), connector.getOption(OptionKey.OPEN_OPTIONS));
         }
-        decoder.location = path;
-        String id = Strings.trimOrNull(decoder.stringValue(ACDD.id));
-        if (id == null) {
-            id = decoder.getFilename();
+        if (decoder != null) {
+            decoder.location = path;
+            String id = Strings.trimOrNull(decoder.stringValue(ACDD.id));
+            if (id == null) {
+                id = decoder.getFilename();
+            }
+            if (id != null) {
+                final NameFactory f = decoder.nameFactory;
+                decoder.namespace = f.createNameSpace(f.createLocalName(null, id), null);
+            }
         }
-        if (id != null) {
-            final NameFactory f = decoder.nameFactory;
-            decoder.namespace = f.createNameSpace(f.createLocalName(null, id), null);
+        if (encoder != null) {
+            encoder.location = path;
+            String id = encoder.getFilename();
+            if (id != null) {
+                final NameFactory f = encoder.nameFactory;
+                encoder.namespace = f.createNameSpace(f.createLocalName(null, id), null);
+            }
         }
         if (getClass() == NetcdfStore.class) {
             listeners.useReadOnlyEvents();
@@ -250,6 +282,29 @@ public class NetcdfStore extends DataStore implements Aggregate {
         return components;
     }
 
+    @Override
+    public Resource add(Resource resource) throws DataStoreException {
+        final Encoder encoder = encoder();
+        if (!(encoder instanceof ZarrEncoder)) {
+            throw new DataStoreException("This DataStore does not support adding resources (Only ZarrEncoder supports this operation).");
+        }
+
+        List<Variable> variables = RasterResource.createVariablesFromResource(encoder, resource);
+        try {
+            encoder.writeVariables(variables);
+
+        } catch (DataStoreException | IOException e) {
+            throw new DataStoreException("Failed to write the resource.", e);
+        }
+
+        return resource;
+    }
+
+    @Override
+    public void remove(Resource resource) throws DataStoreException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
     /**
      * Registers a listener to notify when the specified kind of event occurs in this data store.
      * The current implementation of this data store can emit only {@link WarningEvent}s;
@@ -299,6 +354,19 @@ public class NetcdfStore extends DataStore implements Aggregate {
             throw new DataStoreClosedException(getLocale(), Constants.NETCDF, StandardOpenOption.READ);
         }
         return reader;
+    }
+
+    /**
+     * Returns the encoder if it has not been closed.
+     *
+     * @see #close()
+     */
+    private Encoder encoder() throws DataStoreClosedException {
+        final Encoder writer = encoder;
+        if (writer == null) {
+            throw new DataStoreClosedException(getLocale(), Constants.NETCDF, StandardOpenOption.WRITE);
+        }
+        return writer;
     }
 
     /**

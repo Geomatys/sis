@@ -16,6 +16,9 @@
  */
 package org.apache.sis.storage.netcdf.base;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
@@ -26,6 +29,26 @@ import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.file.Path;
 import java.awt.image.DataBuffer;
+import java.util.Set;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import org.apache.sis.coverage.grid.PixelInCell;
+import org.apache.sis.referencing.CRS;
+import org.apache.sis.referencing.CommonCRS;
+import org.apache.sis.referencing.operation.transform.LinearTransform;
+import org.apache.sis.storage.GridCoverageResource;
+import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.crs.GeodeticCRS;
+import org.opengis.referencing.crs.GeographicCRS;
+import org.opengis.referencing.crs.SingleCRS;
+import org.opengis.referencing.crs.TemporalCRS;
+import org.opengis.referencing.datum.Ellipsoid;
+import org.opengis.referencing.datum.PrimeMeridian;
+import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.Matrix;
+import org.opengis.util.FactoryException;
 import org.opengis.util.GenericName;
 import org.opengis.metadata.Metadata;
 import org.opengis.referencing.operation.MathTransform1D;
@@ -56,6 +79,9 @@ import org.apache.sis.measure.NumberRange;
 import org.apache.sis.util.resources.Errors;
 import org.apache.sis.util.resources.Vocabulary;
 import org.apache.sis.storage.netcdf.internal.Resources;
+import ucar.nc2.constants.CF;
+
+import static org.apache.sis.storage.netcdf.base.Encoder.getPositions;
 
 
 /**
@@ -68,6 +94,12 @@ import org.apache.sis.storage.netcdf.internal.Resources;
  * @author  Alexis Manin (Geomatys)
  */
 public final class RasterResource extends AbstractGridCoverageResource implements StoreResource {
+
+    /**
+     * Logger for the RasterResource class.
+     */
+    public static final Logger LOGGER = Logger.getLogger(RasterResource.class.getName());
+
     /**
      * Words used in standard (preferred) or long (if no standard) variable names which suggest
      * that the variable is a component of a vector. Those words are used in heuristic rules
@@ -197,6 +229,218 @@ public final class RasterResource extends AbstractGridCoverageResource implement
         sampleDimensions = new SampleDimension[numBands];
         data             = bands.toArray(Variable[]::new);
         assert data.length == (bandDimension >= 0 ? 1 : sampleDimensions.length);
+    }
+
+    /**
+     * Creates a list of variables from the given resource (GridVerageResource).
+     *
+     * @param encoder the encoder to use for creating the resource.
+     * @param resource the resource to convert into a raster resource.
+     * @return a new raster resource created from the given resource.
+     * @throws DataStoreException if an error occurred while creating the raster resource.
+     */
+    public static List<Variable> createVariablesFromResource(final Encoder encoder, final Resource resource) throws DataStoreException {
+        List<Variable> variables = new ArrayList<>();
+
+        if (resource instanceof GridCoverageResource) {
+            final GridCoverageResource coverage = (GridCoverageResource) resource;
+
+            GridGeometry gridGeom = coverage.getGridGeometry();
+            GridExtent extent = gridGeom.getExtent();
+            int nDim = extent.getDimension();
+            List<SingleCRS> listCRS = CRS.getSingleComponents(gridGeom.getCoordinateReferenceSystem());
+            int nCrsComposants = listCRS.size();
+            double[] resolutions = gridGeom.getResolution(true);
+            CoordinateReferenceSystem crs = gridGeom.getCoordinateReferenceSystem();
+
+            // 1. Create main dimensions (axes) and associated variables
+            Dimension[] dimensions = new Dimension[nDim];
+
+            int processedDims = 0;
+            for (int crsComponent = 0; crsComponent < nCrsComposants; crsComponent++) {
+                SingleCRS dimCRS = listCRS.get(crsComponent);
+                int crsDim = dimCRS.getCoordinateSystem().getDimension();
+
+                for (int k = 0; k < crsDim; k++) {
+                    int i = processedDims;
+
+                    int dimLen = (int) extent.getSize(i);
+                    String name = dimCRS.getCoordinateSystem().getAxis(k).getName().getCode();
+                    if (Strings.isNullOrEmpty(name)) {
+                        name = "dim" + i;
+                    }
+                    long length = extent.getSize(i);
+                    dimensions[i] = encoder.buildDimension(name, (int) length);
+
+                    double[] values;
+                    if (Double.isNaN(resolutions[i])) {
+                        try {
+                            values = getPositions(dimCRS, gridGeom);
+                            if (values.length == 0) {
+                                throw new DataStoreException("Cannot determine axis values for dimension variable: " + name);
+                            }
+                        } catch (TransformException e) {
+                            throw new DataStoreException("Error computing axis values for dimension variable: " + name, e);
+                        }
+                    } else {
+                        double[] valArr = new double[dimLen];
+                        long origin = extent.getLow(i);
+                        for (int j = 0; j < dimLen; j++) {
+                            valArr[j] = origin + j * resolutions[i];
+                        }
+                        values = valArr;
+                    }
+
+                    if (dimCRS instanceof TemporalCRS) {
+                        final MathTransform mt;
+                        try {
+                            mt = CRS.findOperation(dimCRS, CommonCRS.Temporal.JAVA.crs(), null).getMathTransform();
+                            mt.transform(values, 0, values, 0, values.length);
+                        } catch (FactoryException e) {
+                            throw new DataStoreException("Error computing axis values for dimension variable: " + name, e);
+                        } catch (TransformException e) {
+                            throw new DataStoreException("Error transforming axis values for dimension variable: " + name, e);
+                        }
+                    }
+
+                    Map<String, Object> dimAttrs = new HashMap<>(Map.of(
+                            CF.LONG_NAME, name,
+                            CF.STANDARD_NAME, name,
+                            CF.AXIS, "XYZT".charAt(i % 4)
+                    ));
+                    String unit = crs.getCoordinateSystem().getAxis(i).getUnit().getName();
+                    if (unit != null) {
+                        dimAttrs.put(CF.UNITS, unit);
+                    }
+
+                    DataType dimType = DataType.DOUBLE; // or infer from values if all integers
+                    int[] shape = new int[]{dimLen};
+                    Dimension[] dims = new Dimension[]{dimensions[i]};
+                    Variable dimVar = encoder.buildVariable(name, dims, dimAttrs, dimType, shape, null, values, null);
+                    variables.add(dimVar);
+                    processedDims++;
+                }
+            }
+
+            // 2. Create data variables (coverage bands / sample dimensions)
+            List<? extends SampleDimension> bands = coverage.getSampleDimensions();
+            int nBands = bands.size();
+
+            for (int b = 0; b < nBands; b++) {
+                SampleDimension band = bands.get(b);
+
+                // Compose name for variable
+                String varName = band.getName().toString();
+                // Create attributes map from SampleDimension
+                Map<String, Object> attrs = Map.of(
+                        CF.LONG_NAME, band.getName().toString(),
+                        CF.UNITS, band.getUnits().isPresent() ? band.getUnits().get().toString() : "",
+                        CF.GRID_MAPPING, "spatial_ref" // if CRS is present
+                );
+
+                // ZarrArrayMetadata: build or mock; for now, shape = grid shape, chunking = shape, codecs = bytes
+                int[] shape = new int[nDim];
+                for (int i = 0; i < nDim; i++) shape[i] = (int) extent.getSize(i);
+
+                Variable smVar = encoder.buildVariable(
+                        varName,
+                        dimensions,
+                        attrs,
+                        DataType.UNKNOWN,
+                        shape, null, resource, b
+                );
+                variables.add(smVar);
+            }
+
+            // 3. Create auxiliary variables (for GeoZarr)
+            if (encoder instanceof ZarrEncoder && crs != null) {
+                String wkt = null;
+                String gridMappingName = null;
+                double semiMajor = Double.NaN, semiMinor = Double.NaN;
+                double invFlattening = Double.NaN, lonPrimeMeridian = Double.NaN;
+                String refEllipsoidName = null, primeMeridianName = null, geogCrsName = null, horizDatumName = null;
+                String geoTransformStr = null;
+
+                try {
+                    wkt = crs.toWKT();
+                    gridMappingName = crs.getName() != null ? crs.getName().getCode() : null;
+
+                    if (crs instanceof GeodeticCRS) {
+                        GeodeticCRS gcrs = (GeodeticCRS) crs;
+                        Ellipsoid ell = gcrs.getDatum().getEllipsoid();
+                        semiMajor = ell.getSemiMajorAxis();
+                        semiMinor = ell.getSemiMinorAxis();
+                        invFlattening = ell.getInverseFlattening();
+                        refEllipsoidName = ell.getName() != null ? ell.getName().getCode() : null;
+
+                        PrimeMeridian pm = gcrs.getDatum().getPrimeMeridian();
+                        lonPrimeMeridian = pm.getGreenwichLongitude();
+                        primeMeridianName = pm.getName() != null ? pm.getName().getCode() : null;
+
+                        geogCrsName = gcrs.getName().getCode();
+                        horizDatumName = gcrs.getDatum().getName().getCode();
+                    }
+
+                    MathTransform gridToCRS = gridGeom.getGridToCRS(PixelInCell.CELL_CENTER);
+
+                    if (gridToCRS instanceof LinearTransform) {
+                        // This is affine
+                        Matrix matrix = ((LinearTransform) gridToCRS).getMatrix();
+                        // For a 2D transform, the matrix is 3x3 :
+                        // [ m00 m01 m02 ]
+                        // [ m10 m11 m12 ]
+                        // [  0   0   1  ]
+                        // GDAL expects: [X_offset, X_pixel_size, X_skew, Y_offset, Y_skew, Y_pixel_size]
+                        // i.e. [ m02, m00, m01, m12, m10, m11 ]
+
+                        double m00 = matrix.getElement(0, 0);
+                        double m01 = matrix.getElement(0, 1);
+                        double m02 = matrix.getElement(0, 2);
+                        double m10 = matrix.getElement(1, 0);
+                        double m11 = matrix.getElement(1, 1);
+                        double m12 = matrix.getElement(1, 2);
+
+                        // GeoZarr/gdal expects:
+                        // X_offset, X_pixel_size, X_skew, Y_offset, Y_skew, Y_pixel_size
+                        //        = m02   , m00         , m01   , m12  , m10   , m11
+
+                        geoTransformStr = String.format(Locale.US, "%s %s %s %s %s %s",
+                                m02, m00, m01, m12, m10, m11);
+                    }
+                } catch (UnsupportedOperationException ex) {
+                    LOGGER.warning("Failed to extract required CRS/GeoTransform metadata: " + ex.getMessage());
+                }
+
+                if (wkt != null) {
+                    Map<String, Object> crsAttrs = new LinkedHashMap<>();
+                    if (!Double.isNaN(semiMajor)) crsAttrs.put(CF.SEMI_MAJOR_AXIS, semiMajor);
+                    if (!Double.isNaN(semiMinor)) crsAttrs.put(CF.SEMI_MINOR_AXIS, semiMinor);
+                    if (!Double.isNaN(invFlattening)) crsAttrs.put(CF.INVERSE_FLATTENING, invFlattening);
+                    if (refEllipsoidName != null) crsAttrs.put("reference_ellipsoid_name", refEllipsoidName);
+                    if (!Double.isNaN(lonPrimeMeridian)) crsAttrs.put(CF.LONGITUDE_OF_PRIME_MERIDIAN, lonPrimeMeridian);
+                    if (primeMeridianName != null) crsAttrs.put("prime_meridian_name", primeMeridianName);
+                    if (geogCrsName != null) crsAttrs.put("geographic_crs_name", geogCrsName);
+                    if (horizDatumName != null) crsAttrs.put("horizontal_datum_name", horizDatumName);
+                    if (gridMappingName != null) crsAttrs.put(CF.GRID_MAPPING_NAME, gridMappingName);
+                    if (geoTransformStr != null) crsAttrs.put("GeoTransform", geoTransformStr);
+                    crsAttrs.put("spatial_ref", wkt);
+                    crsAttrs.put("crs_wkt", wkt);
+
+                    Variable crsVar = encoder.buildVariable(
+                            "spatial_ref",
+                            new Dimension[0],
+                            crsAttrs,
+                            DataType.UNKNOWN,
+                            new int[] {1},
+                            null,
+                            null, null
+                    );
+                    variables.add(crsVar);
+                }
+            }
+            return variables;
+        }
+        return List.of();
     }
 
     /**

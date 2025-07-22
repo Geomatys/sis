@@ -52,6 +52,10 @@ dependencies {
     api           (libs.geoapi)
     implementation(libs.jaxb.api)                  // Transitive dependency.
     runtimeOnly   (libs.jaxb.impl)
+    runtimeOnly   (libs.jackson.core)
+    runtimeOnly   (libs.jackson.annotations)
+    runtimeOnly   (libs.jackson.databind)
+    runtimeOnly   (libs.zstd.jni)
     api           (files(File(pathToFX, "javafx.base.jar")))
     api           (files(File(pathToFX, "javafx.graphics.jar")))
     api           (files(File(pathToFX, "javafx.controls.jar")))

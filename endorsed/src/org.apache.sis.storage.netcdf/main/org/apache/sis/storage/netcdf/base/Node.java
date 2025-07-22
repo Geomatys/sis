@@ -38,12 +38,28 @@ public abstract class Node extends NamedElement {
     protected final Decoder decoder;
 
     /**
+     * The encoder used for writing this node.
+     */
+    protected final Encoder encoder;
+
+    /**
      * Creates a new node.
      *
      * @param decoder  the netCDF file where this node is stored.
      */
     protected Node(final Decoder decoder) {
         this.decoder = decoder;
+        this.encoder = null; // Not used for reading.
+    }
+
+    protected Node(final Encoder encoder) {
+        this.decoder = null; // Not used for writing.
+        this.encoder = encoder;
+    }
+
+    protected Node(final Decoder decoder, final Encoder encoder) {
+        this.decoder = decoder;
+        this.encoder = encoder;
     }
 
     /**
@@ -192,6 +208,7 @@ public abstract class Node extends NamedElement {
         if (value instanceof Number) {
             singleton = (Number) value;
         } else if (value instanceof String) {
+            assert decoder != null;
             singleton = decoder.parseNumber(attributeName, (String) value);
         } else if (value instanceof Vector) {
             final Vector data = (Vector) value;
@@ -257,7 +274,13 @@ public abstract class Node extends NamedElement {
      * @return the resources for error messages using the locales specified to the decoder.
      */
     final Errors errors() {
-        return Errors.forLocale(decoder.getLocale());
+        if( decoder != null) {
+            return Errors.forLocale(decoder.getLocale());
+        }
+        else if( encoder != null) {
+            return Errors.forLocale(encoder.getLocale());
+        }
+        return null; // Should never happen
     }
 
     /**
@@ -271,7 +294,12 @@ public abstract class Node extends NamedElement {
      * @param  arguments  values to be formatted in the {@link java.text.MessageFormat} pattern.
      */
     protected final void warning(final Class<?> caller, final String method, final Exception exception, final short key, final Object... arguments) {
-        warning(decoder.listeners, caller, method, null, null, key, arguments);
+        if (decoder != null) {
+            warning(decoder.listeners, caller, method, null, null, key, arguments);
+        }
+        if (encoder != null) {
+            warning(encoder.listeners, caller, method, null, null, key, arguments);
+        }
     }
 
     /**
@@ -284,7 +312,12 @@ public abstract class Node extends NamedElement {
      * @param  arguments  values to be formatted in the {@link java.text.MessageFormat} pattern.
      */
     protected final void error(final Class<?> caller, final String method, final Exception exception, final short key, final Object... arguments) {
-        warning(decoder.listeners, caller, method, exception, errors(), key, arguments);
+        if (decoder != null) {
+            warning(decoder.listeners, caller, method, exception, errors(), key, arguments);
+        }
+        if (encoder != null) {
+            warning(encoder.listeners, caller, method, exception, errors(), key, arguments);
+        }
     }
 
     /*
