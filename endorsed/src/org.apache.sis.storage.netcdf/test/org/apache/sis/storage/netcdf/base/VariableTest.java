@@ -109,7 +109,7 @@ public class VariableTest extends TestCase {
      * @param  expected   the expected property values.
      * @param  variables  the variable for which to test properties.
      */
-    private static void assertBasicPropertiesEqual(final Object[] expected, final Variable[] variables) {
+    public static void assertBasicPropertiesEqual(final Object[] expected, final Variable[] variables) {
         int propertyIndex = 0;
         for (final Variable variable : variables) {
             final String name = variable.getName();
@@ -180,14 +180,14 @@ public class VariableTest extends TestCase {
     /**
      * Returns the dimension names.
      */
-    private static String[] names(final List<Dimension> dimensions) {
+    public static String[] names(final List<Dimension> dimensions) {
         return dimensions.stream().map(Dimension::getName).toArray(String[]::new);
     }
 
     /**
      * Returns the dimension lengths.
      */
-    private static long[] lengths(final List<Dimension> dimensions) {
+    public static long[] lengths(final List<Dimension> dimensions) {
         return dimensions.stream().mapToLong(Dimension::length).toArray();
     }
 
@@ -246,7 +246,7 @@ public class VariableTest extends TestCase {
      * Asserts that the attribute of given name contains a value equals to the expected value.
      * This method is used for attributes that are expected to contain singleton.
      */
-    private static void assertSingletonEquals(final Node variable, final String name, final Object expected) {
+    public static void assertSingletonEquals(final Node variable, final String name, final Object expected) {
         final String t = expected.toString();
         assertEquals     (expected,         variable.getAttributeValue    (name));
         assertEquals     (t,                variable.getAttributeAsString (name));
@@ -267,7 +267,7 @@ public class VariableTest extends TestCase {
      * Asserts that the attribute of given name contains a value equals to the expected value.
      * This method is used for attributes that are expected to contain vector.
      */
-    private static void assertVectorEquals(final Node variable, final String name, final Number... expected) {
+    protected static void assertVectorEquals(final Node variable, final String name, final Number... expected) {
         final Vector values = variable.getAttributeAsVector(name);
         assertNotNull(values, name);
         assertEquals (expected.length, values.size());

@@ -27,6 +27,10 @@ module org.apache.sis.storage.netcdf {
     requires static cdm.core;
     requires static udunits;
     requires static com.google.common;
+    requires com.fasterxml.jackson.core;
+    requires com.fasterxml.jackson.annotation;
+    requires com.fasterxml.jackson.databind;
+    requires com.github.luben.zstd_jni;
 
     uses org.apache.sis.storage.netcdf.base.Convention;
 
@@ -34,6 +38,12 @@ module org.apache.sis.storage.netcdf {
         with org.apache.sis.storage.netcdf.NetcdfStoreProvider;
 
     exports org.apache.sis.storage.netcdf;
+    opens org.apache.sis.storage.netcdf;
+
+    exports  org.apache.sis.storage.netcdf.zarr.metadata;
+    opens org.apache.sis.storage.netcdf.zarr.metadata;
+
+    opens org.apache.sis.storage.netcdf.zarr; // TODO: Find a better way - For jackson serialization / deserialization
 
     exports org.apache.sis.storage.netcdf.base to
             org.apache.sis.profile.japan;

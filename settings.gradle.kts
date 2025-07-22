@@ -71,6 +71,10 @@ dependencyResolutionManagement {
             library("udunits",       "edu.ucar",               "udunits")             .version {strictly("[5.0, 6.0[");  prefer("5.9.1")}
             library("guava",         "com.google.guava",       "guava")               .version {                         prefer("33.4.8-jre")}
             library("aws.s3",        "software.amazon.awssdk", "s3")                  .version {strictly("[2.0, 3.0[");  prefer("2.33.4")}
+            library("jackson.core",  "com.fasterxml.jackson.core",  "jackson-core")        .version {strictly("[2.18, 3.0["); prefer("2.19.1")}
+            library("jackson.annotations",  "com.fasterxml.jackson.core",  "jackson-annotations").version {strictly("[2.18, 3.0["); prefer("2.19.1")}
+            library("jackson.databind",  "com.fasterxml.jackson.core",  "jackson-databind").version {strictly("[2.18, 3.0["); prefer("2.19.1")}
+            library("zstd.jni", "com.github.luben", "zstd-jni").version {strictly("[1.5.7-1, 1.5.7-4["); prefer("1.5.7-4")}
         }
         create("tests") {
             library("geoapi",        "org.opengis",            "geoapi-conformance")     .version {strictly(geoapiVersion)}

@@ -589,6 +589,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         return value;
     }
 
+
     /**
      * Returns the value of the given attribute, or {@code null} if none.
      * This method does not search the lower-case variant of the given name because the argument given to this method

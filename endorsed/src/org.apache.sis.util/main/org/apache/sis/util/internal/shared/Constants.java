@@ -148,6 +148,11 @@ public final class Constants {
     public static final String NETCDF = "NetCDF";
 
     /**
+     * The {@value} code space.
+     */
+    public static final String ZARR = "Zarr";
+
+    /**
      * The {@value} code space. The project name is {@code "Proj.4"}, but this constant omits
      * the dot because this name is used as a code space and we want to avoid risk of confusion.
      * We use "Proj4" instead of "PROJ" for historical reasons, because we use this identifier

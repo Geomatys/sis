@@ -17,6 +17,11 @@
 package org.apache.sis.storage.netcdf;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import org.apache.sis.storage.netcdf.zarr.ZarrDecoder;
 import ucar.nc2.NetcdfFile;
 import org.apache.sis.storage.ProbeResult;
 import org.apache.sis.storage.StorageConnector;
@@ -40,6 +45,7 @@ import org.opengis.test.dataset.TestData;
  * Tests {@link NetcdfStoreProvider}.
  *
  * @author  Martin Desruisseaux (Geomatys)
+ * @author  Quentin Bialota (Geomatys)
  */
 public final class NetcdfStoreProviderTest extends TestCase {
     /**
@@ -60,7 +66,7 @@ public final class NetcdfStoreProviderTest extends TestCase {
         final NetcdfStoreProvider provider = new NetcdfStoreProvider();
         final ProbeResult probe = provider.probeContent(c);
         assertTrue  (probe.isSupported());
-        assertEquals(NetcdfStoreProvider.MIME_TYPE, probe.getMimeType());
+        assertEquals(NetcdfStoreProvider.NETCDF_MIME_TYPE, probe.getMimeType());
         assertEquals(new Version("1"), probe.getVersion());
         c.closeAllExcept(null);
     }
@@ -78,9 +84,26 @@ public final class NetcdfStoreProviderTest extends TestCase {
             final NetcdfStoreProvider provider = new NetcdfStoreProvider();
             final ProbeResult probe = provider.probeContent(c);
             assertTrue  (probe.isSupported());
-            assertEquals(NetcdfStoreProvider.MIME_TYPE, probe.getMimeType());
+            assertEquals(NetcdfStoreProvider.NETCDF_MIME_TYPE, probe.getMimeType());
             assertNull  (probe.getVersion());
         }
+    }
+
+    /**
+     * Tests {@link NetcdfStoreProvider#probeContent(StorageConnector)} for a Zarr dataset.
+     *
+     * @throws URISyntaxException if an error occurred while getting the test resource.
+     * @throws DataStoreException if a logical error occurred.
+     */
+    @Test
+    public void testProbeContentFromZarr() throws DataStoreException, URISyntaxException {
+        Path root = Paths.get(NetcdfStoreProviderTest.class.getResource("/org/apache/sis/storage/netcdf/resources/zarr/basic.zarr").toURI());
+        final StorageConnector c = new StorageConnector(root);
+        final NetcdfStoreProvider provider = new NetcdfStoreProvider();
+        final ProbeResult probe = provider.probeContent(c);
+        assertTrue  (probe.isSupported());
+        assertEquals(NetcdfStoreProvider.ZARR_MIME_TYPE, probe.getMimeType());
+        assertNull  (probe.getVersion());
     }
 
     /**
@@ -110,6 +133,22 @@ public final class NetcdfStoreProviderTest extends TestCase {
         final StorageConnector c = new StorageConnector(createUCAR(TestData.NETCDF_2D_GEOGRAPHIC));
         final Decoder decoder = NetcdfStoreProvider.decoder(createListeners(), c);
         assertInstanceOf(DecoderWrapper.class, decoder);
+        decoder.close(new DataStoreMock("lock"));
+    }
+
+    /**
+     * Tests {@link NetcdfStoreProvider#decoder(StoreListeners, StorageConnector)} for a Zarr dataset.
+     * The provider shall instantiate a {@link ZarrDecoder}.
+     *
+     * @throws IOException if an error occurred while reading the Zarr dataset.
+     * @throws URISyntaxException if an error occurred while getting the test resource.
+     * @throws DataStoreException if a logical error occurred.
+     */
+    @Test void testDecoderFromZarr() throws IOException, DataStoreException, URISyntaxException {
+        Path root = Paths.get(NetcdfStoreProviderTest.class.getResource("/org/apache/sis/storage/netcdf/resources/zarr/basic.zarr").toURI());
+        final StorageConnector c = new StorageConnector(root);
+        final Decoder decoder = NetcdfStoreProvider.decoder(createListeners(), c);
+        assertInstanceOf(ZarrDecoder.class, decoder);
         decoder.close(new DataStoreMock("lock"));
     }
 }

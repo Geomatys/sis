@@ -16,6 +16,7 @@
  */
 package org.apache.sis.storage.netcdf.base;
 
+import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.time.Instant;
@@ -170,6 +171,15 @@ public abstract class TestCase extends org.apache.sis.test.TestCase {
                 assertNotNull(decoder);
                 assertNull(decoders.put(name, decoder));
             }
+            decoder.setSearchPath(GLOBAL);
+            return decoder;                     // Reminder: Decoder instances are not thread-safe.
+        }
+    }
+
+    protected final Decoder selectDataset(final Path path) throws IOException, DataStoreException {
+        synchronized (decoders) {               // Paranoiac safety, but should not be used in multi-threads environment.
+            decoder = new org.apache.sis.storage.netcdf.zarr.ZarrDecoder(path, GeometryLibrary.JAVA2D, createListeners());
+            assertNotNull(decoder);
             decoder.setSearchPath(GLOBAL);
             return decoder;                     // Reminder: Decoder instances are not thread-safe.
         }
