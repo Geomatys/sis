@@ -38,6 +38,7 @@ public final class GeometryFactories {
     /**
      * The default geometry implementation to use. The default implementation
      * is JTS if present, or otherwise ESRI if present, or otherwise Java2D.
+     * S2 is a special none cartesian implementation therefor it should never be a default.
      */
     static final Geometries<?> DEFAULT = link(link(link(null, "j2d"), "esri"), "jts");
     static {

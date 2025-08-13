@@ -94,6 +94,26 @@ public enum GeometryLibrary {
     JTS("JTS"),
 
     /**
+     * The S2 library. This open source library provides an object model
+     * for spherical geometry together with a set of fundamental geometric functions.
+     * The library is licensed under Apache 2 License.
+     *
+     * <table class="sis">
+     *   <caption>Implementation classes</caption>
+     *   <tr><th>Geometry type</th>               <th>Class name</th></tr>
+     *   <tr><td>Root geometry class</td>         <td>{@code com.google.common.geometry.S2Region}</td></tr>
+     *   <tr><td>{@link GeometryType#POINT}</td>  <td>{@code com.google.common.geometry.S2Point}</td></tr>
+     *   <tr><td>{@link GeometryType#LINEAR}</td> <td>{@code com.google.common.geometry.S2Polyline}</td></tr>
+     *   <tr><td>{@link GeometryType#AREAL}</td>  <td>{@code com.google.common.geometry.S2Polygon}</td></tr>
+     * </table>
+     *
+     * @see <a href="https://github.com/google/s2-geometry-library-java">S2 home page</a>
+     *
+     * @since 2.0 (temporary version number until this branch is released)
+     */
+    S2("S2"),
+
+    /**
      * The SIS library. This open source library provides an object model
      * for a large set of geometry types but has limited geometric functions.
      * The library is available under Apache 2 license.

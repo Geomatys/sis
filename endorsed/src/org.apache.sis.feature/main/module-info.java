@@ -30,6 +30,7 @@ module org.apache.sis.feature {
     // Optional dependencies to be provided by user.
     requires static esri.geometry.api;
     requires static org.locationtech.jts;
+    //requires static com.google.common.geometry; //bug ? not found ?
 
     uses org.apache.sis.filter.FunctionRegister;
 

@@ -63,6 +63,7 @@ dependencies {
     compileOnly(libs.jaxb.impl)                 // For avoiding compiler warnings. Not read by SIS modules.
     compileOnly(libs.jts.core)
     compileOnly(libs.esri.geometry)
+    compileOnly(libs.s2.geometry)
     compileOnly(libs.libreoffice)
     compileOnly(libs.ucar)
     compileOnly(libs.aws.s3)
@@ -77,6 +78,7 @@ dependencies {
     testImplementation(tests.geographiclib)
     testImplementation(libs.jts.core)           // We need to repeat optional dependencies.
     testImplementation(libs.esri.geometry)      // Idem.
+    testImplementation(libs.s2.geometry)      // Idem.
     testImplementation(libs.libreoffice)
     testImplementation(libs.ucar)
     testImplementation(libs.aws.s3)

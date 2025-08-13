@@ -77,6 +77,7 @@ dependencies {
     testRuntimeOnly   (tests.jupiter)
     testRuntimeOnly   (libs.jts.core)
     testRuntimeOnly   (libs.esri.geometry)
+    testRuntimeOnly   (libs.s2.geometry)
 }
 
 /*
