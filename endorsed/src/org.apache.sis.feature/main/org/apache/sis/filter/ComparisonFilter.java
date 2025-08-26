@@ -737,7 +737,7 @@ abstract class ComparisonFilter<R> extends BinaryFunction<R,Object,Object>
         @Override protected boolean fromCompareTo(final int result) {return result == 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left == right);}
+        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left == right || (Double.isNaN(left) && Double.isNaN(right)));}
         @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left == right);}
         @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return left.isEqual(right);}
         @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return left.isEqual(right);}
