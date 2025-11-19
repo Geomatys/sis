@@ -546,13 +546,14 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
 
         final long[] lower  = new long[nDim];
         final long[] upper  = new long[nDim];
-        final long[] size   = (area != null) ? new long[nDim] : upper;
 
-        for (int i=0; i<nDim; i++) {
-            size[i] = arrayShape[i];
+        for (int i = 0; i < nDim; i++) {
             if (area != null) {
                 lower[i] = area.getLow(i);
                 upper[i] = Math.incrementExact(area.getHigh(i));
+            } else {
+                lower[i] = 0;
+                upper[i] = arrayShape[i];
             }
         }
 
@@ -572,67 +573,83 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         if (totalElements == 0) return out;
 
         // Helper to store current position in the output array
-        int[] stride = new int[nDim];
-        stride[nDim-1] = 1;
+        int[] outStrides = new int[nDim];
+        outStrides[nDim - 1] = 1;
         for (int i = nDim - 2; i >= 0; i--)
-            stride[i] = stride[i+1] * (int) Math.ceil((double)(upper[i+1]-lower[i+1]) / subsampling[i+1]);
+            outStrides[i] = outStrides[i + 1] * (int) Math.ceil((double)(upper[i + 1] - lower[i + 1]) / subsampling[i + 1]);
 
+        // Pre-calculate chunk strides
+        int[] chunkStrides = new int[nDim];
+        chunkStrides[nDim - 1] = 1;
+        for (int i = nDim - 2; i >= 0; i--) {
+            chunkStrides[i] = chunkStrides[i+1] * chunkShape[i+1];
+        }
 
-        // Iterate over every chunk intersecting with [lower, upper)
-        // Generate chunk indices in grid, e.g. [c0, c1, ...]
-        ChunkLoop:
-        {
-            int[] chunkIdx = new int[nDim];
-            int[] chunkStart = new int[nDim], chunkEnd = new int[nDim];
+        // Calculate grid bounds to read
+        // We determine the range of chunks to loop over: [gridMin, gridMax] (inclusive)
+        int[] gridMin = new int[nDim];
+        int[] gridMax = new int[nDim];
+        int[] chunkIdx = new int[nDim]; // The cursor
 
-            int linearChunkIdx = 0;
-            while (true) {
-                // Compute chunk origin and chunk size in array coordinate space
-                for (int d = 0; d < nDim; d++) {
-                    chunkStart[d] = chunkIdx[d] * chunkShape[d];
-                    chunkEnd[d]   = Math.min(chunkStart[d] + chunkShape[d], arrayShape[d]);
+        for (int i = 0; i < nDim; i++) {
+            gridMin[i] = (int) (lower[i] / chunkShape[i]);
+            // (upper - 1) ensures that if upper is exactly on a chunk boundary, we don't include the next empty chunk
+            gridMax[i] = (int) ((upper[i] - 1) / chunkShape[i]);
+            chunkIdx[i] = gridMin[i]; // Initialize cursor
+        }
+
+        // Chunk Looping
+        // We loop strictly from gridMin to gridMax.
+        boolean done = false;
+        while (!done) {
+
+            // 1. Compute geometry for this specific chunk
+            int[] chunkStart = new int[nDim];
+            int[] chunkEnd   = new int[nDim];
+            int[] sliceStart = new int[nDim];
+            int[] sliceEnd   = new int[nDim];
+
+            for (int d = 0; d < nDim; d++) {
+                chunkStart[d] = chunkIdx[d] * chunkShape[d];
+                chunkEnd[d]   = Math.min(chunkStart[d] + chunkShape[d], arrayShape[d]);
+
+                // Intersection Logic
+                sliceStart[d] = (int) Math.max(chunkStart[d], lower[d]);
+                sliceEnd[d]   = (int) Math.min(chunkEnd[d], upper[d]);
+            }
+
+            // 2. Read & Decode
+            Path chunkPath = this.metadata.getChunkPath(chunkIdx);
+            Object data = readChunkBytes(chunkPath); // Your existing method
+
+            if (data != null) {
+                // Decode
+                for (int i = metadata.codecs().size() - 1; i >= 0; i--) {
+                    AbstractZarrCodec codec = metadata.codecs().get(i);
+                    data = codec.decode(data, representationTypes.get(i));
                 }
-                // Compute intersection with area
-                boolean intersects = true;
-                int[] sliceStart = new int[nDim], sliceEnd = new int[nDim]; // coordinates in array
-                for (int d = 0; d < nDim; d++) {
-                    sliceStart[d] = (int) Math.max(chunkStart[d], lower[d]);
-                    sliceEnd[d]   = (int) Math.min(chunkEnd[d], upper[d]);
-                    if (sliceStart[d] >= sliceEnd[d])
-                        intersects = false;
-                }
-                if (intersects) {
-                    // Read/decode chunk bytes (decode w/ codecs)
-                    Path chunkPath = this.metadata.getChunkPath(chunkIdx);
 
-                    Object data = readChunkBytes(chunkPath);
-                    if (data != null) {
-                        for (int i = metadata.codecs().size() -1; i >= 0 ; i--) {
-                            AbstractZarrCodec codec = metadata.codecs().get(i);
-                            data = codec.decode(data, representationTypes.get(i));
-                        }
+                // 3. Copy chunk region to output array
+                copyChunkRegionToOutput(
+                        data, 0, 0, 0,               // Offsets & Dim Index
+                        chunkStart, chunkShape, chunkStrides,
+                        sliceStart, sliceEnd,
+                        lower, subsampling,
+                        out, outStrides
+                );
+            }
 
-                        // Copy (with subsampling) the intersecting region from chunkArray to out
-                        copyChunkRegionToOutput(
-                                data, chunkStart, chunkShape, // chunk info
-                                sliceStart, sliceEnd,              // area in array coords
-                                lower, upper, subsampling,      // full selection region
-                                arrayShape,                        // full array shape
-                                out, stride, dataType // output array config
-                        );
-                    }
+            // 4. Increment Chunk Index
+            for (int k = nDim - 1; k >= 0; k--) {
+                if (chunkIdx[k] < gridMax[k]) {
+                    chunkIdx[k]++;
+                    break;
                 }
-                // Advance to next chunk index (lexicographic/minor-to-major order)
-                int dim = nDim - 1;
-                while (dim >= 0) {
-                    chunkIdx[dim]++;
-                    if (chunkIdx[dim] < gridShape[dim])
-                        break;
-                    chunkIdx[dim] = 0;
-                    dim--;
-                }
-                if (dim < 0)
-                    break ChunkLoop;
+                // Wrap around: Reset to the MINIMUM for this dimension (not 0)
+                chunkIdx[k] = gridMin[k];
+
+                // If we wrapped around the 0th dimension, we are finished
+                if (k == 0) done = true;
             }
         }
 
@@ -644,58 +661,129 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         return out;
     }
 
-    private void copyChunkRegionToOutput(
-            Object chunkData, int[] chunkStart, int[] chunkShape,
-            int[] sliceStart, int[] sliceEnd,
-            long[] lower, long[] upper, long[] subsampling,
-            int[] arrayShape,
-            Object out, int[] outStride, DataType dataType
-    ) throws DataStoreContentException {
+    /**
+     * Recursive method to copy a region from a chunk to the output array, considering subsampling.
+     * Uses System.arraycopy for the contiguous last dimension when possible, if subsampling is 1 (=> no subsampling).
+     *
+     * @param chunkData      The source 1D flattened array
+     * @param srcBaseOffset  Current offset in chunkData
+     * @param dstBaseOffset  Current offset in out
+     * @param dim            Current dimension index being processed
+     * @param chunkStart     Global coordinates where this chunk starts
+     * @param chunkShape     Shape of the chunk
+     * @param chunkStrides   Strides for the chunk array
+     * @param sliceStart     Global start coordinate to copy (intersected)
+     * @param sliceEnd       Global end coordinate to copy (exclusive)
+     * @param globalLower    Global selection start (needed for out offset calc)
+     * @param subsampling    Subsampling factors
+     * @param out            The destination 1D flattened array
+     * @param outStrides     Strides for the output array
+     */
+    private void copyChunkRegionToOutput(Object chunkData, int srcBaseOffset, int dstBaseOffset, int dim,
+            int[] chunkStart, int[] chunkShape, int[] chunkStrides, int[] sliceStart, int[] sliceEnd,
+            long[] globalLower, long[] subsampling, Object out, int[] outStrides
+    ) {
         int nDim = chunkShape.length;
-        int[] coord = Arrays.copyOf(sliceStart, nDim);
 
-        while (true) {
-            // Compute chunk-local coordinate
-            boolean insideChunk = true;
-            int chunkLinearIdx = 0, outLinearIdx = 0, mulChunk = 1;
-            for (int d = nDim - 1; d >= 0; d--) {
-                int inChunk = coord[d] - chunkStart[d];
-                if (inChunk < 0 || inChunk >= chunkShape[d]) {
-                    insideChunk = false; break;
-                }
-                int outd = (int)((coord[d] - lower[d]) / subsampling[d]);
-                chunkLinearIdx += inChunk * mulChunk;
-                outLinearIdx  += outd * outStride[d];
-                mulChunk *= chunkShape[d];
-            }
+        // 1. Calculate local start/end indices relative to the chunk
+        // - Global coordinate: sliceStart[dim]
+        // - Chunk Origin:      chunkStart[dim]
+        // - Local Index:       sliceStart[dim] - chunkStart[dim]
+        int localStart = sliceStart[dim] - chunkStart[dim];
+        int count = sliceEnd[dim] - sliceStart[dim];
 
-            if (insideChunk) {
-                // Only copy if inside chunk *and* inside actual array/selection
-                if (dataType == DataType.STRING) {
-                    ((String[])out)[outLinearIdx] = ((String[])chunkData)[chunkLinearIdx];
-                } else {
-                    switch (dataType.number) {
-                        case Numbers.BYTE:      ((byte[])out)[outLinearIdx]    = ((byte[])chunkData)[chunkLinearIdx];  break;
-                        case Numbers.SHORT:     ((short[])out)[outLinearIdx]   = ((short[])chunkData)[chunkLinearIdx]; break;
-                        case Numbers.CHARACTER: ((char[])out)[outLinearIdx]    = ((char[])chunkData)[chunkLinearIdx];  break;
-                        case Numbers.INTEGER:   ((int[])out)[outLinearIdx]     = ((int[])chunkData)[chunkLinearIdx];   break;
-                        case Numbers.LONG:      ((long[])out)[outLinearIdx]    = ((long[])chunkData)[chunkLinearIdx];  break;
-                        case Numbers.FLOAT:     ((float[])out)[outLinearIdx]   = ((float[])chunkData)[chunkLinearIdx]; break;
-                        case Numbers.DOUBLE:    ((double[])out)[outLinearIdx]  = ((double[])chunkData)[chunkLinearIdx];break;
-                        case Numbers.BOOLEAN:   ((boolean[])out)[outLinearIdx] = ((boolean[])chunkData)[chunkLinearIdx];break;
-                        default: throw new DataStoreContentException(Errors.format(Errors.Keys.UnknownType_1, dataType));
-                    }
-                }
-            }
+        // 2. Check if we are at the last dimension (contiguous block)
+        // If last dimension, we can copy directly the contiguous block
+        if (dim == nDim - 1) {
 
-            // Advance to next coordinate with correct subsampling
-            int k = nDim - 1;
-            while (k >= 0) {
-                coord[k] += (int) subsampling[k];
-                if (coord[k] < sliceEnd[k]) break;
-                coord[k] = sliceStart[k]; k--;
+            // "Fast Way" when no subsampling (subsampling == 1)
+            // In this case, we can copy the whole contiguous block using System.arraycopy
+            if (subsampling[dim] == 1) {
+                int srcPos = srcBaseOffset + localStart;
+
+                // Determine destination position
+                // The destination is computed based on the global selection
+                // relative coordinate in selection: (sliceStart[dim] - globalLower[dim])
+                int outRel = (int) (sliceStart[dim] - globalLower[dim]);
+                int dstPos = dstBaseOffset + outRel; // outStrides[last] is always 1
+
+                System.arraycopy(chunkData, srcPos, out, dstPos, count);
             }
-            if (k < 0) break;
+            // "Slow Way" when subsampling > 1
+            // In this case, we must iterate manually over the elements to copy
+            else {
+                int step = (int) subsampling[dim];
+                int srcPos = srcBaseOffset + localStart;
+
+                // Initial dest pos
+                int outRel = (int) ((sliceStart[dim] - globalLower[dim]) / step);
+                int dstPos = dstBaseOffset + outRel;
+
+                copyWithSubsampling(chunkData, srcPos, out, dstPos, count, step, chunkData.getClass().getComponentType());
+            }
+        }
+        // 3. Recursive Step for Higher Dimensions
+        // Not the last dimension, must iterate over this dimension and recurse
+        else {
+            int step = (int) subsampling[dim];
+
+            // Loop through the rows/planes of this dimension
+            // We iterate in global coordinates from sliceStart to sliceEnd
+            for (int i = 0; i < count; i += step) {
+                int globalCoord = sliceStart[dim] + i;
+
+                // Calculate Local Coordinate for Source
+                int localCoord = globalCoord - chunkStart[dim];
+                int nextSrcOffset = srcBaseOffset + (localCoord * chunkStrides[dim]);
+
+                // Calculate Coordinate for Destination
+                // How many pixels have we skipped in the global selection?
+                int outCoord = (int) ((globalCoord - globalLower[dim]) / subsampling[dim]);
+                int nextDstOffset = dstBaseOffset + (outCoord * outStrides[dim]);
+
+                // Recurse
+                copyChunkRegionToOutput(
+                        chunkData, nextSrcOffset, nextDstOffset, dim + 1,
+                        chunkStart, chunkShape, chunkStrides,
+                        sliceStart, sliceEnd, globalLower, subsampling, out, outStrides
+                );
+            }
+        }
+    }
+
+    /**
+     * Copies data from source to destination with subsampling.
+     *
+     * @param src the source array
+     * @param srcPos the starting position in the source array
+     * @param dst the destination array
+     * @param dstPos the starting position in the destination array
+     * @param count number of elements to consider from source
+     * @param step the subsampling step
+     * @param type the component type of the arrays
+     */
+    private void copyWithSubsampling(Object src, int srcPos, Object dst, int dstPos, int count, int step, Class<?> type) {
+        // Ideally, keep a reference to DataType enum to avoid reflection,
+        // but for brevity using 'instanceof' or checking type:
+
+        if (src instanceof float[]) {
+            float[] s = (float[]) src; float[] d = (float[]) dst;
+            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
+        } else if (src instanceof double[]) {
+            double[] s = (double[]) src; double[] d = (double[]) dst;
+            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
+        } else if (src instanceof int[]) {
+            int[] s = (int[]) src; int[] d = (int[]) dst;
+            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
+        } else if (src instanceof short[]) {
+            short[] s = (short[]) src; short[] d = (short[]) dst;
+            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
+        } else if (src instanceof long[]) {
+            long[] s = (long[]) src; long[] d = (long[]) dst;
+            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
+        } else if (src instanceof byte[]) {
+            byte[] s = (byte[]) src; byte[] d = (byte[]) dst;
+            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
         }
     }
 

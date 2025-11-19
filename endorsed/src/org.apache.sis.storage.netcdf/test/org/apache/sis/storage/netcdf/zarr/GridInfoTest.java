@@ -20,7 +20,6 @@ import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.netcdf.base.Axis;
 import org.apache.sis.storage.netcdf.base.Decoder;
 import org.apache.sis.storage.netcdf.base.Grid;
-import org.apache.sis.storage.netcdf.base.GridTest;
 import org.apache.sis.util.ArraysExt;
 import org.junit.jupiter.api.Test;
 import org.opengis.test.dataset.TestData;
@@ -29,7 +28,7 @@ import java.io.IOException;
 
 import static org.apache.sis.storage.netcdf.zarr.ZarrDecoderTest.createZarrDecoder;
 import static org.apache.sis.storage.netcdf.zarr.ZarrDecoderTest.getPath;
-import static org.apache.sis.test.TestUtilities.getSingleton;
+import static org.apache.sis.test.Assertions.assertSingleton;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
@@ -66,13 +65,13 @@ public final class GridInfoTest {
     public void testDimensions() throws IOException, DataStoreException {
         final Decoder decoder = createZarrDecoder(getPath("/org/apache/sis/storage/netcdf/resources/zarr/dggs.zarr"));
 
-        Grid geometry = getSingleton(filter(decoder.getGridCandidates()));
+        Grid geometry = assertSingleton(filter(decoder.getGridCandidates()));
         assertEquals(2, geometry.getSourceDimensions());
         assertEquals(2, geometry.getAxes(decoder).length);
 
         final Decoder geoDecoder = createZarrDecoder(getPath("/org/apache/sis/storage/netcdf/resources/zarr/geo.zarr"));
 
-        geometry = getSingleton(filter(geoDecoder.getGridCandidates()));
+        geometry = assertSingleton(filter(geoDecoder.getGridCandidates()));
         assertEquals(3, geometry.getSourceDimensions());
         assertEquals(3, geometry.getAxes(decoder).length);
     }
@@ -83,7 +82,7 @@ public final class GridInfoTest {
     private Axis[] axes(final String path) throws IOException, DataStoreException {
         final Decoder decoder = createZarrDecoder(getPath(path));
 
-        return getSingleton(filter(decoder.getGridCandidates())).getAxes(decoder);
+        return assertSingleton(filter(decoder.getGridCandidates())).getAxes(decoder);
     }
 
 

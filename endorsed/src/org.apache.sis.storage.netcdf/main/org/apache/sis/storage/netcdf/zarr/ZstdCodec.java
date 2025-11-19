@@ -67,17 +67,21 @@ final class ZstdCodec extends AbstractZarrCodec {
      */
     @Override
     public Object encode(Object decodedValue, ZarrRepresentationType decodedType) {
-        // decodedValue is a byte[] or ByteBuffer
         byte[] input;
         if (decodedValue instanceof byte[]) {
             input = (byte[]) decodedValue;
         } else if (decodedValue instanceof ByteBuffer) {
             ByteBuffer buf = (ByteBuffer) decodedValue;
-            input = new byte[buf.remaining()];
-            buf.get(input);
+            if (buf.hasArray()) {
+                input = buf.array();
+            } else {
+                input = new byte[buf.remaining()];
+                buf.get(input);
+            }
         } else {
-            throw new IllegalArgumentException("Unsupported input to ZSTD.encode: " + decodedValue.getClass());
+            throw new IllegalArgumentException("Unsupported input: " + decodedValue.getClass());
         }
+
         return Zstd.compress(input, level);
     }
 
@@ -90,14 +94,17 @@ final class ZstdCodec extends AbstractZarrCodec {
      */
     @Override
     public Object decode(Object encodedValue, ZarrRepresentationType decodedType) {
-        // encodedValue is a compressed byte[] or ByteBuffer, decodedType tells us expected length **optional**
         byte[] input;
         if (encodedValue instanceof byte[]) {
             input = (byte[]) encodedValue;
         } else if (encodedValue instanceof ByteBuffer) {
             ByteBuffer buf = (ByteBuffer) encodedValue;
-            input = new byte[buf.remaining()];
-            buf.get(input);
+            if (buf.hasArray()) {
+                input = buf.array();;
+            } else {
+                input = new byte[buf.remaining()];
+                buf.get(input);
+            }
         } else {
             throw new IllegalArgumentException("Unsupported input to ZSTD.decode: " + encodedValue.getClass());
         }

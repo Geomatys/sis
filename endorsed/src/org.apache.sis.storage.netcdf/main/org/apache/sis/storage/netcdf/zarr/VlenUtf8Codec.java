@@ -81,13 +81,31 @@ final class VlenUtf8Codec extends AbstractZarrCodec {
     @Override
     public Object decode(Object bytes, ZarrRepresentationType decodedType) throws DataStoreContentException {
         if (bytes == null) return null;
-        byte[] all = (bytes instanceof ByteBuffer) ? BytesCodec.getBytes((ByteBuffer) bytes) : (byte[]) bytes;
+
+        ByteBuffer buf;
+        if (bytes instanceof ByteBuffer) {
+            buf = (ByteBuffer) bytes;
+        } else if (bytes instanceof byte[]) {
+            buf = ByteBuffer.wrap((byte[]) bytes);
+        } else {
+            throw new DataStoreContentException("Unsupported input type for VlenUtf8Codec");
+        }
+
+        // VLenUTF8 is always Little Endian for the offsets
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
         int[] shape = decodedType.shape();
         int count = 1;
         for (int s : shape) count *= s;
-        return decodeStringsVlenUtf8(all, count);
+
+        return decodeStringsVlenUtf8(buf, count);
     }
 
+    /**
+     * Encodes an array of strings into VLen-UTF8 byte representation.
+     * @param strings the array of strings to encode
+     * @return the encoded byte array in VLen-UTF8 format
+     */
     private static byte[] encodeStringsVlenUtf8(String[] strings) {
         List<byte[]> utf8s = new ArrayList<>(strings.length);
         int[] offsets = new int[strings.length + 1];
@@ -104,23 +122,59 @@ final class VlenUtf8Codec extends AbstractZarrCodec {
         return buf.array();
     }
 
-    private static String[] decodeStringsVlenUtf8(byte[] payload, int count) throws DataStoreContentException {
-        ByteBuffer buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN);
-        int[] offsets = new int[count + 1];
-        for (int i = 0; i < count + 1; i++) offsets[i] = buf.getInt();
-        byte[] data = new byte[payload.length - 4 * (count + 1)];
-        buf.get(data);
-
+    /**
+     * Decodes VLen-UTF8 byte representation into an array of strings.
+     * @param buf the ByteBuffer containing VLen-UTF8 encoded data
+     * @param count the number of strings to decode
+     * @return the decoded array of strings
+     */
+    private static String[] decodeStringsVlenUtf8(ByteBuffer buf, int count) {
         String[] out = new String[count];
-        for (int i = 0; i < count; i++) {
-            int from = offsets[i];
-            int to = offsets[i + 1];
-            if (from == to) {
-                out[i] = "";
-            } else {
-                out[i] = new String(data, from, to - from, StandardCharsets.UTF_8);
+        int startPos = buf.position();
+
+        // Calculate where the string data actually begins
+        int headerByteSize = (count + 1) * Integer.BYTES;
+        int dataStartPos = startPos + headerByteSize;
+
+        // Fast Way : Heap ByteBuffer (Backed by byte[])
+        if (buf.hasArray()) {
+            byte[] arr = buf.array();
+            int arrayOffset = buf.arrayOffset();
+
+            for (int i = 0; i < count; i++) {
+                // Read offset[i] and offset[i+1]
+                int offStart = buf.getInt(startPos + (i * Integer.BYTES));
+                int offEnd   = buf.getInt(startPos + ((i + 1) * Integer.BYTES));
+                int len = offEnd - offStart;
+
+                if (len == 0) {
+                    out[i] = "";
+                } else {
+                    out[i] = new String(arr, arrayOffset + dataStartPos + offStart, len, StandardCharsets.UTF_8);
+                }
             }
         }
+        // Slow Way: Direct ByteBuffer (or Read-Only)
+        else {
+            // We cannot access the array directly, so we must copy the bytes for each string.
+
+            for (int i = 0; i < count; i++) {
+                int offStart = buf.getInt(startPos + (i * Integer.BYTES));
+                int offEnd   = buf.getInt(startPos + ((i + 1) * Integer.BYTES));
+                int len = offEnd - offStart;
+
+                if (len == 0) {
+                    out[i] = "";
+                } else {
+                    byte[] strBytes = new byte[len];
+                    ByteBuffer view = buf.duplicate();
+                    view.position(dataStartPos + offStart);
+                    view.get(strBytes);
+                    out[i] = new String(strBytes, StandardCharsets.UTF_8);
+                }
+            }
+        }
+
         return out;
     }
 }
