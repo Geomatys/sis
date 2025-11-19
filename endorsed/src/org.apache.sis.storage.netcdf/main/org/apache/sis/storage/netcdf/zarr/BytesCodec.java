@@ -79,8 +79,20 @@ final class BytesCodec extends AbstractZarrCodec {
     @Override
     public Object decode(Object bytes, ZarrRepresentationType decodedType) throws DataStoreContentException {
         if (bytes == null) return null;
-        byte[] b = (bytes instanceof ByteBuffer) ? getBytes((ByteBuffer) bytes) : (byte[]) bytes;
-        return fromBytes(b, decodedType.shape(), decodedType.dtype(), byteOrder);
+
+        ByteBuffer buf;
+        if (bytes instanceof ByteBuffer) {
+            buf = (ByteBuffer) bytes;
+        } else if (bytes instanceof byte[]) {
+            buf = ByteBuffer.wrap((byte[]) bytes);
+        } else {
+            throw new IllegalArgumentException("Unsupported input: " + bytes.getClass());
+        }
+
+        // Enforce the correct endianness for the view
+        buf.order(byteOrder);
+
+        return fromBytes(buf, decodedType.shape(), decodedType.dtype());
     }
 
     /**
@@ -108,48 +120,51 @@ final class BytesCodec extends AbstractZarrCodec {
     /**
      * Converts a byte array to an array of the specified shape and type.
      *
-     * @param b the byte array to convert
+     * @param buf the buffer containing the bytes to decode
      * @param shape the shape of the output array (e.g., [3, 4] for a 2D array)
      * @param type the data type of the output array elements
-     * @param order the byte order (endianness) to use for decoding
      * @return the decoded array (e.g., byte[], short[], int[], etc.)
      * @throws DataStoreContentException if the data type is unknown or unsupported
      */
-    private static Object fromBytes(byte[] b, int[] shape, DataType type, ByteOrder order) throws DataStoreContentException {
+    private static Object fromBytes(ByteBuffer buf, int[] shape, DataType type) throws DataStoreContentException {
         int len = 1;
         for (int s : shape) len *= s;
-        ByteBuffer buf = ByteBuffer.wrap(b).order(order);
 
         switch (type.number) {
-            case Numbers.BYTE:  byte[] xb = new byte[len]; buf.get(xb); return xb;
-            case Numbers.SHORT: short[] s = new short[len]; buf.asShortBuffer().get(s); return s;
-            case Numbers.CHARACTER: char[]  xc = new char[len]; buf.asCharBuffer().get(xc); return xc;
-            case Numbers.INTEGER: int[]  xi = new int[len]; buf.asIntBuffer().get(xi); return xi;
-            case Numbers.LONG: long[] xl = new long[len]; buf.asLongBuffer().get(xl); return xl;
-            case Numbers.FLOAT: float[] xf = new float[len]; buf.asFloatBuffer().get(xf); return xf;
-            case Numbers.DOUBLE: double[] xd = new double[len]; buf.asDoubleBuffer().get(xd); return xd;
-            case Numbers.BOOLEAN: boolean[] xbval = new boolean[len]; for (int i = 0; i < len; i++) xbval[i] = buf.get() != 0; return xbval;
-            default: throw new DataStoreContentException(Errors.format(Errors.Keys.UnknownType_1, type));
-        }
-    }
-
-    /**
-     * Extracts bytes from a ByteBuffer, handling both array-backed and non-array-backed buffers.
-     *
-     * @param buf the ByteBuffer from which to extract bytes
-     * @return a byte array containing the bytes from the buffer
-     */
-    static byte[] getBytes(ByteBuffer buf) {
-        if (buf.hasArray()) {
-            int start = buf.position();
-            int len = buf.remaining();
-            byte[] arr = new byte[len];
-            System.arraycopy(buf.array(), buf.arrayOffset() + start, arr, 0, len);
-            return arr;
-        } else {
-            byte[] arr = new byte[buf.remaining()];
-            buf.get(arr);
-            return arr;
+            case Numbers.BYTE:
+                byte[] xb = new byte[len];
+                buf.get(xb);
+                return xb;
+            case Numbers.SHORT:
+                short[] s = new short[len];
+                buf.asShortBuffer().get(s);
+                return s;
+            case Numbers.CHARACTER:
+                char[] xc = new char[len];
+                buf.asCharBuffer().get(xc);
+                return xc;
+            case Numbers.INTEGER:
+                int[] xi = new int[len];
+                buf.asIntBuffer().get(xi);
+                return xi;
+            case Numbers.LONG:
+                long[] xl = new long[len];
+                buf.asLongBuffer().get(xl);
+                return xl;
+            case Numbers.FLOAT:
+                float[] xf = new float[len];
+                buf.asFloatBuffer().get(xf);
+                return xf;
+            case Numbers.DOUBLE:
+                double[] xd = new double[len];
+                buf.asDoubleBuffer().get(xd);
+                return xd;
+            case Numbers.BOOLEAN:
+                boolean[] xbval = new boolean[len];
+                for (int i = 0; i < len; i++) xbval[i] = buf.get() != 0;
+                return xbval;
+            default:
+                throw new DataStoreContentException(Errors.format(Errors.Keys.UnknownType_1, type));
         }
     }
 
