@@ -135,7 +135,7 @@ public final class VariableInfoTest {
         final Variable[] variables = decoder.getVariables();
         Variable variable = variables[0];
         assertEquals("air", variable.getName());
-        assertSingletonEquals(variable, "_FillValue", "AAAAAAAA+H8=");
+        assertSingletonEquals(variable, "_FillValue", 0.0d);
     }
 
     /**

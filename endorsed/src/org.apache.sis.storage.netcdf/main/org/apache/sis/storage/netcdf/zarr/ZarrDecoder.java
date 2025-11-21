@@ -10,6 +10,7 @@ import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.base.MetadataBuilder;
 import org.apache.sis.storage.event.StoreListeners;
 import org.apache.sis.storage.netcdf.base.Convention;
+import org.apache.sis.storage.netcdf.base.DataType;
 import org.apache.sis.storage.netcdf.base.Decoder;
 import org.apache.sis.storage.netcdf.base.Dimension;
 import org.apache.sis.storage.netcdf.base.Grid;
@@ -53,6 +54,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import org.apache.sis.util.internal.shared.Constants;
+import ucar.nc2.constants.CDM;
 
 /**
  * Provides Zarr decoding services as a standalone library.
@@ -544,6 +546,27 @@ public final class ZarrDecoder extends Decoder {
             DimensionInfo[] dimensions = new DimensionInfo[array.shape().length];
 
             List<Map.Entry<String, Object>> attributes = readAttributes(metadata, false).stream().map(AttributeEntry::toMapEntry).collect(Collectors.toList());
+
+            // Handle _FillValue attribute if present
+            // Zarr v3 stores fill value in array metadata instead of attributes
+            // But some Zarr generators may still put it in attributes
+            Object nativeFill = array.fillValue();
+            if (nativeFill != null) {
+                // Zarr V3 stores NaN as a String "NaN"
+                if ("NaN".equals(nativeFill)) {
+                    if (array.dataType() == DataType.FLOAT) {
+                        nativeFill = Float.NaN;
+                    } else if (array.dataType() == DataType.DOUBLE) {
+                        nativeFill = Double.NaN;
+                    }
+                }
+                // Remove any existing "_FillValue" from the List
+                attributes.removeIf(entry -> CDM.FILL_VALUE.equalsIgnoreCase(entry.getKey()));
+
+                // Add the new value to the List
+                attributes.add(new java.util.AbstractMap.SimpleEntry<>("_FillValue", nativeFill));
+            }
+
             final Map<String,Object> attributeMap = CollectionsExt.toCaseInsensitiveNameMap(attributes, Decoder.DATA_LOCALE);
 
             int i = 0;
@@ -553,7 +576,6 @@ public final class ZarrDecoder extends Decoder {
                     i++;
                 }
             }
-
             variables.add(new VariableInfo(this, name, dimensions, attributeMap, attributeNamesWithMapEntries(attributes, attributeMap), array.dataType(), array));
 
 
