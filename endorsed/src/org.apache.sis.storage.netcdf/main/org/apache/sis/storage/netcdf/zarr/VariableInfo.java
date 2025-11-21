@@ -530,19 +530,9 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
          */
         final int[] chunkShape = this.metadata.chunkGrid().configuration().chunkShape();
 
-        /*
-         * Shape of the grid of chunks in the Zarr array.
-         * If the array shape is [100, 200] and the chunk shape is [10, 20],
-         * the resulting grid shape will be [10, 10].
-         */
-        final int[] gridShape = this.metadata.getChunksGridShape();
-
         final int nDim = dimensions.length;
         final DataType dataType = this.dataType;
         final Object fillValue = this.metadata.fillValue();
-
-        // List of representation types for the codecs used in this Zarr array.
-        List<ZarrRepresentationType> representationTypes = this.metadata.representationTypes();
 
         final long[] lower  = new long[nDim];
         final long[] upper  = new long[nDim];
@@ -572,6 +562,9 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         Object out = BytesCodec.allocate1DArray(dataType, totalElements);
         if (totalElements == 0) return out;
 
+        // Fill array (if not null or not 0)
+        fillArray(out, fillValue);
+
         // Helper to store current position in the output array
         int[] outStrides = new int[nDim];
         outStrides[nDim - 1] = 1;
@@ -586,78 +579,78 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         }
 
         // Calculate grid bounds to read
-        // We determine the range of chunks to loop over: [gridMin, gridMax] (inclusive)
+        // We determine the range of chunks to loop over [gridMin, gridMax]
         int[] gridMin = new int[nDim];
         int[] gridMax = new int[nDim];
-        int[] chunkIdx = new int[nDim]; // The cursor
-
         for (int i = 0; i < nDim; i++) {
             gridMin[i] = (int) (lower[i] / chunkShape[i]);
             // (upper - 1) ensures that if upper is exactly on a chunk boundary, we don't include the next empty chunk
             gridMax[i] = (int) ((upper[i] - 1) / chunkShape[i]);
-            chunkIdx[i] = gridMin[i]; // Initialize cursor
         }
 
-        // Chunk Looping
-        // We loop strictly from gridMin to gridMax.
+        // Generate the list of chunk indices we need to read
+        List<int[]> chunksTask = new ArrayList<>();
+        int[] currentChunkIdx = Arrays.copyOf(gridMin, nDim);
         boolean done = false;
+
+        // Iterate over grid coordinates to build the task list
         while (!done) {
-
-            // 1. Compute geometry for this specific chunk
-            int[] chunkStart = new int[nDim];
-            int[] chunkEnd   = new int[nDim];
-            int[] sliceStart = new int[nDim];
-            int[] sliceEnd   = new int[nDim];
-
-            for (int d = 0; d < nDim; d++) {
-                chunkStart[d] = chunkIdx[d] * chunkShape[d];
-                chunkEnd[d]   = Math.min(chunkStart[d] + chunkShape[d], arrayShape[d]);
-
-                // Intersection Logic
-                sliceStart[d] = (int) Math.max(chunkStart[d], lower[d]);
-                sliceEnd[d]   = (int) Math.min(chunkEnd[d], upper[d]);
-            }
-
-            // 2. Read & Decode
-            Path chunkPath = this.metadata.getChunkPath(chunkIdx);
-            Object data = readChunkBytes(chunkPath); // Your existing method
-
-            if (data != null) {
-                // Decode
-                for (int i = metadata.codecs().size() - 1; i >= 0; i--) {
-                    AbstractZarrCodec codec = metadata.codecs().get(i);
-                    data = codec.decode(data, representationTypes.get(i));
-                }
-
-                // 3. Copy chunk region to output array
-                copyChunkRegionToOutput(
-                        data, 0, 0, 0,               // Offsets & Dim Index
-                        chunkStart, chunkShape, chunkStrides,
-                        sliceStart, sliceEnd,
-                        lower, subsampling,
-                        out, outStrides
-                );
-            }
-
-            // 4. Increment Chunk Index
+            chunksTask.add(Arrays.copyOf(currentChunkIdx, nDim));
             for (int k = nDim - 1; k >= 0; k--) {
-                if (chunkIdx[k] < gridMax[k]) {
-                    chunkIdx[k]++;
+                if (currentChunkIdx[k] < gridMax[k]) {
+                    currentChunkIdx[k]++;
                     break;
                 }
-                // Wrap around: Reset to the MINIMUM for this dimension (not 0)
-                chunkIdx[k] = gridMin[k];
-
-                // If we wrapped around the 0th dimension, we are finished
+                currentChunkIdx[k] = gridMin[k];
                 if (k == 0) done = true;
             }
         }
 
-        // Optionally as in NetCDF: convert double[] to float[] if lossless
-        if (area == null && out instanceof double[]) {
-            float[] copy = ArraysExt.copyAsFloatsIfLossless((double[]) out);
-            if (copy != null) out = copy;
-        }
+        // Execution in parallel (Read)
+        long[] finalSubsampling = subsampling;
+        chunksTask.parallelStream().forEach(chunkIdx -> {
+            try {
+                // 1. Compute geometry
+                int[] chunkStart = new int[nDim];
+                int[] sliceStart = new int[nDim];
+                int[] sliceEnd   = new int[nDim];
+
+                for (int d = 0; d < nDim; d++) {
+                    chunkStart[d] = chunkIdx[d] * chunkShape[d];
+                    sliceStart[d] = (int) Math.max(chunkStart[d], lower[d]);
+                    int chunkLimit = Math.min(chunkStart[d] + chunkShape[d], arrayShape[d]);
+                    sliceEnd[d]   = (int) Math.min(chunkLimit, upper[d]);
+                }
+
+                // 2. Read & Decode
+                // Get chunk path
+                Path chunkPath = this.metadata.getChunkPath(chunkIdx);
+                Object data = readChunkBytes(chunkPath);
+
+                if (data != null) {
+                    // List of representation types for the codecs used in this Zarr array.
+                    List<ZarrRepresentationType> types = this.metadata.representationTypes();
+
+                    // 3. Decode the chunk data (using the codecs in reverse order)
+                    for (int i = metadata.codecs().size() - 1; i >= 0; i--) {
+                        AbstractZarrCodec codec = metadata.codecs().get(i);
+                        data = codec.decode(data, types.get(i));
+                    }
+
+                    // 4. Copy to the output array (thread-safe because each thread writes to distinct regions, there is no overlap)
+                    copyChunkRegionToOutput(
+                            data, 0, 0, 0,
+                            chunkStart, chunkShape, chunkStrides,
+                            sliceStart, sliceEnd,
+                            lower, finalSubsampling,
+                            out, outStrides
+                    );
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error reading chunk " + Arrays.toString(chunkIdx), e);
+            }
+        });
+
         return out;
     }
 
@@ -801,6 +794,88 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         return null;
     }
 
+    /**
+     * Fills the given array with the given value. Only if the value is non-null and non-zero.
+     * @param array the array to fill
+     * @param value the value to fill the array with
+     */
+    private void fillArray(Object array, Object value) {
+        if (value == null) return;
+        boolean isNaN = false;
+        if (value instanceof String) {
+            String str = (String) value;
+            if (str.isEmpty() || str.equals("0") ||
+                    str.equalsIgnoreCase("Infinity") ||
+                    str.equalsIgnoreCase("-Infinity")) {
+                return;
+            }
+            isNaN = str.equalsIgnoreCase("NaN");
+        }
+        // Handle Float Array
+        if (array instanceof float[]) {
+            float v;
+            if (value instanceof Number) {
+                v = ((Number) value).floatValue();
+            } else {
+                if (isNaN) {
+                    Arrays.fill((float[]) array, Float.NaN);
+                }
+                return;
+            }
+            if (v != 0.0f) Arrays.fill((float[]) array, v);
+        }
+        // Handle Double Array
+        else if (array instanceof double[]) {
+            double v;
+            if (value instanceof Number) {
+                v = ((Number) value).doubleValue();
+            } else {
+                if (isNaN) {
+                    Arrays.fill((double[]) array, Double.NaN);
+                }
+                return;
+            }
+            if (v != 0.0d) Arrays.fill((double[]) array, v);
+        }
+        // Handle Integer Array
+        else if (array instanceof int[]) {
+            if (value instanceof Number) {
+                int v = ((Number) value).intValue();
+                if (v != 0) Arrays.fill((int[]) array, v);
+            }
+            // NaN is not defined for integer types
+        }
+        // Handle Long Array
+        else if (array instanceof long[]) {
+            if (value instanceof Number) {
+                long v = ((Number) value).longValue();
+                if (v != 0L) Arrays.fill((long[]) array, v);
+            }
+            // NaN is not defined for long types
+        }
+        // Handle Short Array
+        else if (array instanceof short[]) {
+            if (value instanceof Number) {
+                short v = ((Number) value).shortValue();
+                if (v != 0) Arrays.fill((short[]) array, v);
+            }
+            // NaN is not defined for short types
+        }
+        // Handle Byte Array
+        else if (array instanceof byte[]) {
+            if (value instanceof Number) {
+                byte v = ((Number) value).byteValue();
+                if (v != 0) Arrays.fill((byte[]) array, v);
+            }
+            // NaN is not defined for byte types
+        }
+    }
+
+    /**
+     * Writes the data of this variable.
+     * @throws IOException if an I/O error occurred.
+     * @throws DataStoreException if the data cannot be written.
+     */
     public void write() throws IOException, DataStoreException {
         if (this.isCoordinateSystemAxis && (this.values != null)) {
             writeAxis();

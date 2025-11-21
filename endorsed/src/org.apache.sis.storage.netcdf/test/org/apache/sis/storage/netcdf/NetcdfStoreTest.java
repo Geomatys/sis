@@ -197,7 +197,7 @@ public final class NetcdfStoreTest extends TestCaseWithLogs {
             Collection<Resource> writtenResources = checkWriteStore.components();
             assertFalse(writtenResources.isEmpty(), "Output Zarr store should not be empty");
 
-            RasterResource airResource = (RasterResource) writtenResources.stream().toList().get(0);
+            RasterResource airResource = (RasterResource) writtenResources.stream().toList().getFirst();
             assertNotNull(airResource, "Should contain a raster resource.");
 
             GridGeometry gg = airResource.getGridGeometry();
