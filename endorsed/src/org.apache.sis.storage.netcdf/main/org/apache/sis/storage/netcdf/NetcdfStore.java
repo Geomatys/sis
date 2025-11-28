@@ -20,9 +20,13 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 
 import org.apache.sis.storage.WritableAggregate;
 import org.apache.sis.storage.netcdf.base.Encoder;
@@ -270,18 +274,41 @@ public class NetcdfStore extends DataStore implements WritableAggregate {
         if (components == null) try {
             @SuppressWarnings("LocalVariableHidesMemberVariable")
             final Decoder decoder = decoder();
-            Resource[] resources = decoder.getDiscreteSampling(this);
+
+            // Fetch feature resources first
+            Resource[] features = decoder.getDiscreteSampling(this);
+
+            // Try to create efficient Tiled Raster Resources if possible
             final List<Resource> tiledGrids = TiledRasterResource.create(decoder, this);
-            if (!tiledGrids.isEmpty()) {
-                tiledGrids.addAll(UnmodifiableArrayList.wrap(resources));
-                resources = tiledGrids.toArray(Resource[]::new);
+            final Set<GenericName> handledIdentifiers = new HashSet<>();
+            for (Resource r : tiledGrids) {
+                r.getIdentifier().ifPresent(handledIdentifiers::add);
             }
-//            final List<Resource> grids = RasterResource.create(decoder, this);
-//            if (!grids.isEmpty()) {
-//                grids.addAll(UnmodifiableArrayList.wrap(resources));
-//                resources = grids.toArray(Resource[]::new);
-//            }
-            components = UnmodifiableArrayList.wrap(resources);
+
+            // Fetch "standard" Raster Resources
+            final List<Resource> standardGrids = RasterResource.create(decoder, this);
+
+            // Merge all resources, taking care to avoid duplicates
+            final List<Resource> allResources = new ArrayList<>();
+            if (features != null) {
+                Collections.addAll(allResources, features);
+            }
+
+            // Add TiledRasterResources first
+            allResources.addAll(tiledGrids);
+
+            // Add "standard" Raster resources ONLY if they weren't already handled by TiledRasterResource
+            for (Resource r : standardGrids) {
+                // If the resource identifier is known, check if we already have it
+                boolean isDuplicate = r.getIdentifier()
+                        .map(handledIdentifiers::contains)
+                        .orElse(false);
+
+                if (!isDuplicate) {
+                    allResources.add(r);
+                }
+            }
+            components = UnmodifiableArrayList.wrap(allResources.toArray(Resource[]::new));
         } catch (IOException e) {
             throw new DataStoreException(e);
         }

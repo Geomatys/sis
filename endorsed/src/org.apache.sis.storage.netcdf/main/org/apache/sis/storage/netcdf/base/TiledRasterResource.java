@@ -134,7 +134,7 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
      *
      * @see #getIdentifier()
      */
-    private GenericName identifier;
+    private final GenericName identifier;
 
     /**
      * The grid geometry (size, CRS…) of the {@linkplain #data} cube.
@@ -178,21 +178,6 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
      * @see Variable#bandDimension
      */
     private final int bandDimension;
-
-//    /**
-//     * The band to use for defining pixel colors when the image is displayed on screen.
-//     * All other bands, if any, will exist in the raster but be ignored at display time.
-//     *
-//     * @see Convention#getVisibleBand()
-//     */
-//    private final int visibleBand;
-//
-//    /**
-//     * Path to the netCDF file for information purpose, or {@code null} if unknown.
-//     *
-//     * @see #getFileSet()
-//     */
-//    private final Path location;
 
     /**
      * The object to use for synchronization. For now we use a {@code synchronized} statement,
@@ -248,9 +233,6 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
         identifier       = decoder.nameFactory.createLocalName(decoder.namespace, name);
         this.lock        = lock;
         gridGeometry     = grid;
-
-//        location         = decoder.location;
-//        visibleBand      = decoder.convention().getVisibleBand();
     }
 
     /**
@@ -590,14 +572,6 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
             return preload(coverage);
         }
     }
-
-//    /**
-//     * Gets the paths to files used by this resource, or an empty value if unknown.
-//     */
-//    @Override
-//    public final Optional<FileSet> getFileSet() {
-//        return (location != null) ? Optional.of(new FileSet(location)) : Optional.empty();
-//    }
 
     /**
      * Returns the data store that produced this resource.

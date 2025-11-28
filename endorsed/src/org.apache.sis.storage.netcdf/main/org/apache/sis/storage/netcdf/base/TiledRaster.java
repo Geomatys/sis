@@ -18,15 +18,17 @@ package org.apache.sis.storage.netcdf.base;
 
 import org.apache.sis.coverage.grid.GridGeometry;
 import org.apache.sis.image.internal.shared.RasterFactory;
+import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.base.TiledGridCoverage;
 import org.apache.sis.storage.base.TiledGridResource;
 import org.opengis.util.GenericName;
 
-import java.awt.*;
+import java.awt.Point;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
+import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.DoubleBuffer;
@@ -83,36 +85,45 @@ final class TiledRaster extends TiledGridCoverage {
         return resource.getIdentifier().orElse(null);
     }
 
+    /**
+     * Reads tiles from the resource using the given iterator.
+     *
+     * @param iterator  an iterator over the tiles that intersect the Area Of Interest specified by user.
+     * @return the tiles read from the resource.
+     * @throws IOException if an I/O error occurred while reading tiles.
+     * @throws DataStoreException if a data store error occurred while reading tiles.
+     */
     @Override
-    protected Raster[] readTiles(TileIterator iterator) throws Exception {
+    protected Raster[] readTiles(TileIterator iterator) throws IOException, DataStoreException {
         Raster[] results = new Raster[iterator.tileCountInQuery];
         List<Tile> missings = new ArrayList<>();
 
-        // 1. Identify what is cached and what is missing
-        // Use do-while because iterator starts "on" the first tile.
+        // Identify what is cached and what is missing
         do {
             Raster tile = iterator.getCachedTile();
             if (tile != null) {
                 results[iterator.getTileIndexInResultArray()] = tile;
             } else {
-                // Snapshot the current position of the iterator
+                /*
+                 * Tile not yet loaded. Add to a queue of tiles to load later.
+                 * We create a TileSnapshot now to capture the iterator state
+                 */
                 missings.add(new Tile(iterator));
             }
         } while (iterator.next());
 
-        // 2. Read missing tiles
-        // Note: DataSubset sorts here for disk efficiency. Zarr is random access (HTTP/S3),
-        // so strict sorting isn't as critical, but iterating sequentially is fine.
-
+        // Read missing tiles
+        // Assume all bands have the same chunk shape
         int[] chunkShape = bands[0].getTileShape();
-
-        for (Tile snapshot : missings) {
+        for (Tile tile : missings) {
 
             // Reconstruct Zarr chunk indices from the snapshot
             int[] chunkIndices = new int[chunkShape.length];
             for(int i=0; i<chunkIndices.length; i++) {
-                chunkIndices[i] = Math.toIntExact(snapshot.resourceCoordinates[i]);
+                chunkIndices[i] = Math.toIntExact(tile.resourceCoordinates[i]);
             }
+            // Invert row/column for ordinal to Zarr mapping
+            chunkIndices = swapIndices(chunkIndices);
 
             // Read Data for all bands
             Buffer[] bankBuffers = new Buffer[bands.length];
@@ -125,23 +136,27 @@ final class TiledRaster extends TiledGridCoverage {
             DataBuffer dataBuffer = RasterFactory.wrap(dataType.rasterDataType, bankBuffers);
 
             // The TileSnapshot captured the origin X/Y relative to the RenderedImage
-            Point origin = new Point(snapshot.originX, snapshot.originY);
+            Point origin = new Point(tile.originX, tile.originY);
 
             WritableRaster raster = WritableRaster.createWritableRaster(this.model, dataBuffer, origin);
 
-            // Cache and store in result
-            // Note: We use snapshot.cache(...) which delegates to TiledGridCoverage.cacheTile
-            // but we need the original iterator's logic for caching which relies on indexInTileVector.
-            // Since we don't have the iterator instance here, we call the coverage method directly.
-
-            // However, TiledGridCoverage.AOI.cache(raster) uses indexInTileVector.
-            // We stored indexInTileVector in the snapshot.
-
-//            Raster cached = cacheTile(snapshot.indexInTileVector, raster);
-            results[snapshot.getTileIndexInResultArray()] = raster;
+            Raster cached = tile.cache(raster);
+            results[tile.getTileIndexInResultArray()] = cached;
         }
 
         return results;
+    }
+
+    /**
+     * Swap the first two indices in the given array.
+     * @param indices the indices to swap.
+     * @return the swapped indices.
+     */
+    private int[] swapIndices(int[] indices) {
+        int temp = indices[0];
+        indices[0] = indices[1];
+        indices[1] = temp;
+        return indices;
     }
 
     /**
@@ -163,21 +178,6 @@ final class TiledRaster extends TiledGridCoverage {
             default:
                 throw new IllegalArgumentException("Unsupported data type for wrapping: " + type);
         }
-    }
-
-    private Raster createRasterFromBanks(Buffer[] banks, int[] chunkShape) {
-        // Assume 2D raster logic from the end of the dimensions (Y, X)
-        int width = chunkShape[chunkShape.length - 1];
-        int height = (chunkShape.length >= 2) ? chunkShape[chunkShape.length - 2] : 1;
-
-        // Wrap the multiple buffers into a single Java2D DataBuffer
-        // RasterFactory.wrap usually handles Buffer[] by creating a DataBuffer with multiple banks
-        DataBuffer dataBuffer = RasterFactory.wrap(dataType.rasterDataType, banks);
-
-        // Ensure the sample model matches the buffer size/layout
-        // The `model` field comes from the parent TiledGridCoverage (calculated in TiledRasterResource)
-        // It should be a BandedSampleModel or ComponentSampleModel compatible with multiple banks.
-        return WritableRaster.createWritableRaster(this.model, dataBuffer, new Point(0, 0));
     }
 
     /**
