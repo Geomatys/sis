@@ -139,6 +139,15 @@ final class VariableWrapper extends org.apache.sis.storage.netcdf.base.Variable 
     }
 
     /**
+     * Returns {@code null} since this class does not use tiling.
+     * @return always {@code null}.
+     */
+    @Override
+    public int[] getTileShape() {
+        return null;
+    }
+
+    /**
      * Returns the description of this variable, or {@code null} if none.
      */
     @Override
@@ -465,6 +474,18 @@ final class VariableWrapper extends org.apache.sis.storage.netcdf.base.Variable 
     @Override
     protected boolean isExternallyCached() {
         return true;
+    }
+
+    /**
+     * Reads a single tile of data. This method is not supported by this class.
+     * @param tileIndex the indices of the tile to read.
+     * @return the data in the specified tile.
+     * @throws IOException if an I/O error occurred.
+     * @throws DataStoreException if a logical error occurred.
+     */
+    @Override
+    public Object readTile(int[] tileIndex) throws IOException, DataStoreException {
+        throw new UnsupportedOperationException("readTile is not supported by VariableWrapper.");
     }
 
     /**

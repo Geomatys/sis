@@ -1,27 +1,15 @@
 package org.apache.sis.storage.netcdf.zarr;
 
-import org.apache.sis.coverage.grid.GridExtent;
-import org.apache.sis.coverage.grid.GridGeometry;
-import org.apache.sis.referencing.CRS;
-import org.apache.sis.referencing.CommonCRS;
 import org.apache.sis.setup.GeometryLibrary;
 import org.apache.sis.storage.DataStore;
 import org.apache.sis.storage.DataStoreContentException;
 import org.apache.sis.storage.DataStoreException;
-import org.apache.sis.storage.GridCoverageResource;
-import org.apache.sis.storage.Resource;
 import org.apache.sis.storage.event.StoreListeners;
 import org.apache.sis.storage.netcdf.base.DataType;
 import org.apache.sis.storage.netcdf.base.Dimension;
 import org.apache.sis.storage.netcdf.base.Encoder;
-import org.apache.sis.storage.netcdf.base.RasterResource;
 import org.apache.sis.storage.netcdf.base.Variable;
 import org.apache.sis.util.ArgumentChecks;
-import org.opengis.referencing.crs.SingleCRS;
-import org.opengis.referencing.crs.TemporalCRS;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.TransformException;
-import org.opengis.util.FactoryException;
 
 import java.io.IOException;
 import java.nio.file.Path;

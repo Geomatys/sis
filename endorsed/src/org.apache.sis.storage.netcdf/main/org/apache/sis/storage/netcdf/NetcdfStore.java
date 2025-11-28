@@ -26,6 +26,7 @@ import java.util.Optional;
 
 import org.apache.sis.storage.WritableAggregate;
 import org.apache.sis.storage.netcdf.base.Encoder;
+import org.apache.sis.storage.netcdf.base.TiledRasterResource;
 import org.apache.sis.storage.netcdf.base.Variable;
 import org.apache.sis.storage.netcdf.zarr.ZarrDecoder;
 import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
@@ -270,11 +271,16 @@ public class NetcdfStore extends DataStore implements WritableAggregate {
             @SuppressWarnings("LocalVariableHidesMemberVariable")
             final Decoder decoder = decoder();
             Resource[] resources = decoder.getDiscreteSampling(this);
-            final List<Resource> grids = RasterResource.create(decoder, this);
-            if (!grids.isEmpty()) {
-                grids.addAll(UnmodifiableArrayList.wrap(resources));
-                resources = grids.toArray(Resource[]::new);
+            final List<Resource> tiledGrids = TiledRasterResource.create(decoder, this);
+            if (!tiledGrids.isEmpty()) {
+                tiledGrids.addAll(UnmodifiableArrayList.wrap(resources));
+                resources = tiledGrids.toArray(Resource[]::new);
             }
+//            final List<Resource> grids = RasterResource.create(decoder, this);
+//            if (!grids.isEmpty()) {
+//                grids.addAll(UnmodifiableArrayList.wrap(resources));
+//                resources = grids.toArray(Resource[]::new);
+//            }
             components = UnmodifiableArrayList.wrap(resources);
         } catch (IOException e) {
             throw new DataStoreException(e);

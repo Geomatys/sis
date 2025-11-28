@@ -335,6 +335,12 @@ public abstract class Variable extends Node {
     public abstract String getName();
 
     /**
+     * Returns the shape of tiles for this variable, or {@code null} if this variable is not tiled.
+     * @return {the shape of tiles for this variable, or {@code null} if none.
+     */
+    public abstract int[] getTileShape();
+
+    /**
      * Returns the standard name if available, or the unique variable name otherwise.
      * May be used for {@link RasterResource#getIdentifier()}.
      * Standard name is preferred to variable name when controlled vocabulary is desired,
@@ -1111,6 +1117,17 @@ public abstract class Variable extends Node {
      * @throws DataStoreException if a logical error occurred.
      */
     protected abstract Object readFully() throws IOException, DataStoreException;
+
+    /**
+     * Reads a single tile of data for this variable and returns them as an array of a Java primitive type.
+     * This method is used only for variables stored as tiled arrays.
+     *
+     * @param tileIndex the indices of the tile to read.
+     * @return the data as an array of a Java primitive type.
+     * @throws IOException if an error occurred while reading the data.
+     * @throws DataStoreException if a logical error occurred, or if this variable is not tiled.
+     */
+    public abstract Object readTile(int[] tileIndex) throws IOException, DataStoreException;
 
     /**
      * Sets the values in this variable. The values are normally read from the netCDF file by {@link #read()},

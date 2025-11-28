@@ -260,6 +260,15 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         return name;
     }
 
+    /**
+     * Returns the shape of tiles (chunks) in this variable.
+     * @return the shape of tiles (chunks) in this variable.
+     */
+    @Override
+    public int[] getTileShape() {
+        return metadata.chunkGrid().configuration().chunkShape();
+    }
+
     public void setName(final String name) {
         this.name = name;
     }
@@ -431,6 +440,43 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         List<Dimension> result = new ArrayList<>(Arrays.asList(dimensions));
         Collections.reverse(result);
         return result;
+    }
+
+    /**
+     * Reads and decodes a single tile / chunk at the specified grid index.
+     *
+     * @param tileIndex The index of the tile/chunk in the chunk grid (e.g., {0, 1, 2}).
+     * @return The decoded primitive array (flat) containing the data for this chunk.
+     * @throws IOException If an I/O error occurs.
+     * @throws DataStoreException If an error occurs reading or decoding.
+     */
+    @Override
+    public Object readTile(int[] tileIndex) throws IOException, DataStoreException {
+        // Get chunk path
+        Path chunkPath = this.metadata.getChunkPath(tileIndex);
+
+        // Read chunk bytes
+        Object data = readChunkBytes(chunkPath);
+
+        // Handle missing chunks (Fill Value)
+        if (data == null) {
+            // If chunk doesn't exist, create an array filled with the fill value.
+            int[] chunkShape = this.metadata.chunkGrid().configuration().chunkShape();
+            int size = 1;
+            for (int s : chunkShape) size *= s;
+            Object array = BytesCodec.allocate1DArray(dataType, size);
+            fillArray(array, this.metadata.fillValue());
+            return array;
+        }
+
+        // Decode
+        List<ZarrRepresentationType> types = this.metadata.representationTypes();
+        for (int i = metadata.codecs().size() - 1; i >= 0; i--) {
+            AbstractZarrCodec codec = metadata.codecs().get(i);
+            data = codec.decode(data, types.get(i));
+        }
+
+        return data;
     }
 
     /**
