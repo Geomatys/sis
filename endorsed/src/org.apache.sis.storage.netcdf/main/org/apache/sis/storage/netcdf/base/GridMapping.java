@@ -103,7 +103,7 @@ import org.opengis.referencing.datum.DatumEnsemble;
  *
  * @see <a href="http://cfconventions.org/cf-conventions/cf-conventions.html#grid-mappings-and-projections">CF-conventions</a>
  */
-final class GridMapping {
+public final class GridMapping {
     /**
      * Names of some (not all) attributes where the <abbr>CRS</abbr> may be encoded in <abbr>WKT</abbr> format.
      * Values must be in lower-cases because {@link Convention#projection(Node)} converts names to lower cases.
@@ -183,6 +183,15 @@ final class GridMapping {
     }
 
     /**
+     * Returns the grid mapping node.
+     *
+     * @return the grid mapping node.
+     */
+    public Node getMapping() {
+        return mapping;
+    }
+
+    /**
      * Fetches grid geometry information from attributes associated to the given variable.
      * This method should be invoked only one or two times per variable, but may return a
      * shared {@code GridMapping} instance for all variables because there is typically
@@ -191,22 +200,27 @@ final class GridMapping {
      * @param  variable  the variable for which to create a grid geometry.
      */
     static GridMapping forVariable(final Variable variable) {
-        final Map<String,GridMapping> gridMapping = variable.decoder.gridMapping;
-        for (final String name : variable.decoder.convention().nameOfMappingNode(variable)) {
-            GridMapping gm = gridMapping.get(name);
+        Decoder decoder = variable.decoder;
+
+        for (final String name : decoder.convention().nameOfMappingNode(variable)) {
+            GridMapping gm = decoder.findGridMapping(name, variable);
             if (gm != null) {
                 return gm;
             }
+
             /*
              * Value may be null if we already tried and failed to process that grid.
              * We detect those cases in order to avoid logging the same warning twice.
              */
-            if (!gridMapping.containsKey(name)) {
-                final Node mapping = variable.decoder.findNode(name);
+            if (!decoder.validGridMappingStored(name, variable)) {
+                String[] paths = decoder.getSearchPath();
+                decoder.setSearchPath(variable.getGroupPath());
+                final Node mapping = decoder.findNode(name);
+                decoder.setSearchPath(paths);
                 if (mapping != null) {
                     gm = parse(mapping);
                 }
-                gridMapping.put(name, gm);      // Store even if null.
+                decoder.addGridMapping(name, gm); // Store even if null.
                 if (gm != null) {
                     return gm;
                 }
@@ -217,10 +231,10 @@ final class GridMapping {
          * This is not CF-compliant, but we find some uses of this non-standard approach in practice.
          */
         final String name = variable.getName();
-        GridMapping gm = gridMapping.get(name);
-        if (gm == null && !gridMapping.containsKey(name)) {
+        GridMapping gm = decoder.findGridMapping(name, variable);
+        if (gm == null && !decoder.validGridMappingStored(name, variable)) {
             gm = parse(variable);
-            gridMapping.put(name, gm);      // Store even if null.
+            decoder.addGridMapping(name, gm); // Store even if null.
         }
         return gm;
     }

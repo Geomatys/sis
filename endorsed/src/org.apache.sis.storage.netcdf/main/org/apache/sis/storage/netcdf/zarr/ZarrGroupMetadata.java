@@ -5,13 +5,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Represents the metadata for a Zarr group.
  * A Zarr group can contain other groups or arrays.
  *
- * @author  Quentin Bialota (Geomatys)
+ * @author Quentin Bialota (Geomatys)
  */
 final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
@@ -27,7 +28,8 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /*
      * The consolidated metadata for the group, and for all its child nodes.
-     * Not used in this implementation, because some Zarr datasets may not have consolidated metadata.
+     * Not used in this implementation, because some Zarr datasets may not have
+     * consolidated metadata.
      */
     @JsonProperty("consolidated_metadata")
     private Map<String, Object> consolidatedMetadata;
@@ -41,6 +43,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Finds a child node metadata by its name.
+     * 
      * @param name the name of the child node to find
      * @return the ZarrNodeMetadata of the child node, or null if not found
      */
@@ -50,6 +53,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Adds a child node metadata to the group.
+     * 
      * @param name the name of the child node to add
      * @param node the ZarrNodeMetadata of the child node to add
      */
@@ -62,7 +66,9 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Returns the map of child node metadata.
-     * @return a map where keys are child node names and values are their corresponding ZarrNodeMetadata
+     * 
+     * @return a map where keys are child node names and values are their
+     *         corresponding ZarrNodeMetadata
      */
     @JsonIgnore
     public Map<String, ZarrNodeMetadata> getChildrenNodeMetadata() {
@@ -71,11 +77,34 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Returns the consolidated metadata for the group.
+     * 
      * @return a map of consolidated metadata, or null if not available
      */
     public Map<String, Object> getConsolidatedMetadata() {
         return consolidatedMetadata;
     }
+
+    /**
+     * The multiscale metadata for the group, or null if not available.
+     */
+    @JsonProperty("multiscales")
+    private List<ZarrMultiscale> multiscales;
+
+    /**
+     * Returns the multiscale metadata for the group.
+     * 
+     * @return a list of ZarrMultiscale objects, or null if not available
+     */
+    public List<ZarrMultiscale> getMultiscales() {
+        return multiscales;
+    }
+
+    /**
+     * Sets the multiscale metadata for the group.
+     * 
+     * @param multiscales the list of ZarrMultiscale objects
+     */
+    public void setMultiscales(List<ZarrMultiscale> multiscales) {
+        this.multiscales = multiscales;
+    }
 }
-
-

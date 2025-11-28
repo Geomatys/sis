@@ -102,19 +102,19 @@ public enum DataType {
      * 64 bits signed integer (netCDF type 10) (zarr name "int64").
      * Not available in netCDF classic format.
      */
-    NumberType(Numbers.LONG, Long.class, true, false, (byte) 11, null, "int64", true, true),
+    INT64(NumberType.LONG, Long.class, true, false, (byte) 11, null, "int64", true, true),
 
     /**
      * 64 bits unsigned integer (netCDF type 11) (zarr name "uint64").
      * Not available in netCDF classic format.
      */
-    NumberType(Numbers.LONG, Number.class, true, true, (byte) 10, null, "uint64", true, true),
+    UINT64(NumberType.LONG, Number.class, true, true, (byte) 10, null, "uint64", true, true),
 
     /**
      * Character string (netCDF type 12).
      * Not available in netCDF classic format.
      */
-    STRING(NumberType.OTHER, String.class, false, false, (byte) 12, null, "string", true, true),
+    STRING(NumberType.VOID, String.class, false, false, (byte) 12, null, "string", true, true),
 
     /**
      * Boolean type (zarr name "bool").
@@ -124,15 +124,15 @@ public enum DataType {
     /**
      * Complex number with 32 bits for each of the real and imaginary parts (zarr name "complex64").
      */
-    COMPLEX64(NumberType.OTHER, Float[].class, false, false, (byte) 0, null, "complex64", true, false),
+    COMPLEX64(NumberType.VOID, Float[].class, false, false, (byte) 0, null, "complex64", true, false),
 
     /**
      * Complex number with 64 bits for each of the real and imaginary parts (zarr name "complex128").
      */
-    COMPLEX128(NumberType.OTHER, Double[].class, false, false, (byte) 0, null, "complex128", true, false),
+    COMPLEX128(NumberType.VOID, Double[].class, false, false, (byte) 0, null, "complex128", true, false),
 
     /* ======= Zarr raw bit type: "r*" (r8, r16, ...) — handled with special match ======== */
-    RAW(NumberType.OTHER, byte[].class, false, false, (byte) 0, null, "raw", true, false);
+    RAW(NumberType.VOID, byte[].class, false, false, (byte) 0, null, "raw", true, false);
 
     /**
      * Mapping from the netCDF data type to the enumeration used by Apache <abbr>SIS</abbr>.

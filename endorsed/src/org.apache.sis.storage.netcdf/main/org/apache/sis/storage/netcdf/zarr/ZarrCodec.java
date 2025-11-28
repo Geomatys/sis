@@ -6,12 +6,12 @@ package org.apache.sis.storage.netcdf.zarr;
  * @author  Quentin Bialota (Geomatys)
  */
 enum ZarrCodec {
-    BLOSC (Type.BYTES_TO_BYTES, null),
+    BLOSC (Type.BYTES_TO_BYTES, BloscCodec.class),
     BYTES (Type.ARRAY_TO_BYTES, BytesCodec.class),
-    CRC32C (Type.BYTES_TO_BYTES, null),
-    GZIP (Type.BYTES_TO_BYTES, null),
-    SHARDING_INDEXED (Type.ARRAY_TO_BYTES, null),
-    TRANSPOSE (Type.ARRAY_TO_ARRAY, null),
+    CRC32C (Type.BYTES_TO_BYTES, null), // Not supported
+    GZIP (Type.BYTES_TO_BYTES, null), // Not supported
+    SHARDING_INDEXED (Type.ARRAY_TO_BYTES, null), // Not supported
+    TRANSPOSE (Type.ARRAY_TO_ARRAY, null), // Not supported
     ZSTD (Type.BYTES_TO_BYTES, ZstdCodec.class),
     VLEN_UTF8 (Type.ARRAY_TO_BYTES, VlenUtf8Codec.class);
 

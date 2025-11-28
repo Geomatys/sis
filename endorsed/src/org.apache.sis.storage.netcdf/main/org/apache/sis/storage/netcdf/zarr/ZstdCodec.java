@@ -1,6 +1,8 @@
 package org.apache.sis.storage.netcdf.zarr;
 
 import com.github.luben.zstd.Zstd;
+import org.apache.sis.storage.DataStoreException;
+import org.apache.sis.storage.netcdf.base.DataType;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -90,29 +92,30 @@ final class ZstdCodec extends AbstractZarrCodec {
      *
      * @param encodedValue the compressed value, expected to be a byte[] or ByteBuffer
      * @param decodedType the expected decoded type, which may include shape and dtype information
-     * @return the decompressed value as a byte[]
+     * @return the decompressed value as a ByteBuffer
      */
     @Override
     public Object decode(Object encodedValue, ZarrRepresentationType decodedType) {
-        byte[] input;
+        ByteBuffer input;
         if (encodedValue instanceof byte[]) {
-            input = (byte[]) encodedValue;
+            // Issue with ByteBuffer.wrap(bytes), Zstd.getFrameContentSize(bytes) returns -1 (invalid frame)
+            byte[] bytes = (byte[]) encodedValue;
+            try {
+                bytes = Zstd.decompress(bytes, (int) Zstd.getFrameContentSize(bytes));
+                return ByteBuffer.wrap(bytes);
+            } catch (Exception ex) {
+                throw new RuntimeException("ZSTD decompression failed: " + ex, ex);
+            }
         } else if (encodedValue instanceof ByteBuffer) {
-            ByteBuffer buf = (ByteBuffer) encodedValue;
-            if (buf.hasArray()) {
-                input = buf.array();;
-            } else {
-                input = new byte[buf.remaining()];
-                buf.get(input);
+            input = (ByteBuffer) encodedValue;
+            try {
+                input = Zstd.decompress(input, (int) Zstd.getFrameContentSize(input));
+                return input;
+            } catch (Exception ex) {
+                throw new RuntimeException("ZSTD decompression failed: " + ex, ex);
             }
         } else {
             throw new IllegalArgumentException("Unsupported input to ZSTD.decode: " + encodedValue.getClass());
-        }
-        try {
-            // The output array size is detected by Zstd
-            return Zstd.decompress(input, (int) Zstd.getFrameContentSize(input));
-        } catch (Exception ex) {
-            throw new RuntimeException("ZSTD decompression failed: " + ex, ex);
         }
     }
 }

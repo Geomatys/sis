@@ -61,6 +61,16 @@ public abstract class NamedElement {
     }
 
     /**
+     * If this element is member of a group, returns the path of that group.
+     * Otherwise returns {@code null}. The default implementation always returns {@code null}.
+     *
+     * @return path of the group which contains this element (/group1/group2), or {@code null}.
+     */
+    public String getGroupPath() {
+        return null;
+    }
+
+    /**
      * Creates a name for a {@code NamedElement} made of other components.
      * Current implementation returns a separated list of component names.
      *

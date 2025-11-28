@@ -75,6 +75,7 @@ dependencyResolutionManagement {
             library("jackson.annotations",  "com.fasterxml.jackson.core",  "jackson-annotations").version {strictly("[2.18, 3.0["); prefer("2.19.1")}
             library("jackson.databind",  "com.fasterxml.jackson.core",  "jackson-databind").version {strictly("[2.18, 3.0["); prefer("2.19.1")}
             library("zstd.jni", "com.github.luben", "zstd-jni").version {strictly("[1.5.7-1, 1.5.7-4["); prefer("1.5.7-4")}
+            library("blosc.java", "com.scalableminds", "blosc-java").version {prefer("0.1-1.21.4")}
         }
         create("tests") {
             library("geoapi",        "org.opengis",            "geoapi-conformance")     .version {strictly(geoapiVersion)}

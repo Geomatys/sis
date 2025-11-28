@@ -388,6 +388,15 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     }
 
     /**
+     * Returns {@code null} since this class does not use tiling.
+     * @return always {@code null}.
+     */
+    @Override
+    public int[] getTileShape() {
+        return null;
+    }
+
+    /**
      * Returns the description of this variable, or {@code null} if none.
      * This method searches for the first attribute named {@code "long_name"},
      * {@code "description"}, {@code "title"} or {@code "standard_name"}.
@@ -639,6 +648,18 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
                 node.setValue(TableColumn.VALUE, value);
             }
         }
+    }
+
+    /**
+     * Reads a single tile of data. This method is not supported by this class.
+     * @param tileIndex the indices of the tile to read.
+     * @return the data in the specified tile.
+     * @throws IOException if an I/O error occurred.
+     * @throws DataStoreException if a logical error occurred.
+     */
+    @Override
+    public Object readTile(int[] tileIndex) throws IOException, DataStoreException {
+        throw new UnsupportedOperationException("readTile is not supported by VariableWrapper.");
     }
 
     /**

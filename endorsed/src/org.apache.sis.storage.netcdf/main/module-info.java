@@ -44,6 +44,7 @@ module org.apache.sis.storage.netcdf {
     opens org.apache.sis.storage.netcdf.zarr.metadata;
 
     opens org.apache.sis.storage.netcdf.zarr; // TODO: Find a better way - For jackson serialization / deserialization
+    opens org.apache.sis.storage.netcdf.ucar; // TODO: Find a better way - For Ucar library
 
     exports org.apache.sis.storage.netcdf.base to
             org.apache.sis.profile.japan;

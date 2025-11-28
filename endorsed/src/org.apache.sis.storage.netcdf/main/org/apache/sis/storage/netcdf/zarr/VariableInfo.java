@@ -17,8 +17,6 @@
 package org.apache.sis.storage.netcdf.zarr;
 
 import org.apache.sis.coverage.grid.GridExtent;
-import org.apache.sis.coverage.grid.GridGeometry;
-import org.apache.sis.coverage.grid.GridOrientation;
 import org.apache.sis.math.Vector;
 import org.apache.sis.measure.Units;
 import org.apache.sis.storage.DataStoreContentException;
@@ -33,7 +31,6 @@ import org.apache.sis.storage.netcdf.base.GridAdjustment;
 import org.apache.sis.storage.netcdf.base.Variable;
 import org.apache.sis.storage.netcdf.classic.ChannelDecoder;
 import org.apache.sis.temporal.LenientDateFormat;
-import org.apache.sis.util.ArraysExt;
 import org.apache.sis.util.CharSequences;
 import org.apache.sis.util.Classes;
 import org.apache.sis.util.Numbers;
@@ -47,23 +44,29 @@ import javax.measure.format.MeasurementParseException;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.regex.Matcher;
 
 /**
  * Description of a variable found in a zarr tree structure.
  *
- * @author  Quentin Bialota (Geomatys)
+ * @author Quentin Bialota (Geomatys)
  */
 final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     /**
@@ -143,6 +146,19 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      */
     boolean isCoordinateSystemAxis;
 
+    /**
+     * Constructs a new variable.
+     * @param encoder encoder of the zarr structure where this variable is defined.
+     * @param name the variable name.
+     * @param dimensions the dimensions of this variable. /!\ Needs to be in the correct order (inverse of crs order) (ex : depth, time, lat, lon)
+     * @param attributes attributes associated to this variable, or an empty map if none.
+     * @param attributeNames names of attributes associated to this variable, or an empty set if none.
+     * @param dataType the type of data, or {@code null} if unknown.
+     * @param metadata zarr metadata node for the array containing this variable.
+     * @param data the data associated to this variable, or {@code null} if not yet read.
+     * @param sampleDimensionIndex index of the sample dimension in the data array, or {@code null} if none.
+     * @throws DataStoreContentException
+     */
     VariableInfo(final Encoder encoder,
                  final String  name,
                  final DimensionInfo[] dimensions,
@@ -192,7 +208,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      *
      * @param decoder the zarr structure where this variable is defined.
      * @param name the variable name.
-     * @param dimensions the dimensions of this variable.
+     * @param dimensions the dimensions of this variable. /!\ Needs to be in the correct order (inverse of crs order) (ex : depth, time, lat, lon)
      * @param attributes attributes associated to this variable, or an empty map if none.
      * @param attributeNames names of attributes associated to this variable, or an empty set if none.
      * @param dataType the type of data, or {@code null} if unknown.
@@ -258,6 +274,64 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     @Override
     public String getName() {
         return name;
+    }
+
+    /**
+     * If this element is member of a group, returns the name of that group.
+     * Otherwise, returns {@code null}.
+     * @return the name of the group which contains this element, or {@code null}.
+     */
+    @Override
+    public String getGroupName() {
+        final String[] paths = metadata.zarrPath().split("/");
+        // Array is at the root of the Zarr store => No group, zarr structure is only an array
+        if (paths.length <= 2) {
+            return null;
+        }
+        // Array is under a nested group (> 3 ex /root/group/array)
+        // +or directly under the root group (== 3 ex /root/array)
+        else {
+            return paths[paths.length - 2];
+        }
+    }
+
+    /**
+     * If this element is member of a group, returns the path of that group.
+     * Otherwise, returns {@code null}.
+     * @return the path of the group which contains this element (/group1/group2), or {@code null}.
+     */
+    @Override
+    public String getGroupPath() {
+        final String[] paths = metadata.zarrPath().split("/");
+        // Array is at the root of the Zarr store => No group, zarr structure is only an array
+        if (paths.length <= 2) {
+            return null;
+        }
+        // Array is under a nested group (> 3 ex /root/group/array)
+        // +or directly under the root group (== 3 ex /root/array)
+        else {
+            // Join all elements except the last one
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < paths.length - 1; i++) {
+                if (i > 0) {
+                    sb.append('/');
+                }
+                sb.append(paths[i]);
+            }
+            return sb.toString();
+        }
+    }
+
+    /**
+     * Returns the shape of tiles (chunks) in this variable.
+     * @return the shape of tiles (chunks) in this variable.
+     */
+    @Override
+    public int[] getTileShape() {
+        int[] srcChunkShape = metadata.chunkGrid().configuration().chunkShape();
+        int[] chunkShape = Arrays.copyOf(srcChunkShape, srcChunkShape.length);
+        reverse(chunkShape);
+        return  chunkShape;
     }
 
     public void setName(final String name) {
@@ -429,8 +503,92 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     @Override
     public List<Dimension> getGridDimensions() {
         List<Dimension> result = new ArrayList<>(Arrays.asList(dimensions));
-        Collections.reverse(result);
         return result;
+    }
+
+    /**
+     * Reads and decodes a single tile / chunk at the specified grid index.
+     *
+     * @param tileIndex The index of the tile/chunk in the chunk grid (e.g., {0, 1, 2}).
+     * @return The decoded primitive array (flat) containing the data for this chunk.
+     * @throws IOException If an I/O error occurs.
+     * @throws DataStoreException If an error occurs reading or decoding.
+     */
+    @Override
+    public Object readTile(int[] tileIndex) throws IOException, DataStoreException {
+        reverse(tileIndex);
+        // Get chunk path
+        Path chunkPath = this.metadata.getChunkPath(tileIndex);
+
+        // Read chunk bytes
+        Object data = readChunkBufferOrBytes(chunkPath);
+
+        // Handle missing chunks (Fill Value)
+        if (data == null) {
+            // If chunk doesn't exist, create an array filled with the fill value.
+            int[] chunkShape = this.metadata.chunkGrid().configuration().chunkShape();
+            int size = 1;
+            for (int s : chunkShape) size *= s;
+            Object array = BytesCodec.allocate1DArray(dataType, size);
+            fillArray(array, this.metadata.fillValue());
+            return array;
+        }
+
+        // Decode through codec chain
+        final List<ZarrRepresentationType> types = this.metadata.representationTypes();
+        final List<AbstractZarrCodec> codecs = this.metadata.codecs();
+
+        AbstractZarrCodec arrayToBytesCodec = null;
+        for (int i = codecs.size() - 1; i >= 0; i--) {
+            AbstractZarrCodec codec = codecs.get(i);
+            data = codec.decode(data, types.get(i));
+            // Get the Array-to-Bytes codec, for later use if the last step produced a ByteBuffer.
+            if (codec.codec.zarrCodecType == ZarrCodec.Type.ARRAY_TO_BYTES) {
+                arrayToBytesCodec = codec;
+            }
+        }
+
+        // If the last step produced a ByteBuffer (from an array-to-bytes codec), convert to typed array
+        if (data instanceof ByteBuffer && arrayToBytesCodec != null) {
+            ByteBuffer buf = (ByteBuffer) data;
+            int[] chunkShape = this.metadata.chunkGrid().configuration().chunkShape();
+            int size = 1;
+            for (int s : chunkShape)
+                size *= s;
+            Object array = BytesCodec.allocate1DArray(dataType, size);
+            arrayToBytesCodec.decodeRegion(buf, 0, array, 0, size, 1, dataType);
+            return array;
+        }
+
+        return data;
+    }
+
+    /**
+     * Reverse indices in the given array.
+     *
+     * @param array the indices to reverse.
+     */
+    private void reverse(int[] array) {
+        int n = array.length;
+        for (int i = 0; i < n / 2; i++) {
+            int temp = array[i];
+            array[i] = array[n - 1 - i];
+            array[n - 1 - i] = temp;
+        }
+    }
+
+    /**
+     * Reverse indices in the given array.
+     *
+     * @param array the indices to reverse.
+     */
+    private void reverse(long[] array) {
+        int n = array.length;
+        for (int i = 0; i < n / 2; i++) {
+            long temp = array[i];
+            array[i] = array[n - 1 - i];
+            array[n - 1 - i] = temp;
+        }
     }
 
     /**
@@ -534,8 +692,8 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         final DataType dataType = this.dataType;
         final Object fillValue = this.metadata.fillValue();
 
-        final long[] lower  = new long[nDim];
-        final long[] upper  = new long[nDim];
+        long[] lower  = new long[nDim];
+        long[] upper  = new long[nDim];
 
         for (int i = 0; i < nDim; i++) {
             if (area != null) {
@@ -547,6 +705,16 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
             }
         }
 
+        if (area != null) {
+            //Reverse lower/upper to match Zarr order
+            reverse(lower);
+            reverse(upper);
+        }
+        if (subsampling != null) {
+            //Reverse subsampling to match Zarr order
+            reverse(subsampling);
+        }
+
         if (subsampling == null) {
             subsampling = new long[nDim];
             Arrays.fill(subsampling, 1);
@@ -554,8 +722,8 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
 
         // Calculate output array length after slicing/subsampling
         int totalElements = 1;
-        for (int i=0; i<nDim; i++) {
-            totalElements *= (int) Math.ceil((double)(upper[i] - lower[i]) / subsampling[i]);
+        for (int i = 0; i < nDim; i++) {
+            totalElements *= (int) Math.ceil((double) (upper[i] - lower[i]) / subsampling[i]);
         }
 
         // Allocate output array of the right type
@@ -563,19 +731,19 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         if (totalElements == 0) return out;
 
         // Fill array (if not null or not 0)
-        fillArray(out, fillValue);
+        // fillArray(out, fillValue);
 
         // Helper to store current position in the output array
         int[] outStrides = new int[nDim];
         outStrides[nDim - 1] = 1;
         for (int i = nDim - 2; i >= 0; i--)
-            outStrides[i] = outStrides[i + 1] * (int) Math.ceil((double)(upper[i + 1] - lower[i + 1]) / subsampling[i + 1]);
+            outStrides[i] = outStrides[i + 1] * (int) Math.ceil((double) (upper[i + 1] - lower[i + 1]) / subsampling[i + 1]);
 
         // Pre-calculate chunk strides
         int[] chunkStrides = new int[nDim];
         chunkStrides[nDim - 1] = 1;
         for (int i = nDim - 2; i >= 0; i--) {
-            chunkStrides[i] = chunkStrides[i+1] * chunkShape[i+1];
+            chunkStrides[i] = chunkStrides[i + 1] * chunkShape[i + 1];
         }
 
         // Calculate grid bounds to read
@@ -586,6 +754,17 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
             gridMin[i] = (int) (lower[i] / chunkShape[i]);
             // (upper - 1) ensures that if upper is exactly on a chunk boundary, we don't include the next empty chunk
             gridMax[i] = (int) ((upper[i] - 1) / chunkShape[i]);
+        }
+
+        final List<ZarrRepresentationType> types = this.metadata.representationTypes();
+        final List<AbstractZarrCodec> codecs = this.metadata.codecs();
+        final int codecCount = codecs.size();
+        int arrayToBytesCodecIndex = -1;
+        for (int i = 0; i < codecs.size(); i++) {
+            if (codecs.get(i).codec.zarrCodecType == ZarrCodec.Type.ARRAY_TO_BYTES) {
+                arrayToBytesCodecIndex = i;
+                break;
+            }
         }
 
         // Generate the list of chunk indices we need to read
@@ -607,195 +786,169 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         }
 
         // Execution in parallel (Read)
-        long[] finalSubsampling = subsampling;
-        chunksTask.parallelStream().forEach(chunkIdx -> {
-            try {
-                // 1. Compute geometry
-                int[] chunkStart = new int[nDim];
-                int[] sliceStart = new int[nDim];
-                int[] sliceEnd   = new int[nDim];
+        ForkJoinPool pool = new ForkJoinPool(Math.min(2, Runtime.getRuntime().availableProcessors()));
+        try {
+            long[] finalSubsampling = subsampling;
+            int finalArrayToBytesCodecIndex = arrayToBytesCodecIndex;
+            pool.submit(() -> chunksTask.parallelStream().forEach(chunkIdx -> {
+                try {
+                    // 1. Compute geometry
+                    int[] chunkStart = new int[nDim];
+                    int[] sliceStart = new int[nDim];
+                    int[] sliceEnd = new int[nDim];
 
-                for (int d = 0; d < nDim; d++) {
-                    chunkStart[d] = chunkIdx[d] * chunkShape[d];
-                    sliceStart[d] = (int) Math.max(chunkStart[d], lower[d]);
-                    int chunkLimit = Math.min(chunkStart[d] + chunkShape[d], arrayShape[d]);
-                    sliceEnd[d]   = (int) Math.min(chunkLimit, upper[d]);
-                }
-
-                // 2. Read & Decode
-                // Get chunk path
-                Path chunkPath = this.metadata.getChunkPath(chunkIdx);
-                Object data = readChunkBytes(chunkPath);
-
-                if (data != null) {
-                    // List of representation types for the codecs used in this Zarr array.
-                    List<ZarrRepresentationType> types = this.metadata.representationTypes();
-
-                    // 3. Decode the chunk data (using the codecs in reverse order)
-                    for (int i = metadata.codecs().size() - 1; i >= 0; i--) {
-                        AbstractZarrCodec codec = metadata.codecs().get(i);
-                        data = codec.decode(data, types.get(i));
+                    for (int d = 0; d < nDim; d++) {
+                        chunkStart[d] = chunkIdx[d] * chunkShape[d];
+                        sliceStart[d] = (int) Math.max(chunkStart[d], lower[d]);
+                        int chunkLimit = Math.min(chunkStart[d] + chunkShape[d], arrayShape[d]);
+                        sliceEnd[d] = (int) Math.min(chunkLimit, upper[d]);
                     }
 
-                    // 4. Copy to the output array (thread-safe because each thread writes to distinct regions, there is no overlap)
-                    copyChunkRegionToOutput(
-                            data, 0, 0, 0,
-                            chunkStart, chunkShape, chunkStrides,
-                            sliceStart, sliceEnd,
-                            lower, finalSubsampling,
-                            out, outStrides
-                    );
+                    // 2. Read & Decode
+                    Path chunkPath = this.metadata.getChunkPath(chunkIdx);
+                    Object data = readChunkBufferOrBytes(chunkPath);
+
+                    if (data != null) {
+                        for (int i = codecCount - 1; i >= 0; i--) {
+                            data = codecs.get(i).decode(data, types.get(i));
+                        }
+
+                        if ((data instanceof byte[])) {
+                            data = ByteBuffer.wrap((byte[]) data);
+                        }
+                        copyChunkRegionToOutput(
+                                (ByteBuffer) data, codecs.get(finalArrayToBytesCodecIndex), dataType, 0, 0, 0,
+                                chunkStart, chunkShape, chunkStrides,
+                                sliceStart, sliceEnd,
+                                lower, finalSubsampling,
+                                out, outStrides);
+                        data = null;
+                    } else {
+                        fillChunkRegion(out, outStrides, chunkStart, sliceStart, sliceEnd, lower, finalSubsampling, fillValue);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Error reading chunk " + Arrays.toString(chunkIdx), e);
                 }
-            } catch (Exception e) {
-                throw new RuntimeException("Error reading chunk " + Arrays.toString(chunkIdx), e);
-            }
-        });
+            })).get();
+        } catch (ExecutionException | InterruptedException e) {
+            throw new DataStoreException(e);
+        } finally {
+            pool.shutdown();
+        }
 
         return out;
     }
 
     /**
-     * Recursive method to copy a region from a chunk to the output array, considering subsampling.
-     * Uses System.arraycopy for the contiguous last dimension when possible, if subsampling is 1 (=> no subsampling).
+     * Recursive method to copy a region from a chunk (represented as a {@link ByteBuffer})
+     * to the output array, considering subsampling.
+     * Uses {@link BytesCodec#decodeRegion} to read elements directly from the ByteBuffer
+     * into the output array, avoiding allocation of a full chunk-sized typed array.
      *
-     * @param chunkData      The source 1D flattened array
-     * @param srcBaseOffset  Current offset in chunkData
-     * @param dstBaseOffset  Current offset in out
-     * @param dim            Current dimension index being processed
-     * @param chunkStart     Global coordinates where this chunk starts
-     * @param chunkShape     Shape of the chunk
-     * @param chunkStrides   Strides for the chunk array
-     * @param sliceStart     Global start coordinate to copy (intersected)
-     * @param sliceEnd       Global end coordinate to copy (exclusive)
-     * @param globalLower    Global selection start (needed for out offset calc)
-     * @param subsampling    Subsampling factors
-     * @param out            The destination 1D flattened array
-     * @param outStrides     Strides for the output array
+     * @param chunkBuffer   The source ByteBuffer containing the raw decompressed chunk bytes
+     * @param zarrCodec     The ZarrCodec (an array-bytes codec) instance used to decode typed elements from the buffer
+     * @param dataType      The data type of the array elements
+     * @param srcBaseOffset Current offset in the chunk (in element units)
+     * @param dstBaseOffset Current offset in out
+     * @param dim           Current dimension index being processed
+     * @param chunkStart    Global coordinates where this chunk starts
+     * @param chunkShape    Shape of the chunk
+     * @param chunkStrides  Strides for the chunk array
+     * @param sliceStart    Global start coordinate to copy (intersected)
+     * @param sliceEnd      Global end coordinate to copy (exclusive)
+     * @param globalLower   Global selection start (needed for out offset calc)
+     * @param subsampling   Subsampling factors
+     * @param out           The destination 1D flattened array
+     * @param outStrides    Strides for the output array
      */
-    private void copyChunkRegionToOutput(Object chunkData, int srcBaseOffset, int dstBaseOffset, int dim,
+    private void copyChunkRegionToOutput(ByteBuffer chunkBuffer, AbstractZarrCodec zarrCodec, DataType dataType,
+            int srcBaseOffset, int dstBaseOffset, int dim,
             int[] chunkStart, int[] chunkShape, int[] chunkStrides, int[] sliceStart, int[] sliceEnd,
-            long[] globalLower, long[] subsampling, Object out, int[] outStrides
-    ) {
+            long[] globalLower, long[] subsampling, Object out, int[] outStrides) {
         int nDim = chunkShape.length;
 
         // 1. Calculate local start/end indices relative to the chunk
-        // - Global coordinate: sliceStart[dim]
-        // - Chunk Origin:      chunkStart[dim]
-        // - Local Index:       sliceStart[dim] - chunkStart[dim]
         int localStart = sliceStart[dim] - chunkStart[dim];
         int count = sliceEnd[dim] - sliceStart[dim];
 
         // 2. Check if we are at the last dimension (contiguous block)
-        // If last dimension, we can copy directly the contiguous block
         if (dim == nDim - 1) {
+            int step = (int) subsampling[dim];
+            int srcPos = srcBaseOffset + localStart;
 
-            // "Fast Way" when no subsampling (subsampling == 1)
-            // In this case, we can copy the whole contiguous block using System.arraycopy
-            if (subsampling[dim] == 1) {
-                int srcPos = srcBaseOffset + localStart;
-
-                // Determine destination position
-                // The destination is computed based on the global selection
-                // relative coordinate in selection: (sliceStart[dim] - globalLower[dim])
+            if (step == 1) {
+                // Contiguous copy: decode elements directly from ByteBuffer to output
                 int outRel = (int) (sliceStart[dim] - globalLower[dim]);
-                int dstPos = dstBaseOffset + outRel; // outStrides[last] is always 1
-
-                System.arraycopy(chunkData, srcPos, out, dstPos, count);
-            }
-            // "Slow Way" when subsampling > 1
-            // In this case, we must iterate manually over the elements to copy
-            else {
-                int step = (int) subsampling[dim];
-                int srcPos = srcBaseOffset + localStart;
-
-                // Initial dest pos
+                int dstPos = dstBaseOffset + outRel;
+                try {
+                    zarrCodec.decodeRegion(chunkBuffer, srcPos, out, dstPos, count, 1, dataType);
+                } catch (DataStoreException e) {
+                    throw new RuntimeException("Error decoding region", e);
+                }
+            } else {
+                // Subsampled copy: decode only the needed elements
                 int outRel = (int) ((sliceStart[dim] - globalLower[dim]) / step);
                 int dstPos = dstBaseOffset + outRel;
-
-                copyWithSubsampling(chunkData, srcPos, out, dstPos, count, step, chunkData.getClass().getComponentType());
+                try {
+                    zarrCodec.decodeRegion(chunkBuffer, srcPos, out, dstPos, count, step, dataType);
+                } catch (DataStoreException e) {
+                    throw new RuntimeException("Error decoding region with subsampling", e);
+                }
             }
         }
         // 3. Recursive Step for Higher Dimensions
-        // Not the last dimension, must iterate over this dimension and recurse
         else {
             int step = (int) subsampling[dim];
 
-            // Loop through the rows/planes of this dimension
-            // We iterate in global coordinates from sliceStart to sliceEnd
             for (int i = 0; i < count; i += step) {
                 int globalCoord = sliceStart[dim] + i;
 
-                // Calculate Local Coordinate for Source
                 int localCoord = globalCoord - chunkStart[dim];
                 int nextSrcOffset = srcBaseOffset + (localCoord * chunkStrides[dim]);
 
-                // Calculate Coordinate for Destination
-                // How many pixels have we skipped in the global selection?
                 int outCoord = (int) ((globalCoord - globalLower[dim]) / subsampling[dim]);
                 int nextDstOffset = dstBaseOffset + (outCoord * outStrides[dim]);
 
-                // Recurse
                 copyChunkRegionToOutput(
-                        chunkData, nextSrcOffset, nextDstOffset, dim + 1,
+                        chunkBuffer, zarrCodec, dataType, nextSrcOffset, nextDstOffset, dim + 1,
                         chunkStart, chunkShape, chunkStrides,
-                        sliceStart, sliceEnd, globalLower, subsampling, out, outStrides
-                );
+                        sliceStart, sliceEnd, globalLower, subsampling, out, outStrides);
             }
         }
     }
 
     /**
-     * Copies data from source to destination with subsampling.
-     *
-     * @param src the source array
-     * @param srcPos the starting position in the source array
-     * @param dst the destination array
-     * @param dstPos the starting position in the destination array
-     * @param count number of elements to consider from source
-     * @param step the subsampling step
-     * @param type the component type of the arrays
-     */
-    private void copyWithSubsampling(Object src, int srcPos, Object dst, int dstPos, int count, int step, Class<?> type) {
-        // Ideally, keep a reference to DataType enum to avoid reflection,
-        // but for brevity using 'instanceof' or checking type:
-
-        if (src instanceof float[]) {
-            float[] s = (float[]) src; float[] d = (float[]) dst;
-            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
-        } else if (src instanceof double[]) {
-            double[] s = (double[]) src; double[] d = (double[]) dst;
-            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
-        } else if (src instanceof int[]) {
-            int[] s = (int[]) src; int[] d = (int[]) dst;
-            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
-        } else if (src instanceof short[]) {
-            short[] s = (short[]) src; short[] d = (short[]) dst;
-            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
-        } else if (src instanceof long[]) {
-            long[] s = (long[]) src; long[] d = (long[]) dst;
-            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
-        } else if (src instanceof byte[]) {
-            byte[] s = (byte[]) src; byte[] d = (byte[]) dst;
-            for (int k = 0; k < count; k+=step) d[dstPos++] = s[srcPos + k];
-        }
-    }
-
-    /**
-     * Reads the bytes of the given chunk.
+     * Reads the bytes of the given chunk as a ByteBuffer or a byte[].
      * If the chunk does not exist, then this method returns {@code null}.
      *
-     * @param  chunkPath  path to the chunk file.
-     * @return the bytes of the chunk, or {@code null} if the chunk does not exist.
+     * @param chunkPath path to the chunk file.
+     * @return the bytes of the chunk as a ByteBuffer, or {@code null} if the chunk does not exist.
      * @throws IOException if an I/O error occurred while reading the chunk.
      */
-    private byte[] readChunkBytes(Path chunkPath) throws IOException {
-        if (Files.exists(chunkPath))
-            return Files.readAllBytes(chunkPath);
-        return null;
+    private Object readChunkBufferOrBytes(Path chunkPath) throws IOException {
+        try (FileChannel channel = FileChannel.open(chunkPath, StandardOpenOption.READ)) {
+            // Maps the file directly into memory
+            try {
+                return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            } catch (UnsupportedOperationException ex) {
+                // Fallback to reading the file into a byte array if memory mapping is not supported (e.g., with ZipFileSystem)
+                return Files.readAllBytes(chunkPath);
+            }
+        } catch (NoSuchFileException e) {
+            // If the file doesn't exist, return null as per original logic
+            return null;
+        } catch (IOException e) {
+            // If another I/O error occurs, verify existence to match your specific logic
+            if (!Files.exists(chunkPath)) {
+                return null;
+            }
+            throw e;
+        }
     }
 
     /**
      * Fills the given array with the given value. Only if the value is non-null and non-zero.
+     * 
      * @param array the array to fill
      * @param value the value to fill the array with
      */
@@ -872,8 +1025,121 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     }
 
     /**
+     * Fills a specific region of the output array with the fill value.
+     * Called only for missing chunks, instead of pre-filling the entire output array.
+     * The region to fill is determined by the intersection of the chunk bounds with
+     * the requested area, respecting subsampling.
+     *
+     * @param out         the output 1D flattened array
+     * @param outStrides  strides for the output array
+     * @param chunkStart  global coordinates where this chunk starts (unused, kept for call-site symmetry)
+     * @param sliceStart  global start coordinate of the region to fill (intersected)
+     * @param sliceEnd    global end coordinate of the region to fill (exclusive)
+     * @param globalLower global selection start (needed for output offset calculation)
+     * @param subsampling subsampling factors
+     * @param fillValue   the fill value to write
+     */
+    private void fillChunkRegion(Object out, int[] outStrides, int[] chunkStart,
+            int[] sliceStart, int[] sliceEnd,
+            long[] globalLower, long[] subsampling, Object fillValue) {
+        if (fillValue == null)
+            return;
+
+        // Same early-return logic as fillArray:
+        // Java zero-initializes arrays, so filling with 0 is unnecessary.
+        if (fillValue instanceof Number) {
+            double v = ((Number) fillValue).doubleValue();
+            if (v == 0.0 && !Double.isNaN(v))
+                return;
+        } else if (fillValue instanceof String) {
+            String str = (String) fillValue;
+            if (str.isEmpty() || str.equals("0") ||
+                    str.equalsIgnoreCase("Infinity") ||
+                    str.equalsIgnoreCase("-Infinity")) {
+                return;
+            }
+        }
+
+        fillChunkRegionRecursive(out, outStrides, 0, 0,
+                sliceStart, sliceEnd, globalLower, subsampling, fillValue);
+    }
+
+    /**
+     * Recursive helper for {@link #fillChunkRegion}.
+     * Traverses dimensions from outermost to innermost, computing the output offset
+     * at each level. At the last dimension, fills a contiguous range.
+     *
+     * @param out           the output 1D flattened array
+     * @param outStrides    strides for the output array
+     * @param dstBaseOffset accumulated offset in the output array from outer dimensions
+     * @param dim           current dimension index being processed
+     * @param sliceStart    global start coordinates of the fill region
+     * @param sliceEnd      global end coordinates of the fill region (exclusive)
+     * @param globalLower   global selection start
+     * @param subsampling   subsampling factors
+     * @param fillValue     the fill value to write
+     */
+    private void fillChunkRegionRecursive(Object out, int[] outStrides, int dstBaseOffset, int dim,
+            int[] sliceStart, int[] sliceEnd,
+            long[] globalLower, long[] subsampling, Object fillValue) {
+        final int nDim = outStrides.length;
+        final int count = sliceEnd[dim] - sliceStart[dim];
+        final int step = (int) subsampling[dim];
+
+        if (dim == nDim - 1) {
+            // Last dimension: fill a contiguous range in the output array
+            int outRel = (int) ((sliceStart[dim] - globalLower[dim]) / step);
+            int dstPos = dstBaseOffset + outRel;
+            int fillCount = (int) Math.ceil((double) count / step);
+
+            fillRange(out, dstPos, fillCount, fillValue);
+        } else {
+            // Recurse into the next dimension
+            for (int i = 0; i < count; i += step) {
+                int globalCoord = sliceStart[dim] + i;
+                int outCoord = (int) ((globalCoord - globalLower[dim]) / subsampling[dim]);
+                int nextDstOffset = dstBaseOffset + (outCoord * outStrides[dim]);
+
+                fillChunkRegionRecursive(out, outStrides, nextDstOffset, dim + 1,
+                        sliceStart, sliceEnd, globalLower, subsampling, fillValue);
+            }
+        }
+    }
+
+    /**
+     * Fills a range of elements in a typed array with the given fill value.
+     * Uses {@link Arrays#fill(Object[], int, int, Object)} variants for efficiency.
+     *
+     * @param array     the 1D typed array (float[], double[], int[], etc.)
+     * @param fromIndex start index (inclusive)
+     * @param count     number of elements to fill
+     * @param fillValue the value to fill with
+     */
+    private void fillRange(Object array, int fromIndex, int count, Object fillValue) {
+        final int toIndex = fromIndex + count;
+        boolean isNaN = (fillValue instanceof String) && ((String) fillValue).equalsIgnoreCase("NaN");
+
+        if (array instanceof float[]) {
+            float v = isNaN ? Float.NaN : ((Number) fillValue).floatValue();
+            Arrays.fill((float[]) array, fromIndex, toIndex, v);
+        } else if (array instanceof double[]) {
+            double v = isNaN ? Double.NaN : ((Number) fillValue).doubleValue();
+            Arrays.fill((double[]) array, fromIndex, toIndex, v);
+        } else if (array instanceof int[]) {
+            Arrays.fill((int[]) array, fromIndex, toIndex, ((Number) fillValue).intValue());
+        } else if (array instanceof long[]) {
+            Arrays.fill((long[]) array, fromIndex, toIndex, ((Number) fillValue).longValue());
+        } else if (array instanceof short[]) {
+            Arrays.fill((short[]) array, fromIndex, toIndex, ((Number) fillValue).shortValue());
+        } else if (array instanceof byte[]) {
+            Arrays.fill((byte[]) array, fromIndex, toIndex, ((Number) fillValue).byteValue());
+        }
+    }
+
+    /**
      * Writes the data of this variable.
-     * @throws IOException if an I/O error occurred.
+     * 
+     * @throws IOException        if an I/O error occurred.
      * @throws DataStoreException if the data cannot be written.
      */
     public void write() throws IOException, DataStoreException {
@@ -925,8 +1191,8 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
             do {
                 GridExtent extent = buildSliceExtent(idx, shape);
                 Raster raster = (this.sampleDimensionIndex < 0)
-                        ? gcr.read(new GridGeometry(extent, null, GridOrientation.REFLECTION_Y)).forConvertedValues(true).render(null).getData()
-                        : gcr.read(new GridGeometry(extent, null, GridOrientation.REFLECTION_Y), this.sampleDimensionIndex).forConvertedValues(true).render(null).getData();
+                        ? gcr.read(null).forConvertedValues(true).render(extent).getData()
+                        : gcr.read(null, this.sampleDimensionIndex).forConvertedValues(true).render(extent).getData(); // new GridGeometry(extent, null, GridOrientation.REFLECTION_Y)
                 setDataTypeFromRaster(raster);
                 rasterSlices.add(raster);
             } while (incrementIndex(idx, outerShape));
@@ -1120,28 +1386,28 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
 
     private Object getElement(Object arr, int index, DataType type) {
         switch (type.number) {
-            case Numbers.BYTE:      return ((byte[]) arr)[index];
-            case Numbers.SHORT:     return ((short[]) arr)[index];
-            case Numbers.CHARACTER: return ((char[]) arr)[index];
-            case Numbers.INTEGER:   return ((int[]) arr)[index];
-            case Numbers.LONG:      return ((long[]) arr)[index];
-            case Numbers.FLOAT:     return ((float[]) arr)[index];
-            case Numbers.DOUBLE:    return ((double[]) arr)[index];
-            case Numbers.BOOLEAN:   return ((boolean[]) arr)[index];
+            case BYTE:      return ((byte[]) arr)[index];
+            case SHORT:     return ((short[]) arr)[index];
+            case CHARACTER: return ((char[]) arr)[index];
+            case INTEGER:   return ((int[]) arr)[index];
+            case LONG:      return ((long[]) arr)[index];
+            case FLOAT:     return ((float[]) arr)[index];
+            case DOUBLE:    return ((double[]) arr)[index];
+            case BOOLEAN:   return ((boolean[]) arr)[index];
             default: throw new IllegalArgumentException("Not a supported primitive type: " + type.name());
         }
     }
 
     private void setElement(Object arr, int index, Object value, DataType type) {
         switch (type.number) {
-            case Numbers.BYTE:      ((byte[]) arr)[index]      = ((Number) value).byteValue();   break;
-            case Numbers.SHORT:     ((short[]) arr)[index]     = ((Number) value).shortValue();  break;
-            case Numbers.CHARACTER: ((char[]) arr)[index]      = (value instanceof Character) ? ((Character) value) : (char) ((Number) value).intValue(); break;
-            case Numbers.INTEGER:   ((int[]) arr)[index]       = ((Number) value).intValue();    break;
-            case Numbers.LONG:      ((long[]) arr)[index]      = ((Number) value).longValue();   break;
-            case Numbers.FLOAT:     ((float[]) arr)[index]     = ((Number) value).floatValue();  break;
-            case Numbers.DOUBLE:    ((double[]) arr)[index]    = ((Number) value).doubleValue(); break;
-            case Numbers.BOOLEAN:
+            case BYTE:      ((byte[]) arr)[index]      = ((Number) value).byteValue();   break;
+            case SHORT:     ((short[]) arr)[index]     = ((Number) value).shortValue();  break;
+            case CHARACTER: ((char[]) arr)[index]      = (value instanceof Character) ? ((Character) value) : (char) ((Number) value).intValue(); break;
+            case INTEGER:   ((int[]) arr)[index]       = ((Number) value).intValue();    break;
+            case LONG:      ((long[]) arr)[index]      = ((Number) value).longValue();   break;
+            case FLOAT:     ((float[]) arr)[index]     = ((Number) value).floatValue();  break;
+            case DOUBLE:    ((double[]) arr)[index]    = ((Number) value).doubleValue(); break;
+            case BOOLEAN:
                 ((boolean[]) arr)[index] = (value instanceof Boolean) ? (Boolean)value : ((Number) value).doubleValue() != 0.0;
                 break;
             default: throw new IllegalArgumentException("Not a supported primitive type: " + type.name());
@@ -1273,10 +1539,10 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
             } else if (vector != null) {
                 // copy element
                 switch (dataType.number) {
-                    case Numbers.DOUBLE:    ((double[])chunkArr)[dstIndex] = vector.doubleValues()[srcIndex]; break;
-                    case Numbers.FLOAT:     ((float[])chunkArr)[dstIndex]  = vector.floatValues()[srcIndex];  break;
-                    case Numbers.LONG:      ((long[])chunkArr)[dstIndex]  = vector.longValues()[srcIndex];  break;
-                    case Numbers.INTEGER:   ((int[])chunkArr)[dstIndex]   = vector.intValues()[srcIndex];   break;
+                    case DOUBLE:    ((double[])chunkArr)[dstIndex] = vector.doubleValues()[srcIndex]; break;
+                    case FLOAT:     ((float[])chunkArr)[dstIndex]  = vector.floatValues()[srcIndex];  break;
+                    case LONG:      ((long[])chunkArr)[dstIndex]  = vector.longValues()[srcIndex];  break;
+                    case INTEGER:   ((int[])chunkArr)[dstIndex]   = vector.intValues()[srcIndex];   break;
                     default:
                         throw new DataStoreContentException("Data type not supported for chunk extraction from Vector: " + dataType + ". Only float/double supported (for dimensions axes).");
                 }
@@ -1389,5 +1655,14 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     @Override
     protected Object getAttributeValue(final String attributeName) {
         return attributes.get(attributeName);
+    }
+
+    /**
+     * Returns a string representation of this variable.
+     * @return string representation of this variable.
+     */
+    @Override
+    public String toString() {
+        return name + " [" + dataType + "] [" + metadata.zarrPath() + "] [" + Arrays.toString(metadata.shape()) + "]";
     }
 }

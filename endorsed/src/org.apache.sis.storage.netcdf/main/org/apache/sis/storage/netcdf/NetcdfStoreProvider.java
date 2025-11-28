@@ -348,54 +348,60 @@ public class NetcdfStoreProvider extends DataStoreProvider {
         Decoder decoder = null;
         Object keepOpen = null;
 
-        // Try raw binary/netCDF first
-        final ChannelDataInput input = connector.getStorageAs(ChannelDataInput.class);
-        if (input != null) {
-            try {
-                decoder = new ChannelDecoder(input, connector.getOption(OptionKey.ENCODING), geomlib, listeners);
-                keepOpen = input;
-            } catch (DataStoreException | ArithmeticException e) {
-                // Will try Zarr and fallback approaches below
+        try {
+            // 1. Try NetCDF-3 (Raw binary/Channel)
+            final ChannelDataInput input = connector.getStorageAs(ChannelDataInput.class);
+            if (input != null) {
+                try {
+                    decoder = new ChannelDecoder(input, connector.getOption(OptionKey.ENCODING), geomlib, listeners);
+                    keepOpen = input;
+                } catch (DataStoreException | ArithmeticException e) {
+                    // Not a NetCDF-3 file, move to next check
+                }
             }
-        }
 
-        // Fallback: try Zarr (directory or zip), or UCAR
-        if (decoder == null) {
-            Path inputPath = connector.getStorageAs(Path.class);
-
-            if (inputPath != null) {
-                if (isZipFile(inputPath)) {
-                    try {
-                        FileSystem zipFs = FileSystems.newFileSystem(inputPath, (ClassLoader) null);
-                        Path zarrRootInZip = findZarrRoot(zipFs); // Finds "/" or first folder with zarr.json
-                        decoder = new ZarrDecoder(zarrRootInZip, geomlib, listeners);
-                        keepOpen = inputPath;
-                    } catch (Exception zipEx) {
-                        throw new DataStoreException("Cannot open ZIP filesystem for: " + inputPath, zipEx);
-                    }
-                } else {
-                    try {
-                        decoder = new ZarrDecoder(inputPath, geomlib, listeners);
-                        keepOpen = inputPath;
-                    } catch (DataStoreException e) {
-                        // Will try fallback approach below
-                        decoder = null;
+            // 2. Try Zarr (Directory or ZIP)
+            if (decoder == null) {
+                final Path inputPath = connector.getStorageAs(Path.class);
+                if (inputPath != null) {
+                    if (isZipFile(inputPath)) {
+                        // Note: The FileSystem remains open if ZarrDecoder takes ownership of the Path
+                        try {
+                            FileSystem zipFs = FileSystems.newFileSystem(inputPath, (ClassLoader) null);
+                            Path zarrRootInZip = findZarrRoot(zipFs);
+                            decoder = new ZarrDecoder(zarrRootInZip, geomlib, listeners);
+                            keepOpen = inputPath; // We keep the ZIP path open
+                        } catch (Exception zipEx) {
+                            // Not a valid Zarr ZIP, fall through
+                        }
+                    } else {
+                        try {
+                            decoder = new ZarrDecoder(inputPath, geomlib, listeners);
+                            keepOpen = inputPath;
+                        } catch (DataStoreException e) {
+                            // Not a Zarr directory, fall through
+                        }
                     }
                 }
-            } else {
-                String path = connector.getStorageAs(String.class);
-                if (path != null) {
-                    decoder = createByReflection(path, false, geomlib, listeners);
-                    keepOpen = path;
-                } else {
-                    // Last resort: try generic storage handle
+            }
+
+            // 3. Try NetCDF-4 (UCAR via Reflection)
+            if (decoder == null) {
+                // First Check if the storage can be converted to ChannelDataInput (if not, it's probably a ucar class)
+                // If not, try String (filename or URL)
+                if (connector.getStorageAs(ChannelDataInput.class) == null) {
                     keepOpen = connector.getStorage();
                     decoder = createByReflection(keepOpen, true, geomlib, listeners);
+                } else {
+                    keepOpen = connector.getStorageAs(String.class);
+                    decoder = createByReflection(keepOpen, false, geomlib, listeners);
                 }
             }
-        }
 
-//    connector.closeAllExcept(decoder != null ? keepOpen : null);
+        } finally {
+            // Close all unused views.
+            connector.closeAllExcept(decoder != null ? keepOpen : null);
+        }
 
         if (decoder != null) {
             decoder.applyOtherConventions();
