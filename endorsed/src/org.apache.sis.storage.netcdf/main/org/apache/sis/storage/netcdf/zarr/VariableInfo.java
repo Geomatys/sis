@@ -452,6 +452,9 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      */
     @Override
     public Object readTile(int[] tileIndex) throws IOException, DataStoreException {
+        // Invert row/column for ordinal to Zarr mapping
+        tileIndex = swapIndices(tileIndex);
+
         // Get chunk path
         Path chunkPath = this.metadata.getChunkPath(tileIndex);
 
@@ -477,6 +480,18 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         }
 
         return data;
+    }
+
+    /**
+     * Swap the first two indices in the given array.
+     * @param indices the indices to swap.
+     * @return the swapped indices.
+     */
+    private int[] swapIndices(int[] indices) {
+        int temp = indices[0];
+        indices[0] = indices[1];
+        indices[1] = temp;
+        return indices;
     }
 
     /**

@@ -112,51 +112,56 @@ final class TiledRaster extends TiledGridCoverage {
             }
         } while (iterator.next());
 
-        // Read missing tiles
-        // Assume all bands have the same chunk shape
-        int[] chunkShape = bands[0].getTileShape();
-        for (Tile tile : missings) {
+        if (!missings.isEmpty()) {
+            int[] chunkShape = bands[0].getTileShape();
 
-            // Reconstruct Zarr chunk indices from the snapshot
-            int[] chunkIndices = new int[chunkShape.length];
-            for(int i=0; i<chunkIndices.length; i++) {
-                chunkIndices[i] = Math.toIntExact(tile.resourceCoordinates[i]);
+            try {
+                missings.parallelStream().forEach(tile -> {
+                    try {
+                        // Reconstruct Zarr chunk indices from the snapshot
+                        int[] chunkIndices = new int[chunkShape.length];
+                        for (int i = 0; i < chunkIndices.length; i++) {
+                            chunkIndices[i] = Math.toIntExact(tile.resourceCoordinates[i]);
+                        }
+
+                        // Read Data for all bands (Thread-safe per assumption)
+                        Buffer[] bankBuffers = new Buffer[bands.length];
+                        for (int i = 0; i < bands.length; i++) {
+                            Object primitiveArray = bands[i].readTile(chunkIndices);
+                            bankBuffers[i] = wrapBuffer(primitiveArray, dataType);
+                        }
+
+                        // Create Raster
+                        // RasterFactory is stateless/thread-safe for wrapping
+                        DataBuffer dataBuffer = RasterFactory.wrap(dataType.rasterDataType, bankBuffers);
+
+                        // The TileSnapshot captured the origin X/Y relative to the RenderedImage
+                        Point origin = new Point(tile.originX, tile.originY);
+
+                        // Create the writable raster (Thread-local)
+                        WritableRaster raster = WritableRaster.createWritableRaster(this.model, dataBuffer, origin);
+
+                        // Cache and store in result
+                        // tile.cache delegates to the Resource's WeakValueHashMap (Synchronized in SIS)
+                        Raster cached = tile.cache(raster);
+
+                        // Arrays allow concurrent writes to distinct indices
+                        results[tile.getTileIndexInResultArray()] = cached;
+
+                    } catch (Exception e) {
+                        // Wrap checked exceptions to propagate them out of the stream
+                        throw new RuntimeException(e);
+                    }
+                });
+            } catch (RuntimeException e) {
+                // Unwrap and rethrow the original checked exceptions
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException) throw (IOException) cause;
+                if (cause instanceof DataStoreException) throw (DataStoreException) cause;
+                throw e;
             }
-            // Invert row/column for ordinal to Zarr mapping
-            chunkIndices = swapIndices(chunkIndices);
-
-            // Read Data for all bands
-            Buffer[] bankBuffers = new Buffer[bands.length];
-            for (int i = 0; i < bands.length; i++) {
-                Object primitiveArray = bands[i].readTile(chunkIndices);
-                bankBuffers[i] = wrapBuffer(primitiveArray, dataType);
-            }
-
-            // Create Raster
-            DataBuffer dataBuffer = RasterFactory.wrap(dataType.rasterDataType, bankBuffers);
-
-            // The TileSnapshot captured the origin X/Y relative to the RenderedImage
-            Point origin = new Point(tile.originX, tile.originY);
-
-            WritableRaster raster = WritableRaster.createWritableRaster(this.model, dataBuffer, origin);
-
-            Raster cached = tile.cache(raster);
-            results[tile.getTileIndexInResultArray()] = cached;
         }
-
         return results;
-    }
-
-    /**
-     * Swap the first two indices in the given array.
-     * @param indices the indices to swap.
-     * @return the swapped indices.
-     */
-    private int[] swapIndices(int[] indices) {
-        int temp = indices[0];
-        indices[0] = indices[1];
-        indices[1] = temp;
-        return indices;
     }
 
     /**
