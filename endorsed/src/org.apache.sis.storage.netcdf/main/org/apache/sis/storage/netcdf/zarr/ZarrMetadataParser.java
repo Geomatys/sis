@@ -14,10 +14,12 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /**
- * Parses Zarr metadata from the filesystem and constructs a tree structure of Zarr nodes.
- * This class reads the `zarr.json` files in the Zarr dataset directories and builds the metadata tree structure.
+ * Parses Zarr metadata from the filesystem and constructs a tree structure of
+ * Zarr nodes.
+ * This class reads the `zarr.json` files in the Zarr dataset directories and
+ * builds the metadata tree structure.
  *
- * @author  Quentin Bialota (Geomatys)
+ * @author Quentin Bialota (Geomatys)
  */
 final class ZarrMetadataParser {
 
@@ -35,7 +37,8 @@ final class ZarrMetadataParser {
      * Reads the Zarr metadata tree starting from the given root directory.
      *
      * @param root the root directory of the Zarr dataset.
-     * @return the root node of the Zarr metadata tree, which can be a {@link ZarrGroupMetadata} or {@link ZarrArrayMetadata}.
+     * @return the root node of the Zarr metadata tree, which can be a
+     *         {@link ZarrGroupMetadata} or {@link ZarrArrayMetadata}.
      *         The root node contains the metadata for the entire Zarr dataset.
      * @throws IOException if an error occurs while reading the metadata.
      */
@@ -46,8 +49,8 @@ final class ZarrMetadataParser {
     /**
      * Reads the Zarr metadata for a specific node in the Zarr dataset.
      *
-     * @param dir the directory containing the Zarr metadata files.
-     * @param name the name of the node.
+     * @param dir      the directory containing the Zarr metadata files.
+     * @param name     the name of the node.
      * @param zarrPath the Zarr path of the node, used for serialization.
      * @return a {@link ZarrNodeMetadata} representing the node's metadata.
      * @throws IOException if an error occurs while reading the metadata.
@@ -85,13 +88,34 @@ final class ZarrMetadataParser {
                             ZarrNodeMetadata childNode = readZarrNode(
                                     child,
                                     childName,
-                                    subZarrPath
-                            );
+                                    subZarrPath);
                             group.addChildNodeMetadata(childName, childNode);
                         }
                     }
                 }
             }
+
+            // Check for multiscales attribute in the group attributes
+            if (node.has("attributes")) {
+                JsonNode attributesNode = node.get("attributes");
+                if (attributesNode.has("multiscales")) {
+                    JsonNode multiscalesNode = attributesNode.get("multiscales");
+                    try {
+                        if (multiscalesNode.isArray()) {
+                            List<ZarrMultiscale> multiscales = mapper.readerForListOf(ZarrMultiscale.class)
+                                    .readValue(multiscalesNode);
+                            group.setMultiscales(multiscales);
+                        } else {
+                            ZarrMultiscale multiscale = mapper.treeToValue(multiscalesNode, ZarrMultiscale.class);
+                            group.setMultiscales(List.of(multiscale));
+                        }
+                    } catch (IOException e) {
+                        LOGGER.warning(
+                                "Failed to parse multiscales metadata for group " + name + ": " + e.getMessage());
+                    }
+                }
+            }
+
             return group;
 
         } else if (nodeType.equalsIgnoreCase("array")) {
@@ -115,11 +139,13 @@ final class ZarrMetadataParser {
      * Parses the codecs defined in the Zarr metadata.
      *
      * @param codecsArray the JSON array containing codec definitions.
-     * @return a list of {@link AbstractZarrCodec} instances representing the codecs.
+     * @return a list of {@link AbstractZarrCodec} instances representing the
+     *         codecs.
      */
     private List<AbstractZarrCodec> parseCodecs(JsonNode codecsArray) {
         List<AbstractZarrCodec> result = new ArrayList<>();
-        if (codecsArray == null || !codecsArray.isArray()) return result;
+        if (codecsArray == null || !codecsArray.isArray())
+            return result;
 
         for (JsonNode codecNode : codecsArray) {
             String name = codecNode.path("name").asText();
@@ -139,7 +165,7 @@ final class ZarrMetadataParser {
                 continue;
             }
 
-            //TODO: Add support for other codecs if needed
+            // TODO: Add support for other codecs if needed
             switch (codecEnum) {
                 case BYTES:
                     result.add(new BytesCodec(config));
