@@ -830,16 +830,88 @@ public final class ZarrDecoder extends Decoder {
     }
 
     /**
-     * Adds to the given set all variables of the given names. This operation is performed when the set of axes is
-     * specified by a {@code "coordinates"} attribute associated to a data variable, or by customized conventions
-     * specified by {@link org.apache.sis.storage.netcdf.base.Convention#namesOfAxisVariables(Variable)}.
+     * Returns the groups of variables that form a multiscale pyramid.
      *
-     * @param  names       names of variables containing axis data, or {@code null} if none.
-     * @param  axes        where to add named variables.
-     * @param  dimensions  where to report all dimensions used by added axes.
+     * @return groups of variables forming multiscale pyramids.
+     */
+    @Override
+    public Collection<List<Variable>> getMultiresolutionVariables() {
+        // Map all variables by their full Zarr path for efficient lookup
+        Map<String, Variable> pathMap = new HashMap<>();
+        for (VariableInfo v : variables) {
+            pathMap.put(v.metadata.zarrPath(), v);
+        }
+
+        List<List<Variable>> result = new ArrayList<>();
+        collectMultiscaleVariables(metadata, pathMap, result);
+        return result;
+    }
+
+    /**
+     * Recursively traverses the Zarr metadata tree to find and collect multiscale
+     * variable groups.
+     */
+    private void collectMultiscaleVariables(ZarrNodeMetadata node, Map<String, Variable> pathMap,
+            List<List<Variable>> result) {
+        if (node instanceof ZarrGroupMetadata) {
+            ZarrGroupMetadata group = (ZarrGroupMetadata) node;
+
+            // Check for multiscales metadata
+            List<ZarrMultiscale> multiscales = group.getMultiscales();
+            if (multiscales != null) {
+                for (ZarrMultiscale ms : multiscales) {
+                    if (ms.layout != null && !ms.layout.isEmpty()) {
+                        List<Variable> pyramid = new ArrayList<>();
+                        for (ZarrMultiscale.Level level : ms.layout) {
+                            String assetPath = resolvePath(group.zarrPath(), level.asset);
+                            Variable v = pathMap.get(assetPath);
+                            if (v != null) {
+                                pyramid.add(v);
+                            }
+                        }
+                        if (!pyramid.isEmpty()) {
+                            result.add(pyramid);
+                        }
+                    }
+                }
+            }
+
+            // Recurse into children
+            for (ZarrNodeMetadata child : group.getChildrenNodeMetadata().values()) {
+                collectMultiscaleVariables(child, pathMap, result);
+            }
+        }
+    }
+
+    /**
+     * Resolves an asset path relative to a group path.
+     */
+    private String resolvePath(String groupPath, String asset) {
+        if (asset.startsWith("/")) {
+            return asset;
+        }
+        if (groupPath.endsWith("/")) {
+            return groupPath + asset;
+        }
+        return groupPath + "/" + asset;
+    }
+
+    /**
+     * Adds to the given set all variables of the given names. This operation is
+     * performed when the set of axes is
+     * specified by a {@code "coordinates"} attribute associated to a data variable,
+     * or by customized conventions
+     * specified by
+     * {@link org.apache.sis.storage.netcdf.base.Convention#namesOfAxisVariables(Variable)}.
+     *
+     * @param names      names of variables containing axis data, or {@code null} if
+     *                   none.
+     * @param axes       where to add named variables.
+     * @param dimensions where to report all dimensions used by added axes.
      * @return whether {@code names} was non-null and non-empty.
      */
-    private boolean listAxes(final CharSequence[] names, final Set<VariableInfo> axes, final Set<DimensionInfo> dimensions) {
+    private boolean listAxes(final CharSequence[] names, final Set<VariableInfo> axes,
+            final Set<DimensionInfo> dimensions) {
         if (names == null || names.length == 0) {
             return false;
         }
@@ -1011,6 +1083,6 @@ nextVar:    for (final VariableInfo variable : variables) {
 
     @Override
     public void close(DataStore lock) throws IOException {
-//        input.channel.close();
+        // input.channel.close();
     }
 }

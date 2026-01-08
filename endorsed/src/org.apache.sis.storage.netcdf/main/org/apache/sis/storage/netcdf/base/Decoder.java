@@ -403,6 +403,20 @@ public abstract class Decoder extends ReferencingFactoryContainer {
     public abstract Variable[] getVariables();
 
     /**
+     * Returns the groups of variables that form a multiscale pyramid.
+     * Each element in the collection is a list of variables representing the same data at different resolutions,
+     * ordered from finest to coarsest resolution.
+     * <p>
+     * The default implementation returns an empty list.
+     * </p>
+     *
+     * @return groups of variables forming multiscale pyramids.
+     */
+    public Collection<List<Variable>> getMultiresolutionVariables() {
+        return List.of();
+    }
+
+    /**
      * If the file contains features encoded as discrete sampling (for example profiles or trajectories),
      * returns objects for handling them. This method does not need to cache the returned array, because
      * it will be invoked only once by {@link org.apache.sis.storage.netcdf.NetcdfStore#components()}.
