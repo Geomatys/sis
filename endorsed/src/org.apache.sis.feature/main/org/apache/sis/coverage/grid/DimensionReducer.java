@@ -17,6 +17,7 @@
 package org.apache.sis.coverage.grid;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import org.opengis.util.FactoryException;
 import org.opengis.geometry.Envelope;
 import org.opengis.geometry.DirectPosition;
@@ -55,10 +56,10 @@ final class DimensionReducer {
     /**
      * Requests to retain only the axes in the specified <abbr>CRS</abbr> dimensions.
      *
-     * @param  dimensions  the <abbr>CRS</abbr> dimensions to keep, or {@code null} for keeping them all.
+     * @param  mask  the <abbr>CRS</abbr> dimensions to keep.
      */
-    DimensionReducer(final int... dimensions) {
-        this.dimensions = dimensions;
+    DimensionReducer(final BitSet mask) {
+        dimensions = mask.stream().toArray();
     }
 
     /**

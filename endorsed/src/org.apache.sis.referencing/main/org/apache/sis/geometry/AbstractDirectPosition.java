@@ -58,7 +58,7 @@ import static org.apache.sis.util.ArgumentChecks.ensureDimensionMatches;
  * serializable, is left to subclasses.</p>
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
- * @version 1.5
+ * @version 1.6
  * @since   0.3
  */
 public abstract class AbstractDirectPosition extends FormattableObject implements DirectPosition {
@@ -71,10 +71,10 @@ public abstract class AbstractDirectPosition extends FormattableObject implement
     /**
      * Returns the given position as an {@code AbstractDirectPosition} instance.
      * If the given position is already an instance of {@code AbstractDirectPosition},
-     * then it is returned unchanged. Otherwise the coordinate values and the CRS
+     * then it is returned unchanged. Otherwise, the coordinate values and the <abbr>CRS</abbr>
      * of the given position are copied in a new position.
      *
-     * @param  position  the position to cast, or {@code null}.
+     * @param  position  the position to cast or copy, or {@code null}.
      * @return the values of the given position as an {@code AbstractDirectPosition} instance.
      *
      * @since 1.0
@@ -102,21 +102,25 @@ public abstract class AbstractDirectPosition extends FormattableObject implement
      */
     @Override
     public void setCoordinate(int dimension, double value) {
-        throw new UnsupportedOperationException(Errors.format(Errors.Keys.UnmodifiableObject_1, getClass()));
+        // Be tolerant if the coordinate is the same for allowing `normalize()` to be a no-operation.
+        if (!Numerics.equals(getCoordinate(dimension), value)) {
+            throw new UnsupportedOperationException(Errors.format(Errors.Keys.UnmodifiableObject_1, getClass()));
+        }
     }
 
     /**
      * Sets this direct position to the given position. If the given position is
      * {@code null}, then all coordinate values are set to {@link Double#NaN NaN}.
      *
-     * <p>If this position and the given position have a non-null CRS, then the default implementation
-     * requires the CRS to be {@linkplain CRS#equivalent equivalent},
+     * <p>If this position and the given position have a non-null <abbr>CRS</abbr>,
+     * then the default implementation requires the <abbr>CRS</abbr> to be {@linkplain CRS#equivalent equivalent},
      * otherwise a {@code MismatchedCoordinateMetadataException} is thrown. However, subclass may choose
-     * to assign the CRS of this position to the CRS of the given position.</p>
+     * to assign the <abbr>CRS</abbr> of this position to the <abbr>CRS</abbr> of the given position.</p>
      *
      * @param  position  the new position, or {@code null}.
      * @throws MismatchedDimensionException if the given position doesn't have the expected dimension.
      * @throws MismatchedCoordinateMetadataException if the given position doesn't use the expected CRS.
+     * @throws UnsupportedOperationException if this direct position is immutable.
      */
     public void setLocation(final DirectPosition position)
             throws MismatchedDimensionException, MismatchedCoordinateMetadataException
@@ -196,7 +200,7 @@ public abstract class AbstractDirectPosition extends FormattableObject implement
     }
 
     /**
-     * Formats this position in the <i>Well Known Text</i> (WKT) format.
+     * Formats this position in the <i>Well Known Text</i> (<abbr>WKT</abbr>) format.
      * The format is like below, where {@code x₀}, {@code x₁}, {@code x₂}, <i>etc.</i>
      * are the coordinate values at index 0, 1, 2, <i>etc.</i>:
      *
@@ -209,7 +213,7 @@ public abstract class AbstractDirectPosition extends FormattableObject implement
      * adjusted for the axis unit of measurement and the planet size if different than Earth).
      *
      * @param  formatter  the formatter where to format the inner content of this point.
-     * @return the WKT keyword, which is {@code "Point"} for this element.
+     * @return the <abbr>WKT</abbr> keyword, which is {@code "Point"} for this element.
      *
      * @since 1.0
      */
@@ -245,11 +249,11 @@ public abstract class AbstractDirectPosition extends FormattableObject implement
     /**
      * Implementation of the public {@link #toString()} and {@link DirectPosition2D#toString()} methods
      * for formatting a {@code POINT} element from a direct position in <i>Well Known Text</i>
-     * (WKT) format.
+     * (<abbr>WKT</abbr>) format.
      *
      * @param  position           the position to format.
      * @param  isSinglePrecision  {@code true} if every coordinate values can be cast to {@code float}.
-     * @return the point as a {@code POINT} in WKT format.
+     * @return the point as a {@code POINT} in <abbr>WKT</abbr> format.
      *
      * @see ArraysExt#isSinglePrecision(double[])
      */
@@ -277,9 +281,9 @@ public abstract class AbstractDirectPosition extends FormattableObject implement
     }
 
     /**
-     * Parses the given WKT.
+     * Parses the given <abbr>WKT</abbr>.
      *
-     * @param  wkt  the WKT to parse.
+     * @param  wkt  the <abbr>WKT</abbr> to parse.
      * @return the coordinates, or {@code null} if none.
      * @throws NumberFormatException if a number cannot be parsed.
      * @throws IllegalArgumentException if the parenthesis are not balanced.
@@ -394,7 +398,7 @@ parse:  while (i < length) {
 
     /**
      * Returns {@code true} if the specified object is also a {@code DirectPosition}
-     * with equal coordinates and equal CRS.
+     * with equal coordinates and equal <abbr>CRS</abbr>.
      *
      * This method performs the comparison as documented in the {@link DirectPosition#equals(Object)}
      * javadoc. In particular, the given object is not required to be of the same implementation class.
@@ -410,7 +414,7 @@ parse:  while (i < length) {
             return true;
         }
         if (object instanceof DirectPosition) {
-            final DirectPosition that = (DirectPosition) object;
+            final var that = (DirectPosition) object;
             final int dimension = getDimension();
             if (dimension == that.getDimension()) {
                 for (int i=0; i<dimension; i++) {

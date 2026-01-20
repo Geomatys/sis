@@ -17,6 +17,7 @@
 package org.apache.sis.coverage.grid;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -739,7 +740,7 @@ public final class GridDerivationTest extends TestCase {
     }
 
     /**
-     * Tests {@link GridDerivation#project(Predicate)}.
+     * Tests {@link GridDerivation#selectDimensions(Predicate)}.
      */
     @Test
     public void testProject() {
@@ -751,7 +752,7 @@ public final class GridDerivationTest extends TestCase {
                         0,   0,   2,    3,
                         0,   0,   0,    1)), HardCodedCRS.WGS84_3D);
 
-        GridGeometry projected = grid.derive().project((axis) -> axis.getDirection() != AxisDirection.UP).build();
+        GridGeometry projected = grid.derive().excludeDimensions(Set.of(AxisDirection.UP)).build();
         assertNotSame(grid, projected);
         assertEquals(2, projected.getDimension());
         assertTrue(CRS.equivalent(HardCodedCRS.WGS84, projected.getCoordinateReferenceSystem()));

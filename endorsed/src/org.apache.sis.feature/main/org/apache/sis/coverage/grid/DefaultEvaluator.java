@@ -626,7 +626,7 @@ next:   while (--numPoints >= 0) {
         MathTransform crsToGrid = TranslatedTransform.resolveNaN(gridToCRS.inverse(), gridGeometry);
         if (crs != null) {
             final CoordinateReferenceSystem stepCRS = coverage.getCoordinateReferenceSystem();
-            final GeographicBoundingBox areaOfInterest = gridGeometry.geographicBBox();
+            final GeographicBoundingBox areaOfInterest = gridGeometry.getGeographicExtent().orElse(null);
             try {
                 CoordinateOperation op = CRS.findOperation(crs, stepCRS, areaOfInterest);
                 crsToGrid = MathTransforms.concatenate(op.getMathTransform(), crsToGrid);
@@ -670,7 +670,7 @@ next:   while (--numPoints >= 0) {
                         } else {
                             final Long value = slice.get(j);
                             if (value == null) {
-                                final GridExtent extent = gridGeometry.extent;
+                                final GridExtent extent = gridGeometry.getExtent();
                                 throw new FactoryException(Resources.format(Resources.Keys.NoNDimensionalSlice_3,
                                                 crsDim, extent.getAxisIdentification(j, j), extent.getSize(j)));
                             }

@@ -19,6 +19,7 @@ package org.apache.sis.referencing;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Filter;
@@ -93,7 +94,6 @@ import org.apache.sis.util.ArgumentChecks;
 import org.apache.sis.util.ComparisonMode;
 import org.apache.sis.util.OptionalCandidate;
 import org.apache.sis.util.Utilities;
-import org.apache.sis.util.internal.shared.Numerics;
 import org.apache.sis.util.internal.shared.Constants;
 import org.apache.sis.util.resources.Errors;
 import org.apache.sis.util.logging.Logging;
@@ -164,6 +164,11 @@ public final class CRS {
      * The {@value} value, for identifying code that assume two-dimensional objects.
      */
     static final int BIDIMENSIONAL = 2;
+
+    /**
+     * The {@value} value, for identifying code that assume three-dimensional objects.
+     */
+    static final int TRIDIMENSIONAL = 3;
 
     /**
      * Do not allow instantiation of this class.
@@ -1229,22 +1234,125 @@ public final class CRS {
     }
 
     /**
-     * Gets or creates a coordinate reference system with a subset of the dimensions of the given CRS.
+     * Returns a mask of the dimensions where a {@code subCRS} element is found in the given <abbr>CRS</abbr>.
+     * If the given {@code crs} is {@linkplain #equivalent equivalent} to an element of the {@code subCRS} array,
+     * then this method returns a {@link BitSet} in which all bits are set to {@code true} in the range from 0 to
+     * <var>n</var>−1, where <var>n</var> is the number of dimensions of {@code crs}.
+     * Otherwise, if {@code crs} is an instance of {@link CompoundCRS}, then the {@code crs} components are traversed
+     * recursively and compared in the same way as described above, except that the range of bits set to {@code true}
+     * does not start at index 0. Instead, the range starts at the index of the first dimension of the matched
+     * {@code crs} component. If no match is found, then the returned {@link BitSet} is empty.
+     *
+     * <h4>Example</h4>
+     * The following snippet gets the dimensions of the temporal and vertical components of a <abbr>CRS</abbr>:
+     *
+     * {@snippet lang="java" :
+     *     CoordinateReferenceSystem crs = ...;
+     *     SingleCRS temporal = CRS.getTemporalComponent(crs);
+     *     SingleCRS vertical = CRS.getVerticalComponent(crs, false);
+     *     BitSet mask = CRS.locateDimensions(crs, vertical, temporal);
+     *     int[] dimensions = mask.stream().toArray();
+     *     }
+     *
+     * <p><b>Tip 1:</b> if only the index of the first dimension is desired, {@code mask.stream().toArray()}
+     * can be replaced by <code>mask.{@linkplain BitSet#nextSetBit(int) nextSetBit}(0)</code>.</p>
+     *
+     * <p><b>Tip 2:</b> for locating all dimensions <em>except</em> the vertical and temporal ones, use
+     * <code>mask.{@linkplain BitSet#flip(int, int) flip}(0, CRS.getDimensionOrZero(crs))</code>.</p>
+     *
+     * <h4>Null values</h4>
+     * This method is null-safe: if {@code crs} or {@code subCRS} is {@code null}, this method returns an empty set.
+     * If {@code subCRS} contains {@code null} elements, these elements are ignored. The latter makes easy to use
+     * directly the return value of methods such as {@link #getTemporalComponent(CoordinateReferenceSystem)}.
+     *
+     * @param  crs     the <abbr>CRS</abbr> for which the indexes of some dimensions are wanted.
+     * @param  subCRS  the <abbr>CRS</abbr>s to compare with {@code crs} or {@code crs} components.
+     * @return indexes of the dimensions where a {@code subCRS} element is found in {@code crs}.
+     *
+     * @see #selectDimensions(CoordinateReferenceSystem, BitSet, SeparationMode)
+     *
+     * @since 1.6
+     */
+    public static BitSet locateDimensions(final CoordinateReferenceSystem crs, final SingleCRS... subCRS) {
+        final var mask = new BitSet();
+        if (subCRS != null) {
+            int lower = 0;
+            for (final CoordinateReferenceSystem component : getSingleComponents(crs)) {
+                final int upper = lower + getDimensionOrZero(component);
+                for (final CoordinateReferenceSystem search : subCRS) {
+                    if (equivalent(component, search)) {
+                        mask.set(lower, upper);
+                    }
+                }
+                lower = upper;
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * Gets or creates a coordinate reference system with a subset of the dimensions of the given <abbr>CRS</abbr>.
+     * The dimensions to retain are specified by a mask. The bit at index 0 specifies whether to retain dimension 0,
+     * the bit at index 1 specifies whether to retain dimension 1, <i>etc</i>. After this method call,
+     * the given mask is updated to the dimensions that the {@code crs} dimensions that were effectively retained.
+     * The return value is always a <abbr>CRS</abbr> with axes in the same order as the given {@code crs}.
+     *
+     * <h4>Ellipsoidal height</h4>
+     * This method can transform a three-dimensional geographic <abbr>CRS</abbr> into a two-dimensional geographic
+     * <abbr>CRS</abbr>, i.e. this method can do the converse of {@link #compound(CoordinateReferenceSystem...)}.
+     * This method can also extract the {@linkplain CommonCRS.Vertical#ELLIPSOIDAL ellipsoidal height}
+     * from a three-dimensional geographic <abbr>CRS</abbr>, but this is generally not recommended because
+     * ellipsoidal heights make little sense without the (<var>latitude</var>, <var>longitude</var>) coordinates.
+     *
+     * <h4>Unseparable <abbr>CRS</abbr></h4>
+     * It is illegal to extract only the latitude or longitude axis from a geodetic <abbr>CRS</abbr>.
+     * Similar constraints exist also for projected and engineering <abbr>CRS</abbr>. If {@code crs}
+     * or a component of {@code crs} cannot be separated as requested by the {@code dimensions} mask,
+     * then the behavior of this method depends on the {@code mode} enumeration value:
+     *
+     * <ul>
+     *   <li>If {@link SeparationMode#EXACT}, then a {@link FactoryException} is thrown.</li>
+     *   <li>If {@link SeparationMode#OMIT_UNSEPARABLE}, then the result may contain less dimensions than requested.</li>
+     *   <li>If {@link SeparationMode#WHOLE_UNSEPARABLE}, then the result may contain more dimensions than requested.</li>
+     * </ul>
+     *
+     * @param  crs   the <abbr>CRS</abbr> to reduce the dimensionality, or {@code null} if none.
+     * @param  mask  on input, the dimensions to select. On output, the dimensions effectively selected.
+     * @param  mode  action to take if the {@code crs} cannot be separated in components at the requested dimensions.
+     * @return a coordinate reference system for the given dimensions, or {@code null} if the given {@code crs} was null.
+     * @throws IllegalArgumentException if the given {@code mask} is invalid.
+     * @throws FactoryException if this method needs to create a new <abbr>CRS</abbr> and that operation failed.
+     *
+     * @see #locateDimensions(CoordinateReferenceSystem, SingleCRS...)
+     * @see #compound(CoordinateReferenceSystem...)
+     *
+     * @since 1.6
+     */
+    public static CoordinateReferenceSystem selectDimensions(final CoordinateReferenceSystem crs, final BitSet mask, final SeparationMode mode)
+            throws FactoryException
+    {
+        ArgumentChecks.ensureNonNull("mask", mask);
+        ArgumentChecks.ensureNonNull("mode", mode);
+        return (crs == null) ? null : new Separator(mask, mode).reduce(crs);
+    }
+
+    /**
+     * Gets or creates a coordinate reference system with a subset of the dimensions of the given <abbr>CRS</abbr>.
      * This method can be used for dimensionality reduction, but not for changing axis order.
      * The specified dimensions are used as if they were in strictly increasing order without duplicated values.
      *
      * <h4>Ellipsoidal height</h4>
-     * This method can transform a three-dimensional geographic CRS into a two-dimensional geographic CRS.
-     * In this aspect, this method is the converse of {@link #compound(CoordinateReferenceSystem...)}.
+     * This method can transform a three-dimensional geographic <abbr>CRS</abbr> into a two-dimensional geographic
+     * <abbr>CRS</abbr>, i.e. this method can do the converse of {@link #compound(CoordinateReferenceSystem...)}.
      * This method can also extract the {@linkplain CommonCRS.Vertical#ELLIPSOIDAL ellipsoidal height}
-     * from a three-dimensional geographic CRS, but this is generally not recommended since ellipsoidal
-     * heights make little sense without their (<var>latitude</var>, <var>longitude</var>) locations.
+     * from a three-dimensional geographic <abbr>CRS</abbr>, but this is generally not recommended because
+     * ellipsoidal heights make little sense without the (<var>latitude</var>, <var>longitude</var>) coordinates.
      *
-     * @param  crs         the CRS to reduce the dimensionality, or {@code null} if none.
-     * @param  dimensions  the dimensions to retain. The dimensions will be taken in increasing order, ignoring duplicated values.
-     * @return a coordinate reference system for the given dimensions. May be the given {@code crs}, which may be {@code null}.
-     * @throws IllegalArgumentException if the given array is empty or if the array contains invalid indices.
-     * @throws FactoryException if this method needed to create a new CRS and that operation failed.
+     * @param  crs         the <abbr>CRS</abbr> to reduce the dimensionality, or {@code null} if none.
+     * @param  dimensions  the dimensions to retain. Will be taken in increasing order, ignoring duplicated values.
+     * @return a coordinate reference system for the given dimensions, or {@code null} if the given {@code crs} was null.
+     * @throws IllegalArgumentException if the content of the given {@code dimensions} array is invalid.
+     * @throws FactoryException if this method needs to create a new <abbr>CRS</abbr> and that operation failed.
      *
      * @see #getComponentAt(CoordinateReferenceSystem, int, int)
      * @see #compound(CoordinateReferenceSystem...)
@@ -1254,25 +1362,46 @@ public final class CRS {
     public static CoordinateReferenceSystem selectDimensions(final CoordinateReferenceSystem crs, final int... dimensions)
             throws FactoryException
     {
-        final var components = selectComponents(crs, dimensions);
-        return components.isEmpty() ? null : compound(components.toArray(CoordinateReferenceSystem[]::new));
+        ArgumentChecks.ensureNonNull("dimensions", dimensions);
+        return (crs == null) ? null : new Separator(dimensions).reduce(crs);
     }
 
     /**
-     * Gets or creates CRS components for a subset of the dimensions of the given <abbr>CRS</abbr>.
-     * The method performs the same work as {@link #selectDimensions(CoordinateReferenceSystem, int...)}
-     * except that it does not build new {@link CompoundCRS} instances when the specified dimensions span
-     * more than one {@linkplain DefaultCompoundCRS#getComponents() component}.
-     * Instead, the components are returned directly.
+     * Gets or creates <abbr>CRS</abbr> components for a subset of the dimensions of the given <abbr>CRS</abbr>.
+     * This method does the same work as <code>{@linkplain #selectDimensions(CoordinateReferenceSystem, BitSet,
+     * SeparationMode) selectDimensions}(crs, mask, mode)</code>, but without the final step creating a
+     * {@link CompoundCRS} from the selected components.
      *
-     * <p>While this method does not create new {@code CompoundCRS} instances, it may create other kinds
-     * of CRS for handling ellipsoidal height as documented in the {@code selectDimensions(…)} method.</p>
-     *
-     * @param  crs         the CRS from which to get a subset of the components, or {@code null} if none.
-     * @param  dimensions  the dimensions to retain. The dimensions will be taken in increasing order, ignoring duplicated values.
+     * @param  crs   the <abbr>CRS</abbr> from which to get a subset of the components, or {@code null} if none.
+     * @param  mask  on input, the dimensions to select. On output, the dimensions effectively selected.
+     * @param  mode  action to take if the {@code crs} cannot be separated in components at the requested dimensions.
      * @return components in the specified dimensions, or an empty list if the specified {@code crs} is {@code null}.
-     * @throws IllegalArgumentException if the given array is empty or if the array contains invalid indices.
-     * @throws FactoryException if this method needed to create a new CRS and that operation failed.
+     * @throws IllegalArgumentException if the content of the given {@code dimensions} array is invalid.
+     * @throws FactoryException if this method needs to create a new <abbr>CRS</abbr> and that operation failed.
+     *
+     * @see #selectDimensions(CoordinateReferenceSystem, BitSet, SeparationMode)
+     *
+     * @since 1.6
+     */
+    public static List<CoordinateReferenceSystem> selectComponents(final CoordinateReferenceSystem crs,
+            final BitSet mask, final SeparationMode mode) throws FactoryException
+    {
+        ArgumentChecks.ensureNonNull("mask", mask);
+        ArgumentChecks.ensureNonNull("mode", mode);
+        return (crs == null) ? List.of() : new Separator(mask, mode).components(crs);
+    }
+
+    /**
+     * Gets or creates <abbr>CRS</abbr> components for a subset of the dimensions of the given <abbr>CRS</abbr>.
+     * This method does the same work as <code>{@linkplain #selectDimensions(CoordinateReferenceSystem, int...)
+     * selectDimensions}(crs, dimensions)</code>, but without the final step creating a {@link CompoundCRS} from
+     * the selected components.
+     *
+     * @param  crs         the <abbr>CRS</abbr> from which to get a subset of the components, or {@code null} if none.
+     * @param  dimensions  the dimensions to retain. Will be taken in increasing order, ignoring duplicated values.
+     * @return components in the specified dimensions, or an empty list if the specified {@code crs} is {@code null}.
+     * @throws IllegalArgumentException if the content of the given {@code dimensions} array is invalid.
+     * @throws FactoryException if this method needs to create a new <abbr>CRS</abbr> and that operation failed.
      *
      * @see #selectDimensions(CoordinateReferenceSystem, int...)
      *
@@ -1282,76 +1411,244 @@ public final class CRS {
             throws FactoryException
     {
         ArgumentChecks.ensureNonNull("dimensions", dimensions);
-        final int dimension = getDimensionOrZero(crs);
-        long selected = 0;
-        if (crs != null) {
-            for (final int d : dimensions) {
-                if (Objects.checkIndex(d, dimension) >= Long.SIZE) {
-                    throw new ArithmeticException(Errors.format(Errors.Keys.ExcessiveNumberOfDimensions_1, d+1));
-                }
-                selected |= (1L << d);
-            }
-            if (selected == 0) {
-                throw new IllegalArgumentException(Errors.format(Errors.Keys.EmptyArgument_1, "dimensions"));
-            }
-        }
-        final var components = new ArrayList<CoordinateReferenceSystem>(Long.bitCount(selected));
-        reduce(0, crs, dimension, selected, components);
-        return components;
+        return (crs == null) ? List.of() : new Separator(dimensions).components(crs);
     }
 
     /**
-     * Adds the components of reduced CRS into the given list.
-     * This method may invoke itself recursively for walking through compound CRS.
+     * Action to take when a <abbr>CRS</abbr> cannot be separated in components at the requested dimensions.
+     * For example, a two-dimensional geographic <abbr>CRS</abbr> cannot be separated in a <abbr>CRS</abbr>
+     * containing only the latitude or only the longitude axis. If only the first dimension of such geographic
+     * <abbr>CRS</abbr> is requested, the action can be to throw an exception ({@link #EXACT}),
+     * omit the unseparable geographic <abbr>CRS</abbr> from the separation result ({@link #OMIT_UNSEPARABLE}),
+     * or keep the whole geographic <abbr>CRS</abbr> with all its dimensions ({@link #WHOLE_UNSEPARABLE}).
      *
-     * @param  previous    number of dimensions of previous CRS.
-     * @param  crs         the CRS for which to select components.
-     * @param  dimension   number of dimensions of {@code crs}.
-     * @param  selected    bitmask of dimensions to select.
-     * @param  addTo       where to add CRS components.
-     * @return new bitmask after removal of dimensions of the components added to {@code addTo}.
+     * @author  Martin Desruisseaux (Geomatys)
+     * @version 1.6
+     *
+     * @see #selectDimensions(CoordinateReferenceSystem, BitSet, SeparationMode)
+     *
+     * @since 1.6
      */
-    private static long reduce(int previous, final CoordinateReferenceSystem crs, int dimension, long selected,
-                               final List<CoordinateReferenceSystem> addTo)
-            throws FactoryException
-    {
-        final long current = (Numerics.bitmask(dimension) - 1) << previous;
-        final long intersect = selected & current;
-choice: if (intersect != 0) {
-            if (intersect == current) {
-                addTo.add(crs);
-                selected &= ~current;
-            } else if (crs instanceof CompoundCRS) {
-                for (final CoordinateReferenceSystem component : ((CompoundCRS) crs).getComponents()) {
-                    dimension = getDimensionOrZero(component);
-                    selected = reduce(previous, component, dimension, selected, addTo);
-                    if ((selected & current) == 0) break;           // Stop if it would be useless to continue.
-                    previous += dimension;
-                }
-            } else if (dimension == 3) {
-                final GeodeticCRS baseCRS;
-                if (crs instanceof GeodeticCRS) {
-                    baseCRS = (GeodeticCRS) crs;
-                } else if (crs instanceof ProjectedCRS) {
-                    baseCRS = ((ProjectedCRS) crs).getBaseCRS();
-                } else {
-                    break choice;
-                }
-                final boolean isVertical = Long.bitCount(intersect) == 1;               // Presumed for now, verified later.
-                final int verticalDimension = Long.numberOfTrailingZeros((isVertical ? intersect : ~intersect) >>> previous);
-                final CoordinateSystemAxis verticalAxis = crs.getCoordinateSystem().getAxis(verticalDimension);
-                if (AxisDirections.isVertical(verticalAxis.getDirection())) try {
-                    addTo.add(new EllipsoidalHeightSeparator(baseCRS, isVertical).separate((SingleCRS) crs));
-                    selected &= ~current;
-                } catch (IllegalArgumentException | ClassCastException e) {
-                    throw new FactoryException(Resources.format(Resources.Keys.CanNotSeparateCRS_1, crs.getName()));
+    public enum SeparationMode {
+        /**
+         * Separation result must contain exactly the requested dimensions.
+         * If the request cannot be satisfied, then a {@link FactoryException} will be throw.
+         */
+        EXACT,
+
+        /**
+         * Separation result contains only the components that can satisfy the requested dimensions.
+         * If a <abbr>CRS</abbr> cannot be separated in components at the requested dimensions, that
+         * <abbr>CRS</abbr> is excluded from the result. In other words, the result does not contain
+         * any dimension that was not requested, but some requested dimensions may be ignored.
+         */
+        OMIT_UNSEPARABLE,
+
+        /**
+         * Separation result contains components for all the requested dimensions. The result contains
+         * all requested dimensions, but may also contain some dimensions that were not requested.
+         */
+        WHOLE_UNSEPARABLE
+    }
+
+    /**
+     * Helper class for extracting some components of a <abbr>CRS</abbr>.
+     * The dimensions of the desired components are specified by a mask as a {@link BitSet}.
+     * It is possible to request the two-dimensional horizontal part of a three-dimensional
+     * geographic or projected <abbr>CRS</abbr>. It is also possible to request the ellipsoidal
+     * height of a 3D geographic or projected <abbr>CRS</abbr>, but this is not recommended.
+     */
+    private static final class Separator {
+        /** Mask of dimensions of the components to extract. */
+        private final BitSet mask;
+
+        /** Action when a <abbr>CRS</abbr> cannot be separated in components at the requested dimensions. */
+        private final SeparationMode mode;
+
+        /** The components selected from the specified dimensions. */
+        private final List<CoordinateReferenceSystem> components;
+
+        /** Next range of dimensions to select. */
+        private int lower, upper;
+
+        /**
+         * Creates a new separator for the specified dimensions.
+         *
+         * @param  dimensions  the dimensions to retain. Will be taken in increasing order, ignoring duplicated values.
+         * @throws IllegalArgumentException if {@code dimensions} array contains a negative index.
+         */
+        Separator(final int[] dimensions) {
+            this(new BitSet(), SeparationMode.EXACT);
+            for (int i : dimensions) {
+                try {
+                    mask.set(i);
+                } catch (IndexOutOfBoundsException e) {
+                    throw new IllegalArgumentException(Errors.format(Errors.Keys.IndexOutOfBounds_1, i), e);
                 }
             }
         }
-        if ((selected & current) != 0) {
-            throw new FactoryException(Resources.format(Resources.Keys.CanNotSeparateCRS_1, crs.getName()));
+
+        /**
+         * Creates a new separator for the specified dimensions specified as a mask.
+         *
+         * @param  mask  on input, the dimensions to select. On output, the dimensions effectively selected.
+         * @param  mode  action to take if the {@code crs} cannot be separated in components at the requested dimensions.
+         */
+        Separator(final BitSet mask, final SeparationMode mode) {
+            this.mask = mask;
+            this.mode = mode;
+            components = new ArrayList<>(mask.cardinality());
         }
-        return selected;
+
+        /**
+         * Gets or creates a coordinate reference system with a subset of the dimensions of the given <abbr>CRS</abbr>.
+         *
+         * @param  crs  the <abbr>CRS</abbr> to reduce the dimensionality.
+         * @return a coordinate reference system for the given dimensions.
+         * @throws FactoryException if this method needs to create a new <abbr>CRS</abbr> and that operation failed.
+         *
+         * @see #selectDimensions(CoordinateReferenceSystem, BitSet, SeparationMode)
+         */
+        CoordinateReferenceSystem reduce(final CoordinateReferenceSystem crs) throws FactoryException {
+            return compound(components(crs).toArray(CoordinateReferenceSystem[]::new));
+        }
+
+        /**
+         * Gets or creates <abbr>CRS</abbr> components for a subset of the dimensions of the given <abbr>CRS</abbr>.
+         *
+         * @param  crs  the <abbr>CRS</abbr> from which to get a subset of the components, or {@code null}.
+         * @return components in the specified dimensions, or an empty list if the specified {@code crs} is {@code null}.
+         * @throws FactoryException if this method needs to create a new <abbr>CRS</abbr> and that operation failed.
+         *
+         * @see #selectComponents(CoordinateReferenceSystem, BitSet, SeparationMode)
+         */
+        @SuppressWarnings("ReturnOfCollectionOrArrayField")
+        List<CoordinateReferenceSystem> components(final CoordinateReferenceSystem crs) throws FactoryException {
+            final int dimension = getDimensionOrZero(crs);
+            if (mode != SeparationMode.OMIT_UNSEPARABLE) {
+                final int i = mask.nextSetBit(dimension);
+                if (i >= 0) {
+                    throw new IllegalArgumentException(Errors.format(Errors.Keys.IndexOutOfBounds_1, i));
+                }
+            }
+            lower = mask.nextSetBit(0);
+            if (lower >= 0 && lower < dimension) {
+                upper = mask.nextClearBit(lower + 1);
+                reduce(crs, 0, dimension);
+            }
+            return components;
+        }
+
+        /**
+         * Adds selected components of the given {@code crs} into the {@link #components} list.
+         * This method may invoke itself recursively for walking through compound <abbr>CRS</abbr>.
+         *
+         * <p><b>Precondition:</b> caller must ensure that {@code lower} is between {@code offset}
+         * inclusive and {@code limit} exclusive. This is not verified by this method.</p>
+         *
+         * @param  crs     the <abbr>CRS</abbr> for which to select components.
+         * @param  offset  index of the first dimension of {@code crs} in the {@link #mask}.
+         * @param  limit   index after the last dimension of {@code crs} in the {@link #mask}.
+         * @return whether this method has added the given {@code crs} fully.
+         */
+        private boolean reduce(final CoordinateReferenceSystem crs, final int offset, final int limit)
+                throws FactoryException
+        {
+            assert lower >= offset && lower < limit : lower;
+            /*
+             * Unambiguous case where the next requested component is the whole `crs`.
+             * It may be a `CompoundCRS`, taken without separation of its components.
+             */
+            if (lower == offset && upper >= limit) {
+                return components.add(crs);
+            }
+            /*
+             * Decompose the `crs` in its components and repeat the operation for each of them.
+             * After each iteration, this block needs to ensure that `lower` and `upper` are up-to-date.
+             */
+            if (crs instanceof CompoundCRS) {
+                int end = offset;
+                boolean addedFully = true;
+                final int index = components.size();
+                for (final CoordinateReferenceSystem component : ((CompoundCRS) crs).getComponents()) {
+                    final int start = end;
+                    end += getDimensionOrZero(component);
+                    if (lower >= end) {
+                        addedFully = false;
+                    } else {
+                        addedFully &= reduce(component, start, end);
+                        lower = mask.nextSetBit(end);
+                        if (lower < 0) break;           // Stop if it would be useless to continue.
+                        if (lower >= upper) {
+                            upper = mask.nextClearBit(lower + 1);
+                        }
+                    }
+                }
+                /*
+                 * If all components were added, replace the components by the whole `crs` without
+                 * updating the mask, because the mask was already updated by the recursive calls.
+                 * Note that in `OMIT_UNSEPARABLE` mode, it is possible that no component was added.
+                 */
+                if (addedFully && end == limit) {
+                    components.subList(index, components.size()).clear();
+                    return components.add(crs);
+                }
+                return false;
+            }
+            /*
+             * Special case for the decomposition of a three-dimensional geographic CRS into a horizontal
+             * or a vertical component. Extracting the vertical component is illegal according ISO 19111,
+             * but sometime useful as temporary information.
+             */
+            GeodeticCRS baseCRS = null;
+            if (crs instanceof GeodeticCRS) {
+                baseCRS = (GeodeticCRS) crs;
+            } else if (crs instanceof ProjectedCRS) {
+                baseCRS = ((ProjectedCRS) crs).getBaseCRS();
+            }
+            RuntimeException cause = null;
+            if (baseCRS != null) {
+                int i = lower;
+                int dimension = 0;              // Number of dimensions.
+                boolean isVertical = false;     // Whether the requested dimension is the vertical one.
+                do {
+                    dimension++;
+                    isVertical |= AxisDirections.isVertical(crs.getCoordinateSystem().getAxis(i).getDirection());
+                    i = mask.nextSetBit(i + 1);
+                } while (i >= 0 && i < limit);
+                if (dimension == (isVertical ? 1 : BIDIMENSIONAL)) try {
+                    components.add(new EllipsoidalHeightSeparator(baseCRS, isVertical).separate((SingleCRS) crs));
+                    return false;
+                } catch (IllegalArgumentException | ClassCastException e) {
+                    cause = e;
+                }
+            }
+            /*
+             * Only some dimensions of the CRS are specified, but cannot separate `crs`.
+             * The failure to separate may be because the CRS is not geodetic, or because
+             * an exception occurred while trying to separate the geodetic CRS.
+             */
+            final boolean full;
+            switch (mode) {
+                case OMIT_UNSEPARABLE: {
+                    mask.clear(offset, limit);
+                    full = false;
+                    break;
+                }
+                case WHOLE_UNSEPARABLE: {
+                    mask.set(offset, limit);
+                    full = components.add(crs);
+                    break;
+                }
+                default: {
+                    throw new FactoryException(Resources.format(Resources.Keys.CanNotSeparateCRS_1, crs.getName()), cause);
+                }
+            }
+            if (cause != null) {
+                Logging.recoverableException(LOGGER, CRS.class, "selectComponents", cause);
+            }
+            return full;
+        }
     }
 
     /**
@@ -1467,7 +1764,7 @@ choice: if (intersect != 0) {
             case BIDIMENSIONAL: {
                 return (SingleCRS) crs;
             }
-            case 3: {
+            case TRIDIMENSIONAL: {
                 /*
                  * The CRS would be horizontal if we can remove the vertical axis. CoordinateSystems.replaceAxes(…)
                  * will do this task for us. We can verify if the operation has been successful by checking that
@@ -1569,7 +1866,7 @@ choice: if (intersect != 0) {
                 }
             } while ((a = !a) == allowCreateEllipsoidal);
         }
-        if (allowCreateEllipsoidal && horizontalCode(crs) == 3) {
+        if (allowCreateEllipsoidal && horizontalCode(crs) == TRIDIMENSIONAL) {
             final CoordinateSystem cs = crs.getCoordinateSystem();
             final int i = AxisDirections.indexOfColinear(cs, AxisDirection.UP);
             if (i >= 0) {
@@ -1651,25 +1948,23 @@ choice: if (intersect != 0) {
      *
      * This method guaranteed that the returned list is a flat one as shown on the right side.
      * Note that such flat lists are the only one allowed by ISO/OGC standards for compound CRS.
-     * The hierarchical structure is an Apache SIS flexibility.
+     * The hierarchical structure is an Apache <abbr>SIS</abbr> flexibility.
      *
      * @param  crs  the coordinate reference system, or {@code null}.
      * @return the single coordinate reference systems, or an empty list if the given CRS is {@code null}.
-     * @throws ClassCastException if a CRS is neither a {@link SingleCRS} or a {@link CompoundCRS}.
+     * @throws ClassCastException if a <abbr>CRS</abbr> is neither a {@link SingleCRS} or a {@link CompoundCRS}.
      *
      * @see DefaultCompoundCRS#getSingleComponents()
      */
     public static List<SingleCRS> getSingleComponents(final CoordinateReferenceSystem crs) {
-        final List<SingleCRS> singles;
         if (crs == null) {
-            singles = List.of();
+            return List.of();
         } else if (crs instanceof CompoundCRS) {
-            singles = ((CompoundCRS) crs).getSingleComponents();
+            return ((CompoundCRS) crs).getSingleComponents();
         } else {
             // Intentional CassCastException here if the crs is not a SingleCRS.
-            singles = List.of((SingleCRS) crs);
+            return List.of((SingleCRS) crs);
         }
-        return singles;
     }
 
     /**

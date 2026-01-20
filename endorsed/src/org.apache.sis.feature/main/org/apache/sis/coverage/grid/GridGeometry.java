@@ -16,6 +16,8 @@
  */
 package org.apache.sis.coverage.grid;
 
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,6 +32,7 @@ import org.opengis.util.FactoryException;
 import org.opengis.metadata.Identifier;
 import org.opengis.metadata.extent.GeographicBoundingBox;
 import org.opengis.geometry.Envelope;
+import org.opengis.geometry.DirectPosition;
 import org.opengis.coordinate.CoordinateMetadata;
 import org.opengis.referencing.operation.Matrix;
 import org.opengis.referencing.operation.MathTransform;
@@ -38,8 +41,8 @@ import org.opengis.referencing.operation.CoordinateOperation;
 import org.opengis.referencing.operation.NoninvertibleTransformException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.DerivedCRS;
-import org.opengis.referencing.cs.CoordinateSystemAxis;
 import org.opengis.referencing.cs.CoordinateSystem;
+import org.opengis.referencing.cs.CoordinateSystemAxis;
 import org.apache.sis.math.MathFunctions;
 import org.apache.sis.measure.AngleFormat;
 import org.apache.sis.measure.Latitude;
@@ -48,9 +51,11 @@ import org.apache.sis.geometry.Envelopes;
 import org.apache.sis.geometry.AbstractEnvelope;
 import org.apache.sis.geometry.GeneralEnvelope;
 import org.apache.sis.geometry.ImmutableEnvelope;
+import org.apache.sis.geometry.ImmutableDirectPosition;
 import org.apache.sis.coordinate.DefaultCoordinateMetadata;
 import org.apache.sis.referencing.IdentifiedObjects;
 import org.apache.sis.referencing.crs.AbstractCRS;
+import org.apache.sis.referencing.operation.CoordinateOperationContext;
 import org.apache.sis.referencing.operation.matrix.Matrices;
 import org.apache.sis.referencing.operation.matrix.MatrixSIS;
 import org.apache.sis.referencing.operation.transform.MathTransforms;
@@ -85,6 +90,7 @@ import org.apache.sis.io.TableAppender;
 import org.apache.sis.xml.NilObject;
 import org.apache.sis.xml.NilReason;
 import static org.apache.sis.referencing.CRS.findOperation;
+import static org.apache.sis.referencing.CRS.SeparationMode;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import org.opengis.coordinate.MismatchedDimensionException;
@@ -300,6 +306,14 @@ public class GridGeometry implements LenientComparable, Serializable {
      */
     @SuppressWarnings("VolatileArrayField")                 // Safe because array will not be modified after construction.
     private transient volatile Instant[] timeRange;
+
+    /**
+     * Coordinates that may be considered as constants, or {@code null} if not yet computed.
+     * By convention, a position of dimension 0 means that there is no constant coordinates.
+     *
+     * @see #getConstantCoordinates()
+     */
+    private transient volatile DirectPosition constantCoordinates;
 
     /**
      * An "empty" grid geometry with no value defined. All getter methods invoked on this instance will cause
@@ -601,7 +615,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * @param  caller     the method where exception occurred.
      * @param  exception  the exception that occurred.
      */
-    static void recoverableException(final String caller, final TransformException exception) {
+    static void recoverableException(final String caller, final Exception exception) {
         Logging.recoverableException(GridExtent.LOGGER, GridGeometry.class, caller, exception);
     }
 
@@ -1120,7 +1134,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * <h4>API note</h4>
      * This method does not throw {@link IncompleteGridGeometryException} because the geographic extent
      * may be absent even with a complete grid geometry. Grid geometries are not required to have a
-     * spatial component on Earth surface; a raster could be a vertical profile for example.
+     * spatial component on Earth surface, since a raster could be a vertical profile for example.
      *
      * @return the geographic bounding box in "real world" coordinates.
      */
@@ -1132,7 +1146,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * Returns the {@link #geographicBBox} value or {@code null} if none.
      * This method computes the box when first needed.
      */
-    final GeographicBoundingBox geographicBBox() {
+    private final GeographicBoundingBox geographicBBox() {
         GeographicBoundingBox bbox = geographicBBox;
         if (bbox == null) {
             if (getCoordinateReferenceSystem(envelope) != null && !envelope.isAllNaN()) {
@@ -1186,6 +1200,80 @@ public class GridGeometry implements LenientComparable, Serializable {
             timeRange = times;
         }
         return times;
+    }
+
+    /**
+     * If the envelope has some coordinates that may be considered as constant, returns these coordinates.
+     * A constant coordinates is a coordinate where the lower bound is equal to the upper bound.
+     * All non-constant coordinates are set to NaN. If this method returns a non-empty value,
+     * then it is guaranteed to contain at least one non-NaN value.
+     *
+     * <h4>Coordinate Reference System</h4>
+     * The <abbr>CRS</abbr> of the returned position may be {@link #getCoordinateReferenceSystem()}.
+     * But it may also be a subset of the <abbr>CRS</abbr> components containing only the components
+     * having at least one non-NaN value. For example, if only the time coordinate is constant, then
+     * the <abbr>CRS</abbr> of the returned position may contain only the temporal component.
+     *
+     * <h4>Usage</h4>
+     * This is a helper method for computing coordinate operations with grid geometries that are,
+     * for example, two-dimensional slices in a three- or four-dimensional data cube.
+     * The algorithm should work with any number of dimensions, the two-dimensional slice is only an example.
+     * This method is intended to be used with {@link CoordinateOperationContext} as below:
+     *
+     * {@snippet lang="java" :
+     *     GridGeometry gg = ...;
+     *     var context = new CoordinateOperationContext();
+     *     gg.getGeographicExtent().ifPresent(context::addAreaOfInterest);
+     *     gg.getConstantCoordinates().ifPresent(context::setConstantCoordinates);
+     *     CoordinateOperation op = CRS.findOperation(..., targetGrid.getCoordinateMetadata(), context);
+     *     }
+     *
+     * @return the constant coordinates, or empty if none.
+     *
+     * @see #getGeographicExtent()
+     * @see CoordinateOperationContext#getConstantCoordinates()
+     * @since 1.6
+     */
+    public Optional<DirectPosition> getConstantCoordinates() {
+        DirectPosition constants = constantCoordinates;
+        if (constants == null && envelope != null) {
+            double[] coordinates = new double[envelope.getDimension()];
+            Arrays.fill(coordinates, Double.NaN);
+            final var selected = new BitSet();
+            for (int i=0; i<coordinates.length; i++) {
+                double lower = envelope.getLower(i);
+                double upper = envelope.getUpper(i);
+                if (Double.isNaN(lower)) lower = upper;
+                if (Double.isNaN(upper)) upper = lower;
+                if (lower == upper) {
+                    coordinates[i] = lower;
+                    selected.set(i);
+                }
+            }
+            CoordinateReferenceSystem crs;
+            if (selected.isEmpty()) {
+                crs = null;
+                coordinates = ArraysExt.EMPTY_DOUBLE;
+            } else {
+                crs = envelope.getCoordinateReferenceSystem();
+                try {
+                    crs = org.apache.sis.referencing.CRS.selectDimensions(crs, selected, SeparationMode.WHOLE_UNSEPARABLE);
+                    int count = 0;
+                    for (int i : selected.stream().toArray()) {
+                        coordinates[count++] = coordinates[i];
+                    }
+                    coordinates = ArraysExt.resize(coordinates, count);
+                } catch (FactoryException e) {
+                    recoverableException("getConstantCoordinates", e);
+                }
+            }
+            constants = new ImmutableDirectPosition(crs, coordinates);
+            constantCoordinates = constants;
+        }
+        if (constants != null && constants.getDimension() == 0) {
+            constants = null;
+        }
+        return Optional.ofNullable(constants);
     }
 
     /**

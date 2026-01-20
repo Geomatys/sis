@@ -29,18 +29,13 @@ import org.opengis.coordinate.MismatchedDimensionException;
 import org.opengis.coordinate.MismatchedCoordinateMetadataException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.metadata.extent.GeographicBoundingBox;
-
-import static org.apache.sis.util.ArgumentChecks.ensureDimensionMatches;
+import org.apache.sis.util.ArgumentChecks;
 
 
 /**
  * An immutable {@code Envelope} (a minimum bounding box or rectangle) of arbitrary dimension.
- * This class is final in order to ensure that the immutability contract cannot be broken
- * (assuming not using <i>Java Native Interface</i> or reflections).
- *
- * <h2>Immutability and thread safety</h2>
  * This final class is immutable and thus inherently thread-safe if the {@link CoordinateReferenceSystem}
- * instance given to the constructor is immutable. This is usually the case in Apache SIS.
+ * instance given to the constructor is immutable. This is usually the case in Apache <abbr>SIS</abbr>.
  *
  * @author  Cédric Briançon (Geomatys)
  * @author  Martin Desruisseaux (IRD, Geomatys)
@@ -82,7 +77,7 @@ public final class ImmutableEnvelope extends ArrayEnvelope implements Serializab
     {
         super(lowerCorner, upperCorner);
         this.crs = crs;
-        ensureDimensionMatches("crs", getDimension(), crs);
+        ArgumentChecks.ensureDimensionMatches("crs", getDimension(), crs);
     }
 
     /**
@@ -130,7 +125,7 @@ public final class ImmutableEnvelope extends ArrayEnvelope implements Serializab
     {
         super(envelope);
         this.crs = crs;
-        ensureDimensionMatches("crs", getDimension(), crs);
+        ArgumentChecks.ensureDimensionMatches("crs", getDimension(), crs);
     }
 
     /**
@@ -157,7 +152,7 @@ public final class ImmutableEnvelope extends ArrayEnvelope implements Serializab
     {
         super(wkt);
         this.crs = crs;
-        ensureDimensionMatches("crs", getDimension(), crs);
+        ArgumentChecks.ensureDimensionMatches("crs", getDimension(), crs);
     }
 
     /**

@@ -276,13 +276,11 @@ searchSrc:  while (sourceComponentIndex < sourceComponentIsUsed.length) {
                  */
                 int indexOfConstant = targetLowerDimension;     // Value for the default CRS.
                 final CoordinateReferenceSystem crs = coordinates.getCoordinateReferenceSystem();
-locate:         if (crs != null) {
-                    indexOfConstant = 0;
-                    for (SingleCRS component : CRS.getSingleComponents(crs)) {
-                        if (CRS.equivalent(targetComponent, component)) break locate;
-                        indexOfConstant += component.getCoordinateSystem().getDimension();
+                if (crs != null) {
+                    indexOfConstant = CRS.locateDimensions(crs, targetComponent).nextSetBit(0);
+                    if (indexOfConstant < 0) {
+                        return null;
                     }
-                    return null;
                 }
                 final int d = coordinates.getDimension();
                 final var c = new double[targetUpperDimension - targetLowerDimension];

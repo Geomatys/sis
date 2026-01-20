@@ -573,6 +573,30 @@ public final class GridGeometryTest extends TestCase {
     }
 
     /**
+     * Tests {@link GridGeometry#getConstantCoordinates()}.
+     */
+    @Test
+    public void testGetConstantCoordinates() {
+        for (double sy = 0; sy <= 1; sy++) {
+            final var grid = new GridGeometry(
+                    new GridExtent(12, 1),
+                    PixelInCell.CELL_CORNER,
+                    MathTransforms.linear(new Matrix3(
+                        0.25, 0,   -2,
+                        0,    sy,  -3,
+                        0,    0,    1)),
+                    HardCodedCRS.WGS84);
+
+            final var constant = grid.getConstantCoordinates();
+            assertEquals(constant, grid.getConstantCoordinates());      // Verify the cache.
+            assertEquals(sy == 0, constant.isPresent());
+            if (sy == 0) {
+                assertArrayEquals(new double[] {Double.NaN, -3}, constant.orElseThrow().getCoordinates());
+            }
+        }
+    }
+
+    /**
      * Tests {@link GridGeometry#upsample(long...)}.
      */
     @Test

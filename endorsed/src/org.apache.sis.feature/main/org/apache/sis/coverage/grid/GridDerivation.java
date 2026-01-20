@@ -35,7 +35,9 @@ import org.opengis.referencing.operation.TransformException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.cs.CoordinateSystemAxis;
 import org.opengis.referencing.cs.CoordinateSystem;
+import org.opengis.referencing.cs.AxisDirection;
 import org.apache.sis.referencing.CRS;
+import org.apache.sis.referencing.operation.MissingSourceDimensionsException;
 import org.apache.sis.referencing.operation.transform.MathTransforms;
 import org.apache.sis.referencing.operation.transform.LinearTransform;
 import org.apache.sis.referencing.operation.transform.TransformSeparator;
@@ -233,7 +235,7 @@ public class GridDerivation {
      * Indexes of <abbr>CRS</abbr> axes to keep, or {@code null} if no filtering will be applied.
      * A non-null value may cause a reduction in the number of dimensions of the grid.
      *
-     * @see #project(Set)
+     * @see #selectDimensions(Set)
      */
     private BitSet dimensionsToKeepInCRS;
 
@@ -1202,16 +1204,17 @@ public class GridDerivation {
     }
 
     /**
-     * Requests a projection where only a subset of the <abbr>CRS</abbr> dimensions will be kept.
+     * Requests a grid where only a subset of the <abbr>CRS</abbr> dimensions will be kept.
      * The real world dimensions to keep are specified by a filter applied on the coordinate system axes.
      * This method may reduce the number of dimensions of the grid if, as a result of this filtering,
      * some grid dimensions become unrelated to any <abbr>CRS</abbr> axis.
      *
      * <h4>Example</h4>
-     * The following code removes the temporal dimension of a grid geometry:
+     * The following code keeps only the axes having a linear unit of measurement such as metres or kilometres:
      *
      * {@snippet lang="java" :
-     *     gridGeometry.derive().project((axis) -> axis.getDirection() != AxisDirection.FUTURE).build();
+     *     GridGeometry gg = ...;
+     *     gg = gg.derive().selectDimensions((axis) -> Units.isLinear(axis.getUnit())).build();
      *     }
      *
      * @param  filter  a predicate which returns {@code true} for coordinate system axes to keep.
@@ -1220,7 +1223,7 @@ public class GridDerivation {
      *
      * @since 1.6
      */
-    public GridDerivation project(final Predicate<CoordinateSystemAxis> filter) {
+    public GridDerivation selectDimensions(final Predicate<CoordinateSystemAxis> filter) {
         final var dimensions = new BitSet();
         final CoordinateSystem cs = base.getCoordinateReferenceSystem().getCoordinateSystem();
         for (int i = cs.getDimension(); --i >= 0;) {
@@ -1234,6 +1237,38 @@ public class GridDerivation {
             dimensionsToKeepInCRS.and(dimensions);
         }
         return this;
+    }
+
+    /**
+     * Requests a grid where some <abbr>CRS</abbr> dimensions are excluded.
+     * The real world dimensions to exclude are specified by the axis directions.
+     * This method may reduce the number of dimensions of the grid if, as a result of this filtering,
+     * some grid dimensions become unrelated to any <abbr>CRS</abbr> axis.
+     *
+     * <h4>Example</h4>
+     * This method is provided for convenience in the handling of {@link MissingSourceDimensionsException}.
+     * A usage pattern can be as below:
+     *
+     * {@snippet lang="java" :
+     *     GridGeometry gg = ...;
+     *     try {
+     *         doSomeStuff(gg);
+     *     } catch (MissingSourceDimensionsException e) {
+     *         gg = gg.gridDerivation().excludeDimensions(e.getMissingAxes()).build();
+     *         doSomeStuff(gg);     // Try again.
+     *     }
+     *     }
+     *
+     * @param  exclusion  the dimensions to remove, identified by their axis directions.
+     * @return {@code this} for method call chaining.
+     * @throws IncompleteGridGeometryException if the base grid geometry has no <abbr>CRS</abbr>.
+     *
+     * @see MissingSourceDimensionsException#getMissingAxes()
+     *
+     * @since 1.6
+     */
+    public GridDerivation excludeDimensions(final Set<AxisDirection> exclusion) {
+        return selectDimensions((axis) -> !exclusion.contains(axis.getDirection()));
     }
 
     /**
@@ -1296,7 +1331,7 @@ public class GridDerivation {
             throw new IllegalGridGeometryException(e, "envelope");
         }
         if (dimensionsToKeepInCRS != null) try {
-            grid = new DimensionReducer(dimensionsToKeepInCRS.stream().toArray()).apply(grid);
+            grid = new DimensionReducer(dimensionsToKeepInCRS).apply(grid);
         } catch (FactoryException e) {
             throw new IllegalGridGeometryException(e, "gridToCRS");
         }
