@@ -1825,11 +1825,12 @@ public class GridGeometry implements LenientComparable, Serializable {
      *
      * @param  indices  the grid (not <abbr>CRS</abbr>) dimensions to select, in strictly increasing order.
      * @return the sub-grid geometry, or {@code this} if the given array contains all dimensions of this grid geometry.
+     * @throws IllegalArgumentException if the indices are not in strictly ascending order.
      * @throws IndexOutOfBoundsException if an index is out of bounds.
      *
      * @see GridExtent#selectDimensions(int[])
      * @see GridExtent#getSubspaceDimensions(int)
-     * @see org.apache.sis.referencing.CRS#selectDimensions(CoordinateReferenceSystem, int[])
+     * @see GridDerivation#selectAxes(int[])
      *
      * @since 1.3
      */

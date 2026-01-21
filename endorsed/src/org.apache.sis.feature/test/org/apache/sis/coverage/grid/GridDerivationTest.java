@@ -18,7 +18,6 @@ package org.apache.sis.coverage.grid;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import org.opengis.geometry.DirectPosition;
@@ -740,10 +739,10 @@ public final class GridDerivationTest extends TestCase {
     }
 
     /**
-     * Tests {@link GridDerivation#selectDimensions(Predicate)}.
+     * Tests exclusion of <abbr>CRS</abbr> axes.
      */
     @Test
-    public void testProject() {
+    public void testExcludeAxes() {
         final var grid = new GridGeometry(
                 new GridExtent(null, new long[] {336, 20, 4}, new long[] {401, 419, 10}, true),
                 PixelInCell.CELL_CORNER, MathTransforms.linear(new Matrix4(
@@ -752,7 +751,7 @@ public final class GridDerivationTest extends TestCase {
                         0,   0,   2,    3,
                         0,   0,   0,    1)), HardCodedCRS.WGS84_3D);
 
-        GridGeometry projected = grid.derive().excludeDimensions(Set.of(AxisDirection.UP)).build();
+        GridGeometry projected = grid.derive().excludeAxes(Set.of(AxisDirection.UP)).build();
         assertNotSame(grid, projected);
         assertEquals(2, projected.getDimension());
         assertTrue(CRS.equivalent(HardCodedCRS.WGS84, projected.getCoordinateReferenceSystem()));
