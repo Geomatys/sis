@@ -18,6 +18,7 @@ package org.apache.sis.storage.gdal;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 import java.util.function.Function;
 import java.time.LocalDate;
@@ -125,6 +126,7 @@ public class GDALStoreProvider extends DataStoreProvider {
      * Creates a new provider which will load the <abbr>GDAL</abbr> library from the specified file.
      * The library will be unloaded when this provider will be garbage-collected.
      *
+     * @param  library  path to the library to load.
      * @throws IllegalArgumentException if the GDAL library has not been found.
      * @throws NoSuchElementException if a <abbr>GDAL</abbr> function has not been found in the library.
      * @throws IllegalCallerException if this Apache SIS module is not authorized to call native methods.

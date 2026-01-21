@@ -130,7 +130,7 @@ public final class ModelCRS extends FullBox {
                 case CURI: // Fall through.
                 case CRSU: return CRS.forCode(crs);
                 case WKT2: return CRS.fromWKT(crs);
-                default: listeners.warning("Unknown CRS encoding:" + formatFourCC(crsEncoding));
+                default: listeners.warning("Unknown CRS encoding: " + formatFourCC(crsEncoding));
             }
         } catch (FactoryException e) {
             listeners.warning(e);

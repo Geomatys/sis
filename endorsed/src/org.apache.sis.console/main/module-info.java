@@ -16,8 +16,20 @@
  */
 
 /**
- * Command line interface for Apache SIS.
+ * Command line interface for Apache <abbr>SIS</abbr>.
  * An introduction is available in the <a href="https://sis.apache.org/command-line.html">Apache SIS web site</a>.
+ *
+ * <h2>Usage</h2>
+ * The main method is launched by the {@code sis} executable (a bash script).
+ * Invoking {@code sis} without argument shows a summary of available commands and all options.
+ * For executing a command, the syntax is:
+ *
+ * <blockquote><pre>sis <command> [options] [files]</pre></blockquote>
+ *
+ * For example, {@code sis crs EPSG:6676} prints the definition of the <abbr>CRS</abbr> identified by
+ * the <abbr>EPSG</abbr> code 6676. Other commands allow to verify the validity of a <abbr>CRS</abbr>,
+ * perform coordinate operations or show <abbr>ISO</abbr> 19115 metadata.
+ * See above-cited web site for more details.
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version 1.5
