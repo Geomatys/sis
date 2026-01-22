@@ -38,18 +38,60 @@ import static org.apache.sis.util.internal.shared.Constants.EPSG;
 
 
 /**
- * A predefined set of data important to Apache SIS but not redistributed for space or licensing reasons.
+ * A predefined set of data important to Apache <abbr>SIS</abbr> but not redistributed for space or licensing reasons.
  * This class is in charge of downloading the data if necessary and asking user's agreement before to install them.
  * Authorities managed by the current implementation are:
  *
  * <ul>
- *   <li>{@code "EPSG"} for the EPSG geodetic dataset.</li>
+ *   <li>{@code "EPSG"} for the <abbr>EPSG</abbr> geodetic dataset.</li>
  * </ul>
  *
- * Data are downloaded from URLs hard-coded in this class. Those URLs depend on the Apache SIS versions in use,
- * typically because more recent SIS versions will reference more recent data.
- * The default URLs can be overridden using system properties documented in {@link #getDownloadURL(String)}.
+ * Data are downloaded from <abbr>URL</abbr>s hard-coded in this class.
+ * Those <abbr>URL</abbr>s depend on the Apache <abbr>SIS</abbr> versions in use,
+ * typically because more recent <abbr>SIS</abbr> versions will reference more recent data.
+ * The default URLs can be overridden using system properties documented below.
  * This is useful as a workaround if a URL is no longer accessible.
+ *
+ * <table class="sis">
+ *   <caption>Properties for configuring download <abbr>URL</abbr>s</caption>
+ *   <tr><th>Authority</th>  <th>System property</th></tr>
+ *   <tr><td>EPSG</td>       <td>{@systemProperty org.apache.sis.epsg.downloadURL}</td></tr>
+ * </table>
+ *
+ * <h2>Asking user's permission to download <abbr>EPSG</abbr> data</h2>
+ * If an application does not want to bundle <abbr>EPSG</abbr> data by default,
+ * either for licensing reasons or for saving space, the application can ask user's permission the first time
+ * that <abbr>EPSG</abbr> data are needed, then (if agreed) download and install the data automatically.
+ * It can be done as below:
+ *
+ * {@snippet lang="java" :
+ * public class OptionalInstallDialog extends OptionalInstallations {
+ *     public OptionalInstallDialog() {
+ *         super("text/plain");     // Desired format for the `license` argument below.
+ *     }
+ *
+ *     @Override
+ *     protected boolean askUserAgreement(String authority, String license) {
+ *         if ("EPSG".equals(authority)) {
+ *             return false;    // If not interested in data other than EPSG.
+ *         } else if (license == null) {
+ *             // Ask here to user if she wants to download the EPSG data.
+ *         } else {
+ *             // Ask here to user if she accepts the EPSG terms of use.
+ *         }
+ *     }
+ * }
+ * }
+ *
+ * The above class needs to be declared as an implementation of the {@link InstallationResources} service.
+ * This is done either in {@code module-info.java} or, if the application does not use Java modules,
+ * in the {@code META-INF/services/org.apache.sis.setup.InstallationResources} file.
+ * In addition, the {@code SIS_DATA} environment variable (not to be confused with Java property)
+ * needs to be set to the destination directory where to write data on the user's machine.
+ * With this configuration, Apache <abbr>SIS</abbr> will automatically asks for user agreement and,
+ * if agreed, download <abbr>EPSG</abbr> data when first needed. If the user does not agree,
+ * Apache <abbr>SIS</abbr> will still work but with a small set of hard-coded <abbr>EPSG</abbr>
+ * codes listed {@linkplain org.apache.sis.referencing.CRS#forCode(String) here}.
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version 1.5
@@ -177,13 +219,7 @@ public abstract class OptionalInstallations extends InstallationResources implem
     /**
      * Returns the URL from where to download data for the specified authority.
      * The URLs are hard-coded and may change in any Apache SIS version.
-     * The default URLs can be overridden using system properties documented below:
-     *
-     * <table class="sis">
-     *   <caption>Configuration of download URLs</caption>
-     *   <tr><th>Authority</th>  <th>System property</th></tr>
-     *   <tr><td>EPSG</td>       <td>{@systemProperty org.apache.sis.epsg.downloadURL}</td></tr>
-     * </table>
+     * See class Javadoc for the list of properties recognized by this method.
      *
      * The use of above-listed system properties is usually not needed,
      * except as a workaround if a hard-coded URL is no longer accessible.

@@ -32,9 +32,9 @@ import org.apache.sis.feature.builder.AssociationRoleBuilder;
 import org.apache.sis.feature.builder.AttributeTypeBuilder;
 import org.apache.sis.feature.builder.AttributeRole;
 import org.apache.sis.geometry.wrapper.Geometries;
+import org.apache.sis.math.NumberType;
 import org.apache.sis.util.CharSequences;
 import org.apache.sis.util.Classes;
-import org.apache.sis.util.Numbers;
 
 // Specific to the main branch:
 import org.apache.sis.feature.DefaultFeatureType;
@@ -308,7 +308,7 @@ abstract class FeatureAnalyzer {
     final PrimaryKey createAssociations(final Relation[] exportedKeys) throws Exception {
         if (primaryKey.size() > 1) {
             if (!primaryKeyNullable) {
-                primaryKeyClass = Numbers.wrapperToPrimitive(primaryKeyClass);
+                primaryKeyClass = NumberType.wrapperToPrimitive(primaryKeyClass);
             }
             primaryKeyClass = Classes.changeArrayDimension(primaryKeyClass, 1);
         }

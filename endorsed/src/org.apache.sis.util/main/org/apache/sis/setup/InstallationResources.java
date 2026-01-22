@@ -44,7 +44,7 @@ import org.apache.sis.system.Reflect;
  * </ul>
  *
  * <h2>Recognized authorities</h2>
- * Some authorities implemented in Apache SIS modules are listed below.
+ * Some authorities implemented in Apache <abbr>SIS</abbr> modules are listed below.
  * In this list, {@code "Embedded"} is a pseudo-authority for an embedded database containing EPSG and other data.
  * The embedded database is provided as a convenience for avoiding the need to define a {@code SIS_DATA} directory
  * on the local machine.
@@ -65,6 +65,11 @@ import org.apache.sis.system.Reflect;
  * the <a href="https://sis.apache.org/epsg.html">Apache SIS web site</a> is the only step needed for
  * allowing Apache SIS to read the EPSG scripts (however SIS still needs an installation directory
  * for writing the database; see above-cited web page for more information).</p>
+ *
+ * <h2>Asking user's permission before installation</h2>
+ * By default, data provided by {@code InstallationResources} subclasses must be bundled with the application
+ * and are silently installed when first needed. If instead, it is desired to ask user's permission before to
+ * download and install the data, see the {@link OptionalInstallations} subclass.
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version 1.4

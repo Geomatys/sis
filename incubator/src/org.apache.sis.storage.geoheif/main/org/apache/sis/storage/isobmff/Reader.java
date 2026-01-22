@@ -100,7 +100,7 @@ public final class Reader implements Cloneable {
      *
      * @see #unique(Object)
      */
-    public final Map<Object,Object> sharedObjects;
+    public final Map<Object, Object> sharedObjects;
 
     /**
      * Arbitrary objects identifying warnings that have already been reported.
@@ -339,7 +339,7 @@ public final class Reader implements Cloneable {
             if (type instanceof Integer fourCC) {
                 type = Box.formatFourCC(fourCC);
             }
-            var record = new LogRecord(Level.WARNING, "The \"" + type + "\" type of box is unrecognized.");
+            var record = new LogRecord(Level.FINE, "The \"" + type + "\" type of box is unrecognized.");
             listeners.warning(record);
         }
     }

@@ -22,7 +22,9 @@
  * Running this package requires user's authorization to perform native accesses.
  * See the module Javadoc for more information.
  *
- * <p>Having this module on the module-path is sufficient for allowing Apache <abbr>SIS</abbr> to
+ * <p>If the prerequisites described in the module Javadoc are met
+ * (<abbr>GDAL</abbr> presents in the library search path, native accesses enabled),
+ * then having this module on the module-path is sufficient for allowing Apache <abbr>SIS</abbr> to
  * try <abbr>GDAL</abbr> when {@link org.apache.sis.storage.DataStores#open(Object)} is invoked.
  * Pure Java implementations are tried first, and <abbr>GDAL</abbr> is tried as a fallback when
  * no Java implementation can decode a file. When first needed, this module searches on the

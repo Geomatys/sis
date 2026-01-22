@@ -37,7 +37,7 @@ import java.time.temporal.ChronoField;
 import java.time.temporal.Temporal;
 import org.apache.sis.math.Fraction;
 import org.apache.sis.filter.base.Node;
-import org.apache.sis.filter.base.BinaryFunction;
+import org.apache.sis.filter.base.BinaryFunctionWidening;
 
 // Specific to the main branch:
 import org.apache.sis.pending.geoapi.filter.MatchAction;
@@ -72,7 +72,7 @@ import org.apache.sis.pending.geoapi.filter.BetweenComparisonOperator;
  *
  * @param  <R>  the type of resources (e.g. {@code Feature}) used as inputs.
  */
-abstract class ComparisonFilter<R> extends BinaryFunction<R,Object,Object>
+abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Object>
         implements BinaryComparisonOperator<R>, Optimization.OnFilter<R>
 {
     /**
@@ -156,7 +156,7 @@ abstract class ComparisonFilter<R> extends BinaryFunction<R,Object,Object>
     @Override
     public final boolean equals(final Object obj) {
         if (super.equals(obj)) {
-            final ComparisonFilter<?> other = (ComparisonFilter<?>) obj;
+            final var other = (ComparisonFilter<?>) obj;
             return other.isMatchingCase == isMatchingCase && matchAction.equals(other.matchAction);
         }
         return false;

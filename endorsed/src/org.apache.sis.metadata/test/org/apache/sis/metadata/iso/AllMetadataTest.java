@@ -33,6 +33,7 @@ import org.opengis.util.CodeList;
  *
  * @author  Martin Desruisseaux (Geomatys)
  */
+@SuppressWarnings("exports")
 public final class AllMetadataTest extends PropertyConsistencyCheck {
     /**
      * Creates a new test case with all GeoAPI interfaces and code lists to test.

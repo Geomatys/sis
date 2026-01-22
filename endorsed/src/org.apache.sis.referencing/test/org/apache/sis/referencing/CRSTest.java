@@ -19,6 +19,7 @@ package org.apache.sis.referencing;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 import org.opengis.util.FactoryException;
 import org.opengis.util.NoSuchIdentifierException;
@@ -402,6 +403,16 @@ public final class CRSTest extends TestCaseWithLogs {
                 HardCodedCRS.GEOID_3D,
                 HardCodedCRS.NESTED);
         loggings.assertNoUnexpectedLog();
+    }
+
+    /**
+     * Tests getting a mask of some CRS components.
+     */
+    @Test
+    public void testLocateDimensions() {
+        // Following currently locate only the temporal CRS because geographic CRS is not separated in 2D+1D parts.
+        BitSet mask = CRS.locateDimensions(HardCodedCRS.WGS84_4D, HardCodedCRS.TIME, HardCodedCRS.ELLIPSOIDAL_HEIGHT);
+        assertEquals(BitSet.valueOf(new long[] {0b1000}), mask);
     }
 
     /**

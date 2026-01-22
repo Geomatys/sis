@@ -143,7 +143,7 @@ final class IdentifierFilter extends Node
             Object id = object.getPropertyValue(property);
             if (id != null) return identifier.equals(id.toString());
         } catch (IllegalArgumentException e) {
-            warning(e, false);
+            warning(e);
         }
         return false;
     }

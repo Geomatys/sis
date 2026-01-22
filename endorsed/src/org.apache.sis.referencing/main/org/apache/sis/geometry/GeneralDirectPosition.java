@@ -30,9 +30,8 @@ import org.opengis.geometry.DirectPosition;
 import org.opengis.geometry.MismatchedDimensionException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.apache.sis.util.resources.Errors;
+import org.apache.sis.util.ArgumentChecks;
 import org.apache.sis.util.ArraysExt;
-
-import static org.apache.sis.util.ArgumentChecks.ensureDimensionMatches;
 
 
 /**
@@ -72,8 +71,8 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
     private static volatile Field coordinatesField;
 
     /**
-     * The coordinates of the direct position. The length of this array is the
-     * {@linkplain #getDimension() dimension} of this direct position.
+     * The coordinates of the direct position. The length of this array is
+     * the {@linkplain #getDimension() dimension} of this direct position.
      */
     public final double[] coordinates;
 
@@ -137,12 +136,12 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
     public GeneralDirectPosition(final DirectPosition point) {
         coordinates = point.getCoordinate();                            // Should already be cloned.
         crs = point.getCoordinateReferenceSystem();
-        ensureDimensionMatches("crs", coordinates.length, crs);
+        ArgumentChecks.ensureDimensionMatches("crs", coordinates.length, crs);
     }
 
     /**
-     * Constructs a position initialized to the values parsed
-     * from the given string in <i>Well Known Text</i> (WKT) format.
+     * Constructs a position initialized to the values parsed from the
+     * given string in <i>Well Known Text</i> (<abbr>WKT</abbr>) format.
      * The given string is typically a {@code POINT} element like below:
      *
      * {@snippet lang="wkt" :
@@ -176,9 +175,9 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
     }
 
     /**
-     * Returns the coordinate reference system in which the coordinate is given.
+     * Returns the coordinate reference system in which the coordinates are given.
      * May be {@code null} if this particular {@code DirectPosition} is included
-     * in a larger object with such a reference to a CRS.
+     * in a larger object with such a reference to a <abbr>CRS</abbr>.
      *
      * @return the coordinate reference system, or {@code null}.
      */
@@ -188,7 +187,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
     }
 
     /**
-     * Sets the coordinate reference system in which the coordinate is given.
+     * Sets the coordinate reference system in which the coordinates are given.
      *
      * @param  crs  the new coordinate reference system, or {@code null}.
      * @throws MismatchedDimensionException if the specified CRS does not have the expected number of dimensions.
@@ -196,12 +195,12 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
     public void setCoordinateReferenceSystem(final CoordinateReferenceSystem crs)
             throws MismatchedDimensionException
     {
-        ensureDimensionMatches("crs", getDimension(), crs);
+        ArgumentChecks.ensureDimensionMatches("crs", getDimension(), crs);
         this.crs = crs;
     }
 
     /**
-     * Returns a sequence of numbers that hold the coordinate of this position in its reference system.
+     * Returns a sequence of numbers that hold the coordinates of this position in its reference system.
      *
      * <div class="note"><b>API note:</b>
      * This method is final for ensuring consistency with the {@link #coordinates}, array field, which is public.</div>
@@ -216,7 +215,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
     }
 
     /**
-     * Sets the coordinate values along all dimensions.
+     * Sets the coordinate values in all dimensions.
      *
      * @param  coordinates  the new coordinates values, or a {@code null} array for
      *                      setting all coordinate values to {@link Double#NaN NaN}.
@@ -229,7 +228,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
         if (coordinates == null) {
             Arrays.fill(this.coordinates, Double.NaN);
         } else {
-            ensureDimensionMatches("coordinates", this.coordinates.length, coordinates);
+            ArgumentChecks.ensureDimensionMatches("coordinates", this.coordinates.length, coordinates);
             System.arraycopy(coordinates, 0, this.coordinates, 0, coordinates.length);
         }
     }
@@ -267,8 +266,8 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
 
     /**
      * Sets this coordinate to the specified direct position. If the specified position
-     * contains a coordinate reference system (CRS), then the CRS for this position will
-     * be set to the CRS of the specified position.
+     * contains a coordinate reference system (<abbr>CRS</abbr>), then the <abbr>CRS</abbr>
+     * for this position will be set to the <abbr>CRS</abbr> of the specified position.
      *
      * @param  position  the new position for this point,
      *                   or {@code null} for setting all coordinate values to {@link Double#NaN NaN}.
@@ -279,7 +278,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
         if (position == null) {
             Arrays.fill(coordinates, Double.NaN);
         } else {
-            ensureDimensionMatches("position", coordinates.length, position);
+            ArgumentChecks.ensureDimensionMatches("position", coordinates.length, position);
             setCoordinateReferenceSystem(position.getCoordinateReferenceSystem());
             for (int i=0; i<coordinates.length; i++) {
                 coordinates[i] = position.getOrdinate(i);
@@ -317,7 +316,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
             if (field == null) {
                 coordinatesField = field = getCoordinatesField(GeneralDirectPosition.class);
             }
-            GeneralDirectPosition e = (GeneralDirectPosition) super.clone();
+            var e = (GeneralDirectPosition) super.clone();
             field.set(e, coordinates.clone());
             return e;
         } catch (ReflectiveOperationException | CloneNotSupportedException exception) {
@@ -335,7 +334,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
      */
     @Override
     public int hashCode() {
-        final int code = Arrays.hashCode(coordinates) + Objects.hashCode(getCoordinateReferenceSystem());
+        final int code = Arrays.hashCode(coordinates) + Objects.hashCode(crs);
         assert code == super.hashCode();
         return code;
     }
@@ -349,7 +348,7 @@ public class GeneralDirectPosition extends AbstractDirectPosition implements Ser
             return true;
         }
         if (object instanceof GeneralDirectPosition) {
-            final GeneralDirectPosition that = (GeneralDirectPosition) object;
+            final var that = (GeneralDirectPosition) object;
             return Arrays.equals(coordinates, that.coordinates) && Objects.equals(crs, that.crs);
         }
         return super.equals(object);                // Comparison of other implementation classes.

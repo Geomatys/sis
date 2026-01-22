@@ -36,8 +36,12 @@ import org.apache.sis.pending.jdk.JDK22;
  * before to install them. Authorities managed by the current implementation are:
  *
  * <ul>
- *   <li>{@code "EPSG"} for the EPSG geodetic dataset.</li>
+ *   <li>{@code "EPSG"} for the <abbr>EPSG</abbr> geodetic dataset.</li>
  * </ul>
+ *
+ * This is an implementation of {@link OptionalInstallations} in which user's permission
+ * is asked on the {@link Console}. By comparison, the {@code org.apache.sis.gui} module
+ * (for example) contains a similar implementation but asking for permission in a JavaFX dialog.
  *
  * @author  Martin Desruisseaux (Geomatys)
  * @version 1.5

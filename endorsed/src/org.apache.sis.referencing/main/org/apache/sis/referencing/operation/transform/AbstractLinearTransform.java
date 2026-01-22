@@ -25,7 +25,6 @@ import org.opengis.referencing.operation.NoninvertibleTransformException;
 import org.apache.sis.referencing.operation.matrix.Matrices;
 import org.apache.sis.referencing.operation.provider.Affine;
 import org.apache.sis.referencing.internal.Resources;
-import org.apache.sis.referencing.internal.shared.Formulas;
 import org.apache.sis.util.ComparisonMode;
 import org.apache.sis.util.internal.shared.Numerics;
 import org.apache.sis.util.resources.Errors;
@@ -57,7 +56,7 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
      * @see #inverse()
      */
     @SuppressWarnings("serial")         // Most SIS implementations are serializable.
-    volatile LinearTransform inverse;
+    private volatile LinearTransform inverse;
 
     /**
      * Constructs a transform.
@@ -131,38 +130,42 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
      * This method invokes {@link #createInverse()} when first needed, then caches the result.
      */
     @Override
-    @SuppressWarnings("DoubleCheckedLocking")                           // Okay since 'inverse' is volatile.
+    @SuppressWarnings("DoubleCheckedLocking")   // Okay since `inverse` is volatile.
     public LinearTransform inverse() throws NoninvertibleTransformException {
-        LinearTransform inv = inverse;
-        if (inv == null) {
+        @SuppressWarnings("LocalVariableHidesMemberVariable")
+        LinearTransform inverse = this.inverse;
+        if (inverse == null) {
             synchronized (this) {
-                inv = inverse;
-                if (inv == null) {
-                    inv = createInverse();
-                    inverse = inv;
+                inverse = this.inverse;
+                if (inverse == null) {
+                    setInverse(inverse = createInverse());
                 }
             }
         }
-        return inv;
+        return inverse;
     }
 
     /**
      * Invoked by {@link #inverse()} the first time that the inverse transform needs to be computed.
+     *
+     * @return the inverse transform computed on-the-fly.
+     * @throws NoninvertibleTransformException if the inverse transform cannot be computed.
      */
-    LinearTransform createInverse() throws NoninvertibleTransformException {
-        /*
-         * Should never be the identity transform at this point (except during tests) because
-         * MathTransforms.linear(…) should never instantiate this class in the identity case.
-         * But we check anyway as a paranoiac safety.
-         */
-        if (isIdentity()) {
-            return this;
+    protected LinearTransform createInverse() throws NoninvertibleTransformException {
+        return MathTransforms.linear(Matrices.inverse(this));
+    }
+
+    /**
+     * Sets the inverse transform to the given value. This method should usually not be invoked directly,
+     * unless the caller needs to compute the inverse transform in a way different than the default.
+     *
+     * @param  inverse  the inverse transform to assign to this transform.
+     */
+    final void setInverse(final LinearTransform inverse) {
+        if (inverse instanceof AbstractLinearTransform) {
+            ((AbstractLinearTransform) inverse).inverse = this;
         }
-        final LinearTransform inv = MathTransforms.linear(Matrices.inverse(this));
-        if (inv instanceof AbstractLinearTransform) {
-            ((AbstractLinearTransform) inv).inverse = this;
-        }
-        return inv;
+        this.inverse = inverse;
     }
 
     /**
@@ -237,11 +240,7 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
                 for (int i=0; i<srcDim; i++) {
                     final double e = getElement(j, i);
                     if (e != 0) {   // See the comment in ProjectiveTransform for the purpose of this test.
-                        if (Formulas.USE_FMA) {
-                            sum = Math.fma(srcPts[srcOff + i], e, sum);
-                        } else {
-                            sum += srcPts[srcOff + i] * e;
-                        }
+                        sum = Math.fma(srcPts[srcOff + i], e, sum);
                     }
                 }
                 buffer[j] = sum;
@@ -280,7 +279,7 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
     @Override
     public final boolean equals(final Object object, final ComparisonMode mode) {
         if (object == this) {
-            return true;                                    // Slight optimization
+            return true;        // Slight optimization
         }
         if (object == null) {
             return false;
@@ -320,12 +319,12 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
          */
         if (object instanceof AbstractLinearTransform) {
             /*
-             * If the 'inverse' matrix was not computed in any of the transforms being compared
-             * (i.e. if 'this.inverse' and 'object.inverse' are both null), then assume that the
+             * If the `inverse` matrix was not computed in any of the transforms being compared
+             * (i.e. if `this.inverse` and `object.inverse` are both null), then assume that the
              * two transforms will compute their inverse in the same way. The intent is to avoid
              * to trig the inverse transform computation.
              *
-             * Note that this code requires the 'inverse' fields to be volatile
+             * Note that this code requires the `inverse` fields to be volatile
              * (otherwise we would need to synchronize).
              */
             if (inverse == ((AbstractLinearTransform) object).inverse) {
@@ -333,7 +332,7 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
             }
         }
         /*
-         * Get the matrices of inverse transforms. In the following code 'null' is really the intended
+         * Get the matrices of inverse transforms. In the following code `null` is really the intended
          * value for non-invertible matrices because the Matrices.equals(…) methods accept null values,
          * so we are okay to ignore NoninvertibleTransformException in this particular case.
          */
@@ -341,7 +340,7 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
         try {
             mt = inverse().getMatrix();
         } catch (NoninvertibleTransformException e) {
-            // Leave 'mt' to null.
+            // Leave `mt` to null.
         }
         try {
             if (object instanceof LinearTransform) {
@@ -350,7 +349,7 @@ abstract class AbstractLinearTransform extends AbstractMathTransform implements 
                 mo = Matrices.inverse((Matrix) object);
             }
         } catch (NoninvertibleTransformException e) {
-            // Leave 'mo' to null.
+            // Leave `mo` to null.
         }
         return Matrices.equals(mt, mo, isApproximate ? Numerics.COMPARISON_THRESHOLD : 0, isApproximate);
     }

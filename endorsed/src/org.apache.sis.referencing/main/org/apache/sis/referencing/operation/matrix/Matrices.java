@@ -74,7 +74,7 @@ import org.opengis.geometry.MismatchedDimensionException;
  * </ul>
  *
  * @author  Martin Desruisseaux (IRD, Geomatys)
- * @version 1.5
+ * @version 1.6
  *
  * @see org.apache.sis.parameter.MatrixParameters
  *
@@ -272,6 +272,7 @@ public final class Matrices {
          * (NORTH,EAST) to (EAST,NORTH)), then coordinates at index {@code srcIndex} will have
          * to be moved at index {@code dstIndex}.
          */
+        UnderdeterminedMatrixException exception = null;
         for (int dstIndex = 0; dstIndex < dstAxes.length; dstIndex++) {
             boolean hasFound = false;
             final AxisDirection dstDir = dstAxes[dstIndex];
@@ -312,9 +313,15 @@ public final class Matrices {
                 }
             }
             if (!hasFound) {
-                throw new IllegalArgumentException(Resources.format(
-                        Resources.Keys.CanNotMapAxisToDirection_1, dstAxes[dstIndex]));
+                if (exception == null) {
+                    exception = new UnderdeterminedMatrixException(Resources.format(
+                            Resources.Keys.CanNotMapAxisToDirection_1, dstDir));
+                }
+                exception.addUnknown(dstDir);
             }
+        }
+        if (exception != null) {
+            throw exception;
         }
         matrix.setElement(dstAxes.length, srcAxes.length, 1);
         return matrix;
@@ -439,8 +446,8 @@ public final class Matrices {
      * @param  srcAxes  the ordered sequence of axis directions for source coordinate system.
      * @param  dstAxes  the ordered sequence of axis directions for destination coordinate system.
      * @return the transform from the given source axis directions to the given target axis directions.
-     * @throws IllegalArgumentException if {@code dstAxes} contains at least one axis not found in {@code srcAxes},
-     *         or if some colinear axes were found.
+     * @throws UnderdeterminedMatrixException if {@code dstAxes} contains at least one axis not found in {@code srcAxes}.
+     * @throws IllegalArgumentException if some colinear axes were found.
      *
      * @see #createTransform(Envelope, Envelope)
      * @see #createTransform(Envelope, AxisDirection[], Envelope, AxisDirection[])
@@ -511,8 +518,8 @@ public final class Matrices {
      *         to the given envelope and target axis directions.
      * @throws MismatchedDimensionException if an envelope {@linkplain Envelope#getDimension() dimension} does not
      *         match the length of the axis directions sequence.
-     * @throws IllegalArgumentException if {@code dstAxes} contains at least one axis not found in {@code srcAxes},
-     *         or if some colinear axes were found.
+     * @throws UnderdeterminedMatrixException if {@code dstAxes} contains at least one axis not found in {@code srcAxes}.
+     * @throws IllegalArgumentException if some colinear axes were found.
      *
      * @see #createTransform(Envelope, Envelope)
      * @see #createTransform(AxisDirection[], AxisDirection[])
@@ -946,10 +953,10 @@ search:     while (freeColumn < numCol) {
     }
 
     /**
-     * Creates a new matrix which is a copy of the given matrix.
+     * Creates a new matrix which is a modifiable copy of the given matrix.
      *
      * @param  matrix  the matrix to copy, or {@code null}.
-     * @return a copy of the given matrix, or {@code null} if the given matrix was null.
+     * @return a modifiable copy of the given matrix, or {@code null} if the given matrix was null.
      *
      * @see MatrixSIS#clone()
      * @see MatrixSIS#castOrCopy(Matrix)
@@ -1126,6 +1133,27 @@ search:     while (freeColumn < numCol) {
             }
         }
         return true;
+    }
+
+    /**
+     * Returns whether the given matrix has any NaN value.
+     *
+     * @param  matrix  the matrix to test.
+     * @return {@code true} if at least one matrix element is NaN.
+     *
+     * @since 1.6
+     */
+    public static boolean hasNaN(final Matrix matrix) {
+        final int numCol = matrix.getNumCol();
+        final int numRow = matrix.getNumRow();
+        for (int j=0; j<numRow; j++) {
+            for (int i=0; i<numCol; i++) {
+                if (Double.isNaN(matrix.getElement(j, i))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

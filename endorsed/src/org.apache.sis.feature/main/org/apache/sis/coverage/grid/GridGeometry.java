@@ -16,6 +16,8 @@
  */
 package org.apache.sis.coverage.grid;
 
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,6 +32,7 @@ import org.opengis.util.FactoryException;
 import org.opengis.metadata.Identifier;
 import org.opengis.metadata.extent.GeographicBoundingBox;
 import org.opengis.geometry.Envelope;
+import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.operation.Matrix;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
@@ -37,8 +40,8 @@ import org.opengis.referencing.operation.CoordinateOperation;
 import org.opengis.referencing.operation.NoninvertibleTransformException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.DerivedCRS;
-import org.opengis.referencing.cs.CoordinateSystemAxis;
 import org.opengis.referencing.cs.CoordinateSystem;
+import org.opengis.referencing.cs.CoordinateSystemAxis;
 import org.apache.sis.math.MathFunctions;
 import org.apache.sis.measure.AngleFormat;
 import org.apache.sis.measure.Latitude;
@@ -47,9 +50,11 @@ import org.apache.sis.geometry.Envelopes;
 import org.apache.sis.geometry.AbstractEnvelope;
 import org.apache.sis.geometry.GeneralEnvelope;
 import org.apache.sis.geometry.ImmutableEnvelope;
-import org.apache.sis.metadata.iso.extent.DefaultGeographicBoundingBox;
+import org.apache.sis.geometry.ImmutableDirectPosition;
+import org.apache.sis.coordinate.DefaultCoordinateMetadata;
 import org.apache.sis.referencing.IdentifiedObjects;
 import org.apache.sis.referencing.crs.AbstractCRS;
+import org.apache.sis.referencing.operation.CoordinateOperationContext;
 import org.apache.sis.referencing.operation.matrix.Matrices;
 import org.apache.sis.referencing.operation.matrix.MatrixSIS;
 import org.apache.sis.referencing.operation.transform.MathTransforms;
@@ -59,6 +64,7 @@ import org.apache.sis.referencing.internal.shared.ExtendedPrecisionMatrix;
 import org.apache.sis.referencing.internal.shared.DirectPositionView;
 import org.apache.sis.referencing.internal.shared.TemporalAccessor;
 import org.apache.sis.referencing.internal.shared.AxisDirections;
+import org.apache.sis.metadata.iso.extent.DefaultGeographicBoundingBox;
 import org.apache.sis.metadata.internal.shared.ReferencingServices;
 import org.apache.sis.feature.internal.Resources;
 import org.apache.sis.util.LenientComparable;
@@ -83,6 +89,7 @@ import org.apache.sis.io.TableAppender;
 import org.apache.sis.xml.NilObject;
 import org.apache.sis.xml.NilReason;
 import static org.apache.sis.referencing.CRS.findOperation;
+import static org.apache.sis.referencing.CRS.SeparationMode;
 
 // Specific to the main branch:
 import org.opengis.geometry.MismatchedDimensionException;
@@ -227,6 +234,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * to real world coordinates, with the lower coordinates inclusive and the upper coordinates exclusive.
      * The Coordinate Reference System (CRS) of this envelope defines the "real world" CRS of this grid geometry.
      *
+     * @see #CRS
      * @see #ENVELOPE
      * @see #getEnvelope()
      */
@@ -237,7 +245,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * If non-null, the conversion shall map {@linkplain PixelInCell#CELL_CENTER cell center}.
      * This conversion is usually, but not necessarily, affine.
      *
-     * @see #CRS
+     * @see #GRID_TO_CRS
      * @see #getGridToCRS(PixelInCell)
      * @see PixelInCell#CELL_CENTER
      */
@@ -247,18 +255,21 @@ public class GridGeometry implements LenientComparable, Serializable {
     /**
      * Same conversion as {@link #gridToCRS} but from {@linkplain PixelInCell#CELL_CORNER cell corner}
      * instead of center. This transform is preferable to {@code gridToCRS} for transforming envelopes.
+     * This field may be more accurate than deriving this transform from {@link #gridToCRS}.
      *
-     * @serial This field is serialized because it may be a value specified explicitly at construction time,
-     *         in which case it can be more accurate than a computed value.
+     * @see #GRID_TO_CRS
+     * @see #getGridToCRS(PixelInCell)
+     * @see PixelInCell#CELL_CORNER
+     * @since 1.6
      */
     @SuppressWarnings("serial")         // Most SIS implementations are serializable.
-    final MathTransform cornerToCRS;
+    protected final MathTransform cornerToCRS;
 
     /**
      * An <em>estimation</em> of the grid resolution, in units of the CRS axes.
      * Computed from {@link #gridToCRS}, eventually together with {@link #extent}.
      * May be {@code null} if unknown. If non-null, the array length is equal to
-     * the number of CRS dimensions.
+     * the number of <abbr>CRS</abbr> dimensions.
      *
      * @see #RESOLUTION
      * @see #getResolution(boolean)
@@ -266,7 +277,7 @@ public class GridGeometry implements LenientComparable, Serializable {
     protected final double[] resolution;
 
     /**
-     * Whether the conversions from grid coordinates to the CRS are linear, for each target axis.
+     * Whether the conversions from grid coordinates to the <abbr>CRS</abbr> are linear, for each target axis.
      * The bit located at {@code 1L << dimension} is set to 1 when the conversion at that dimension is non-linear.
      * The dimension indices are those of the CRS, not the grid. The use of {@code long} type limits the capacity
      * to 64 dimensions. But actually {@code GridGeometry} can contain more dimensions provided that index of the
@@ -294,6 +305,14 @@ public class GridGeometry implements LenientComparable, Serializable {
      */
     @SuppressWarnings("VolatileArrayField")                 // Safe because array will not be modified after construction.
     private transient volatile Instant[] timeRange;
+
+    /**
+     * Coordinates that may be considered as constants, or {@code null} if not yet computed.
+     * By convention, a position of dimension 0 means that there is no constant coordinates.
+     *
+     * @see #getConstantCoordinates()
+     */
+    private transient volatile DirectPosition constantCoordinates;
 
     /**
      * An "empty" grid geometry with no value defined. All getter methods invoked on this instance will cause
@@ -595,7 +614,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * @param  caller     the method where exception occurred.
      * @param  exception  the exception that occurred.
      */
-    static void recoverableException(final String caller, final TransformException exception) {
+    static void recoverableException(final String caller, final Exception exception) {
         Logging.recoverableException(GridExtent.LOGGER, GridGeometry.class, caller, exception);
     }
 
@@ -981,6 +1000,20 @@ public class GridGeometry implements LenientComparable, Serializable {
      */
 
     /**
+     * Returns the "real world" coordinate reference system together with the data epoch if any.
+     * This method is preferable to {@link #getCoordinateReferenceSystem()} when the <abbr>CRS</abbr> may be dynamic.
+     *
+     * @return the coordinate reference system (never {@code null}) together with the data epoch if any.
+     * @throws IncompleteGridGeometryException if this grid geometry has no <abbr>CRS</abbr> —
+     *         i.e. <code>{@linkplain #isDefined isDefined}({@linkplain #CRS})</code> returned {@code false}.
+     *
+     * @since 1.6
+     */
+    public DefaultCoordinateMetadata getCoordinateMetadata() {
+        return new DefaultCoordinateMetadata(getCoordinateReferenceSystem(), null);
+    }
+
+    /**
      * Returns the coordinate reference system of the given envelope if defined, or {@code null} if none.
      * Contrarily to {@link #getCoordinateReferenceSystem()}, this method does not throw exception.
      */
@@ -990,9 +1023,11 @@ public class GridGeometry implements LenientComparable, Serializable {
 
     /**
      * Returns the "real world" coordinate reference system.
+     * This method assumes that the <abbr>CRS</abbr> is static.
+     * If the <abbr>CRS</abbr> may be dynamic, use {@link #getCoordinateMetadata()} instead.
      *
      * @return the coordinate reference system (never {@code null}).
-     * @throws IncompleteGridGeometryException if this grid geometry has no CRS —
+     * @throws IncompleteGridGeometryException if this grid geometry has no <abbr>CRS</abbr> —
      *         i.e. <code>{@linkplain #isDefined isDefined}({@linkplain #CRS})</code> returned {@code false}.
      */
     public CoordinateReferenceSystem getCoordinateReferenceSystem() {
@@ -1098,7 +1133,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * <h4>API note</h4>
      * This method does not throw {@link IncompleteGridGeometryException} because the geographic extent
      * may be absent even with a complete grid geometry. Grid geometries are not required to have a
-     * spatial component on Earth surface; a raster could be a vertical profile for example.
+     * spatial component on Earth surface, since a raster could be a vertical profile for example.
      *
      * @return the geographic bounding box in "real world" coordinates.
      */
@@ -1110,7 +1145,7 @@ public class GridGeometry implements LenientComparable, Serializable {
      * Returns the {@link #geographicBBox} value or {@code null} if none.
      * This method computes the box when first needed.
      */
-    final GeographicBoundingBox geographicBBox() {
+    private final GeographicBoundingBox geographicBBox() {
         GeographicBoundingBox bbox = geographicBBox;
         if (bbox == null) {
             if (getCoordinateReferenceSystem(envelope) != null && !envelope.isAllNaN()) {
@@ -1167,6 +1202,80 @@ public class GridGeometry implements LenientComparable, Serializable {
     }
 
     /**
+     * If the envelope has some coordinates that may be considered as constant, returns these coordinates.
+     * A constant coordinates is a coordinate where the lower bound is equal to the upper bound.
+     * All non-constant coordinates are set to NaN. If this method returns a non-empty value,
+     * then it is guaranteed to contain at least one non-NaN value.
+     *
+     * <h4>Coordinate Reference System</h4>
+     * The <abbr>CRS</abbr> of the returned position may be {@link #getCoordinateReferenceSystem()}.
+     * But it may also be a subset of the <abbr>CRS</abbr> components containing only the components
+     * having at least one non-NaN value. For example, if only the time coordinate is constant, then
+     * the <abbr>CRS</abbr> of the returned position may contain only the temporal component.
+     *
+     * <h4>Usage</h4>
+     * This is a helper method for computing coordinate operations with grid geometries that are,
+     * for example, two-dimensional slices in a three- or four-dimensional data cube.
+     * The algorithm should work with any number of dimensions, the two-dimensional slice is only an example.
+     * This method is intended to be used with {@link CoordinateOperationContext} as below:
+     *
+     * {@snippet lang="java" :
+     *     GridGeometry gg = ...;
+     *     var context = new CoordinateOperationContext();
+     *     gg.getGeographicExtent().ifPresent(context::addAreaOfInterest);
+     *     gg.getConstantCoordinates().ifPresent(context::setConstantCoordinates);
+     *     CoordinateOperation op = CRS.findOperation(..., targetGrid.getCoordinateMetadata(), context);
+     *     }
+     *
+     * @return the constant coordinates, or empty if none.
+     *
+     * @see #getGeographicExtent()
+     * @see CoordinateOperationContext#getConstantCoordinates()
+     * @since 1.6
+     */
+    public Optional<DirectPosition> getConstantCoordinates() {
+        DirectPosition constants = constantCoordinates;
+        if (constants == null && envelope != null) {
+            double[] coordinates = new double[envelope.getDimension()];
+            Arrays.fill(coordinates, Double.NaN);
+            final var selected = new BitSet();
+            for (int i=0; i<coordinates.length; i++) {
+                double lower = envelope.getLower(i);
+                double upper = envelope.getUpper(i);
+                if (Double.isNaN(lower)) lower = upper;
+                if (Double.isNaN(upper)) upper = lower;
+                if (lower == upper) {
+                    coordinates[i] = lower;
+                    selected.set(i);
+                }
+            }
+            CoordinateReferenceSystem crs;
+            if (selected.isEmpty()) {
+                crs = null;
+                coordinates = ArraysExt.EMPTY_DOUBLE;
+            } else {
+                crs = envelope.getCoordinateReferenceSystem();
+                try {
+                    crs = org.apache.sis.referencing.CRS.selectDimensions(crs, selected, SeparationMode.WHOLE_UNSEPARABLE);
+                    int count = 0;
+                    for (int i : selected.stream().toArray()) {
+                        coordinates[count++] = coordinates[i];
+                    }
+                    coordinates = ArraysExt.resize(coordinates, count);
+                } catch (FactoryException e) {
+                    recoverableException("getConstantCoordinates", e);
+                }
+            }
+            constants = new ImmutableDirectPosition(crs, coordinates);
+            constantCoordinates = constants;
+        }
+        if (constants != null && constants.getDimension() == 0) {
+            constants = null;
+        }
+        return Optional.ofNullable(constants);
+    }
+
+    /**
      * Returns the "real world" coordinates of the cell at indices (0, 0, … 0).
      * The returned coordinates map the {@linkplain PixelInCell#CELL_CORNER cell corner}.
      * This method computes the origin from the "grid to CRS" transform if available.
@@ -1201,7 +1310,7 @@ public class GridGeometry implements LenientComparable, Serializable {
         } else try {
             cornerToCRS.transform(new double[cornerToCRS.getSourceDimensions()], 0, origin, 0, 1);
         } catch (TransformException e) {
-            throw new IllegalGridGeometryException(e, "gridToCRS");
+            throw new IllegalGridGeometryException(e, "origin");
         }
         return origin;
     }
@@ -1704,23 +1813,23 @@ public class GridGeometry implements LenientComparable, Serializable {
 
     /**
      * Returns a grid geometry that encompass only some dimensions of this grid geometry.
-     * The specified dimensions will be copied into a new grid geometry if necessary.
-     * The selection is applied on {@linkplain #getExtent() grid extent} dimensions;
-     * they are not necessarily the same as the {@linkplain #getEnvelope() envelope} dimensions.
+     * The selection is applied on {@linkplain #getExtent() grid extent} dimensions,
+     * which are not necessarily the same as the {@linkplain #getEnvelope() envelope} dimensions.
      * The given dimensions must be in strictly ascending order without duplicated values.
-     * The number of dimensions of the sub grid geometry will be {@code dimensions.length}.
+     * The number of dimensions of the returned grid geometry will be {@code dimensions.length}.
      *
      * <p>This method performs a <i>dimensionality reduction</i>.
-     * This method cannot be used for changing dimension order.
-     * The converse operation is the {@linkplain #GridGeometry(GridGeometry, GridGeometry) concatenation}.</p>
+     * The converse of this operation is {@linkplain #GridGeometry(GridGeometry, GridGeometry) concatenation}.
+     * This method cannot be used for changing dimension order.</p>
      *
-     * @param  indices  the grid (not CRS) dimensions to select, in strictly increasing order.
+     * @param  indices  the grid (not <abbr>CRS</abbr>) dimensions to select, in strictly increasing order.
      * @return the sub-grid geometry, or {@code this} if the given array contains all dimensions of this grid geometry.
+     * @throws IllegalArgumentException if the indices are not in strictly ascending order.
      * @throws IndexOutOfBoundsException if an index is out of bounds.
      *
-     * @see GridExtent#getSubspaceDimensions(int)
      * @see GridExtent#selectDimensions(int[])
-     * @see org.apache.sis.referencing.CRS#selectDimensions(CoordinateReferenceSystem, int[])
+     * @see GridExtent#getSubspaceDimensions(int)
+     * @see GridDerivation#selectAxes(int[])
      *
      * @since 1.3
      */
@@ -2011,6 +2120,8 @@ public class GridGeometry implements LenientComparable, Serializable {
     /**
      * Returns a hash value for this grid geometry. This value needs not to remain
      * consistent between different implementations of the same class.
+     *
+     * @return a hash code value.
      */
     @Override
     public int hashCode() {
@@ -2067,6 +2178,8 @@ public class GridGeometry implements LenientComparable, Serializable {
      * Current implementation is equivalent to a call to {@link #toTree(Locale, int)} with
      * at least {@link #EXTENT}, {@link #ENVELOPE} and {@link #CRS} flags.
      * Whether more flags are present or not is unspecified.
+     *
+     * @return a human-readable, multi-line string representation.
      */
     @Override
     public String toString() {
