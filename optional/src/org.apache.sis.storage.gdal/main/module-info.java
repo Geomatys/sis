@@ -19,8 +19,15 @@
  * Bridge to the <abbr>GDAL</abbr> library for reading rasters.
  * This module assumes that <abbr>GDAL</abbr> 3.0 or later is preinstalled.
  * The <abbr>GDAL</abbr> C/C++ functions are invoked by using the {@link java.lang.foreign} package.
- * <em>Accesses to native functions are restricted by default in Java and requires user's authorization.</em>
- * This authorization can be granted by the following option on the command-line:
+ *
+ * <h2>Prerequisites</h2>
+ * The {@code libgdal.so} (on <abbr>POSIX</abbr>) or {@code gdal.dll} (on Windows) file must be reachable
+ * on the library search path. On <abbr>POSIX</abbr> systems, the {@code libgdal.so} is searched in the
+ * directories specified by the {@code LD_LIBRARY_PATH} environment variable. If the file is not found
+ * in these directories, then the search continues in {@code /lib/} and {@code /usr/lib/}.
+ *
+ * <p><em>Accesses to native functions are restricted by default in Java and require user's authorization.</em>
+ * This authorization can be granted by the following option on the command-line:</p>
  *
  * {@snippet lang="java" :
  *     java --enable-native-access org.apache.sis.storage.gdal <other options>

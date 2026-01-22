@@ -115,7 +115,7 @@ public class GridExtent implements GridEnvelope, LenientComparable, Serializable
      *
      * @see #typeFromAxes(CoordinateReferenceSystem, int)
      */
-    private static final Map<AxisDirection,DimensionNameType> AXIS_DIRECTIONS = Map.of(
+    private static final Map<AxisDirection, DimensionNameType> AXIS_DIRECTIONS = Map.of(
             AxisDirection.COLUMN_POSITIVE, DimensionNameType.COLUMN,
             AxisDirection.ROW_POSITIVE,    DimensionNameType.ROW,
             AxisDirection.UP,              DimensionNameType.VERTICAL,
@@ -133,7 +133,7 @@ public class GridExtent implements GridEnvelope, LenientComparable, Serializable
      * A pool of shared {@link DimensionNameType} arrays. We use a pool
      * because a small number of arrays is shared by most grid extents.
      */
-    private static final WeakValueHashMap<DimensionNameType[],DimensionNameType[]> POOL = new WeakValueHashMap<>(DimensionNameType[].class);
+    private static final WeakValueHashMap<DimensionNameType[], DimensionNameType[]> POOL = new WeakValueHashMap<>(DimensionNameType[].class);
 
     /**
      * Type of each axis (vertical, temporal, …) or {@code null} if unspecified.
@@ -2165,6 +2165,8 @@ public class GridExtent implements GridEnvelope, LenientComparable, Serializable
     /**
      * Returns a string representation of this grid extent. The returned string
      * is implementation dependent and is provided for debugging purposes only.
+     *
+     * @return a string representation of this grid extent for debugging purposes.
      */
     @Override
     public String toString() {

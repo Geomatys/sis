@@ -39,6 +39,7 @@ import org.apache.sis.storage.base.StoreResource;
 import org.apache.sis.storage.base.GridResourceWrapper;
 import org.apache.sis.referencing.CRS;
 import org.apache.sis.referencing.internal.shared.DirectPositionView;
+import org.apache.sis.referencing.operation.CoordinateOperationContext;
 import org.apache.sis.referencing.operation.matrix.MatrixSIS;
 import static org.apache.sis.storage.geotiff.reader.GridGeometryBuilder.BIDIMENSIONAL;
 
@@ -73,7 +74,7 @@ final class MultiResolutionImage extends GridResourceWrapper implements StoreRes
 
     /**
      * The last coordinate operation returned by {@link #getTransformFrom(CoordinateReferenceSystem)}.
-     * Used as an optimization in the common case where the same CRS is used for many requests.
+     * Used as an optimization in the common case where the same <abbr>CRS</abbr> is used for many requests.
      */
     private volatile CoordinateOperation lastOperation;
 
@@ -205,33 +206,40 @@ final class MultiResolutionImage extends GridResourceWrapper implements StoreRes
     }
 
     /**
-     * Converts a resolution from units in the given CRS to units of this coverage CRS.
+     * Returns the resolution of the given grid geometry, but in units of this coverage <abbr>CRS</abbr>.
      *
      * @param  domain  the geometry from which to get the resolution.
      * @return resolution from the given grid geometry in units of this coverage CRS, or {@code null}.
      */
-    private double[] getResolution(final GridGeometry domain) throws DataStoreException {
+    private double[] convertResolutionOf(final GridGeometry domain) throws DataStoreException {
         if (domain == null || !domain.isDefined(GridGeometry.RESOLUTION)) {
             return null;
         }
         double[] resolution = domain.getResolution(true);
         if (domain.isDefined(GridGeometry.CRS | GridGeometry.ENVELOPE)) try {
-            final CoordinateReferenceSystem crs = domain.getCoordinateReferenceSystem();
             CoordinateOperation op = lastOperation;
-            if (op == null || !crs.equals(op.getTargetCRS())) {
-                final GridGeometry gg = getGridGeometry();
-                op = CRS.findOperation(crs, gg.getCoordinateReferenceSystem(), gg.getGeographicExtent().orElse(null));
+            if (op == null || !domain.getCoordinateReferenceSystem().equals(op.getSourceCRS())) {
+                /*
+                 * The resolution in the user-supplied domain is associated to a CRS different than the CRS
+                 * of the last resolution that we computed. We must update the operation from user-supplied
+                 * resolution to the units of this grid coverage.
+                 */
+                final GridGeometry targetGrid = getGridGeometry();
+                final var context = new CoordinateOperationContext();
+                targetGrid.getGeographicExtent().ifPresent(context::addAreaOfInterest);
+                targetGrid.getConstantCoordinates().ifPresent(context::setConstantCoordinates);
+                op = CRS.findOperation(domain.getCoordinateMetadata(), targetGrid.getCoordinateMetadata(), context);
                 lastOperation = op;
             }
-            final MathTransform sourceToCoverage = op.getMathTransform();
-            if (!sourceToCoverage.isIdentity()) {
+            final MathTransform domainToCoverage = op.getMathTransform();
+            if (!domainToCoverage.isIdentity()) {
                 /*
                  * If the `domain` grid geometry has a resolution and an envelope, then it should have
                  * an extent and a "grid to CRS" transform (otherwise it may be a `GridGeometry` bug)
                  */
                 DirectPosition poi = new DirectPositionView.Double(domain.getExtent().getPointOfInterest(PixelInCell.CELL_CENTER));
                 poi = domain.getGridToCRS(PixelInCell.CELL_CENTER).transform(poi, null);
-                final MatrixSIS derivative = MatrixSIS.castOrCopy(sourceToCoverage.derivative(poi));
+                final MatrixSIS derivative = MatrixSIS.castOrCopy(domainToCoverage.derivative(poi));
                 resolution = derivative.multiply(resolution);
                 for (int i=0; i<resolution.length; i++) {
                     resolution[i] = Math.abs(resolution[i]);
@@ -253,7 +261,7 @@ final class MultiResolutionImage extends GridResourceWrapper implements StoreRes
      */
     @Override
     public GridCoverage read(final GridGeometry domain, final int... ranges) throws DataStoreException {
-        final double[] request = getResolution(domain);
+        final double[] request = convertResolutionOf(domain);
         int level = (request != null) ? resolutions.length : 1;
         synchronized (getSynchronizationLock()) {
 finer:      while (--level > 0) {

@@ -22,7 +22,8 @@ import org.apache.sis.geometry.AbstractDirectPosition;
 
 /**
  * A read-only direct position wrapping an array without performing any copy.
- * This class shall be used for temporary objects only (it is not serializable for this reason).
+ * This class shall be used for temporary objects only, unless the backing array is short.
+ * This class is not serializable for avoiding serialization of a potentially large array.
  *
  * @author  Martin Desruisseaux (Geomatys)
  */

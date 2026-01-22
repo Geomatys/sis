@@ -16,7 +16,7 @@
  */
 
 /**
- * Provides information and some controls about SIS configuration.
+ * Provides information and some controls about Apache <abbr>SIS</abbr> configuration.
  * System-wide information are provided by the {@link org.apache.sis.setup.About} class.
  * Some controls, for example on the {@linkplain org.apache.sis.setup.GeometryLibrary geometry library} to use,
  * is provided by a set of {@linkplain org.apache.sis.setup.OptionKey options} which can be used when a data store
