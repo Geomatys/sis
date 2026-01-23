@@ -16,11 +16,14 @@
  */
 package org.apache.sis.referencing.operation.transform;
 
+import java.util.BitSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.UnaryOperator;
 import org.opengis.util.FactoryException;
@@ -36,6 +39,7 @@ import org.apache.sis.util.ComparisonMode;
 import org.apache.sis.util.LenientComparable;
 import org.apache.sis.util.logging.Logging;
 import org.apache.sis.util.resources.Errors;
+import org.apache.sis.util.internal.shared.Numerics;
 import org.apache.sis.util.collection.BackingStoreException;
 
 
@@ -66,7 +70,7 @@ import org.apache.sis.util.collection.BackingStoreException;
  * a neighbor transform (at relative index -1 or +1) by a call to {@link #replace(int, MathTransform)}.
  *
  * @author  Martin Desruisseaux (Geomatys)
- * @version 1.5
+ * @version 1.6
  *
  * @see AbstractMathTransform#tryConcatenate(TransformJoiner)
  *
@@ -484,9 +488,9 @@ valid:  if (i >= 0 && i < steps.size()) {
      * @throws FactoryException if the concatenation is not a valid replacement.
      * @throws IllegalArgumentException if a value is repeated twice in the given map.
      */
-    public boolean replacePassThrough(Map<Integer,Integer> dimensions) throws FactoryException {
+    public boolean replacePassThrough(Map<Integer, Integer> dimensions) throws FactoryException {
         Matrix before, after;
-        if (!isAffine(before = getMatrix(-1)) || !isAffine(after = getMatrix(+1))) {
+        if (!(isAffine(before = getMatrix(-1)) && isAffine(after = getMatrix(+1)))) {
             return false;
         }
         /*
@@ -496,7 +500,7 @@ valid:  if (i >= 0 && i < steps.size()) {
          * the 1 value can be seen as passing-through.
          */
         final var sourceToTarget = new LinkedHashMap<>(dimensions);
-        final var targetToSource = new LinkedHashMap<Integer,Integer>();
+        final var targetToSource = new LinkedHashMap<Integer, Integer>();
         final MathTransform tr   = steps.get(replaceIndex);
         sourceToTarget.put(tr.getSourceDimensions(),
                            tr.getTargetDimensions());   // For the last row and the translation column in matrices.
@@ -571,7 +575,7 @@ valid:  if (i >= 0 && i < steps.size()) {
         final MatrixSIS simplified = Matrices.copy(moveFromBeforeToAfter ? before : after);
         final int dim = moveFromBeforeToAfter ? after.getNumCol() : before.getNumRow();
         final MatrixSIS moved = Matrices.create(dim, dim, ExtendedPrecisionMatrix.CREATE_IDENTITY);
-        for (final Map.Entry<Integer,Integer> entry : dimensions.entrySet()) {
+        for (final Map.Entry<Integer, Integer> entry : dimensions.entrySet()) {
             final int srcRow = entry.getKey();
             final int tgtRow = entry.getValue();
             moved.setElement(tgtRow, tgtRow, 0);    // Remove the 1 on the diagonal for that row.
@@ -618,7 +622,7 @@ valid:  if (i >= 0 && i < steps.size()) {
      * @param  matrix      the matrix that the caller wants to move if possible and useful.
      * @return how far the modified matrix would be from an identity transform. Lower is better.
      */
-    private static int removeInvalidPassThrough(final Map<Integer,Integer> dimensions, final Matrix matrix,
+    private static int removeInvalidPassThrough(final Map<Integer, Integer> dimensions, final Matrix matrix,
                                                 final boolean moveFromBeforeToAfter)
     {
         /*
@@ -721,9 +725,171 @@ valid:  if (i >= 0 && i < steps.size()) {
     }
 
     /**
+     * Tries to reduce the number of dimensions of the transform at the relative index 0.
+     * This method checks if a neighbor transform changes the number of dimensions.
+     * There are two cases:
+     *
+     * <ul>
+     *   <li>Linear transform at relative index +1 reduces the number of dimensions.</li>
+     *   <li>Linear transform at relative index -1 increases the number of dimensions.</li>
+     * </ul>
+     *
+     * If one of above cases is detected, then this method moves partially the linear step on the
+     * other side for reducing the number of dimensions on which the transform at index 0 operates.
+     * Such reduction can help {@link TransformSeparator} to separate the transform.
+     *
+     * @param  reducer  a constructor accepting selected dimension and returning the new transform.
+     * @return whether  the transform chain has been modified as a result of this method call.
+     * @throws FactoryException if the concatenation is not a valid replacement.
+     */
+    final boolean reduceDimension(final Set<Integer> inputDimensions,
+                                  final Set<Integer> outputDimensions,
+                                  final BiFunction<BitSet, Integer, MathTransform> reducer)
+            throws FactoryException
+    {
+        int relativeIndex = +1;
+check:  do {
+            final Matrix matrix = getMatrix(relativeIndex);
+            if (matrix == null) {
+                // Neighbor transform is not linear.
+                continue;
+            }
+            final int numCol = matrix.getNumCol();
+            final int numRow = matrix.getNumRow();
+            if (Integer.signum(numCol - numRow) != relativeIndex) {
+                // Neighbor transform does not change the number of dimensions in the desired way.
+                continue;
+            }
+            final MatrixSIS keep = Matrices.createIdentity(Math.min(numCol, numRow));
+            final MatrixSIS move = Matrices.copy(matrix);
+            final var rowsToKeep = new BitSet();
+            final var colsToKeep = new BitSet();
+            colsToKeep.set(0, numCol);
+prepare:    if (relativeIndex < 0) {
+                /*
+                 * Case where `matrix` is before the main transform and increases the number of dimensions.
+                 * We will try to move `matrix` after the main transform for making that transform smaller.
+                 * We only need to keep the rows which modify the input coordinates of the main transform.
+                 */
+                inputDimensions.forEach(rowsToKeep::set);
+            } else {
+                /*
+                 * Case where `matrix` is after the main transform and reduces the number of dimensions.
+                 * We will try to move `matrix` before the main transform for making that transform smaller.
+                 * But we cannot move the rows which depend on the output coordinates of the main transform.
+                 */
+                for (int i : outputDimensions) {
+                    for (int j=0; j<numRow; j++) {
+                        if (move.getElement(j, i) != 0) {
+                            rowsToKeep.set(j);
+                        }
+                    }
+                }
+                /*
+                 * Because `move` has too many columns compared to `keep`, we will need to ignore some columns.
+                 * We discard the columns where all coefficients are zero, starting by the last column before
+                 * translation, until we get the right number of columns.
+                 */
+                if (!discardRowsOrColumns(move, numCol, numRow, colsToKeep, true)) {
+                    continue;   // Finished iteration over all columns without discarding enough of them.
+                }
+            }
+            /*
+             * Copy into `keep` the rows that we need to keep because they compute the input coordinates
+             * needed by the main transform, or because they use the output coordinates of main transform.
+             */
+            for (int j=0; (j = rowsToKeep.nextSetBit(j)) >= 0; j++) {
+                for (int k=0, i=0; (i = colsToKeep.nextSetBit(i)) >= 0; i++, k++) {
+                    keep.setNumber (j, k, move.getNumber(j, i));
+                    move.setElement(j, i, (j == i) ? 1 : 0);
+                }
+            }
+            /*
+             * Verify that `move` just forwards the `keep` coordinates without modification, which is a
+             * necessary condition for executing `move` and `keep` in different order. Verify also that
+             * the coordinates modified by `move` will not impact or will not be impacted (depending on
+             * whether `move` will be moved to the right or to the left) by the main transform.
+             */
+            (relativeIndex < 0 ? outputDimensions : inputDimensions).forEach(rowsToKeep::set);
+            // Check input coordinates (columns) because `move` is still a step after `keep`.
+            for (int i=0; (i = rowsToKeep.nextSetBit(i)) >= 0; i++) {
+                for (int j=0; j<numRow; j++) {
+                    if (move.getElement(j, i) != (j == i ? 1 : 0)) {
+                        continue check;
+                    }
+                }
+            }
+            /*
+             * Finished the separation. Transforming by `keep` (a square matrix) followed by transforming
+             * by `move` (non-square matrix) should be equivalent to transforming by the original matrix:
+             *
+             *     assert move × keep = matrix
+             *
+             * Except that we cannot always compute this assertion because of the change of matrix size
+             * caused by `colsToKeep`.
+             */
+            final Matrix prefix, suffix;
+            if (relativeIndex < 0) {
+                assert Matrices.equals(matrix, move.multiply(keep), Numerics.COMPARISON_THRESHOLD, true) : matrix;
+                if (!discardRowsOrColumns(move, numRow, numCol, colsToKeep, false)) {
+                    continue;   // Finished iteration over all rows without discarding enough of them.
+                }
+                prefix = keep;
+                suffix = move;
+            } else {
+                prefix = move;
+                suffix = keep;
+            }
+            colsToKeep.clear(numCol - 1);
+            MathTransform concatenation = reducer.apply(colsToKeep, relativeIndex);
+            if (concatenation != null) {
+                concatenation = factory.createConcatenatedTransform(factory.createAffineTransform(prefix), concatenation);
+                concatenation = factory.createConcatenatedTransform(concatenation, factory.createAffineTransform(suffix));
+                if (replace(relativeIndex, concatenation)) {
+                    return true;
+                }
+            }
+        } while ((relativeIndex = -relativeIndex) < 0);
+        return false;
+    }
+
+    /**
+     * Finds rows or columns to exclude in the given matrix until the expected number is reached.
+     * This method expects a {@code keep} argument with all bits set, and will clear the bits of
+     * the dimensions to skip.
+     *
+     * By default, this method expects a matrix with more rows than columns and will skip rows.
+     * But if {@code transpose} is {@code true}, then the meaning of "row" and "column" are swapped,
+     * i.e. this method become used for skipping columns.
+     *
+     * @param  move       the matrix where to look for coefficients.
+     * @param  numRow     number of rows if {@code transpose} is false, or number of columns otherwise.
+     * @param  numCol     number of columns if {@code transpose} is false, or number of rows otherwise.
+     * @param  keep       the bit set where to clear the bit for rows (or columns) to skip.
+     * @param  transpose  whether to swap the rows and columns.
+     * @return {@code true} on success.
+     */
+    private static boolean discardRowsOrColumns(final Matrix move, final int numRow, final int numCol,
+                                                final BitSet keep, final boolean transpose)
+    {
+skip:   for (int j = numRow - 1; --j >= 0;) {
+            for (int i=0; i<numCol; i++) {
+                if (move.getElement(transpose ? i : j, transpose ? j : i) != 0) {
+                    continue skip;
+                }
+            }
+            keep.clear(j);
+            if (keep.cardinality() == numCol) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Creates a transform by concatenating two existing transforms.
      * This is a shortcut for {@code factory.createConcatenatedTransform(tr1, tr2)},
-     * except that this method reuse existing concatenated transform when possible.
+     * except that this method reuses existing concatenated transforms when possible.
      *
      * <p>Note that it is not always useful to invoke this method. For example, it will usually not bring any benefit
      * compared to direct use of the {@linkplain #factory} if one of the arguments is a newly created transform.</p>

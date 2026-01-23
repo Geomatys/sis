@@ -16,8 +16,9 @@
  */
 package org.apache.sis.referencing.operation.transform;
 
-import java.util.Objects;
+import java.util.Set;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.function.Function;
 import java.io.Serializable;
 import org.opengis.util.FactoryException;
@@ -66,7 +67,7 @@ import org.apache.sis.parameter.Parameters;
  * (it may be the [0 … 360]° range, but not necessarily).
  *
  * @author  Martin Desruisseaux (Geomatys)
- * @version 1.5
+ * @version 1.6
  *
  * @see org.apache.sis.geometry.Envelopes#transformWithWraparound(MathTransform, Envelope)
  *
@@ -405,7 +406,7 @@ public class WraparoundTransform extends AbstractMathTransform implements Serial
     }
 
     /**
-     * Concatenates in an optimized way this math transform with the given one, if possible.
+     * Optimizes the concatenation of this transform with its neighbor transforms, if possible.
      * If this method detects a chain of operations like below:
      *
      * <blockquote>[wraparound]  ⇄  [affine]  ⇄  [wraparound]</blockquote>
@@ -490,9 +491,22 @@ public class WraparoundTransform extends AbstractMathTransform implements Serial
                 dimensions.put(i, i);
             }
         }
-        if (!context.replacePassThrough(dimensions)) {
-            super.tryConcatenate(context);
+        if (context.replacePassThrough(dimensions)) {
+            return;
         }
+        if (getClass() == WraparoundTransform.class) {      // Because we did not defined an overrideable `redimension` method yet.
+            final var workOn = Set.of(wraparoundDimension);
+            if (context.reduceDimension(workOn, workOn,
+                    (selected, ignored) -> new WraparoundTransform(
+                            selected.cardinality(),
+                            Math.toIntExact(selected.stream().filter((i) -> i < wraparoundDimension).count()),
+                            period,
+                            sourceMedian)))
+            {
+                return;
+            }
+        }
+        super.tryConcatenate(context);
     }
 
     /**

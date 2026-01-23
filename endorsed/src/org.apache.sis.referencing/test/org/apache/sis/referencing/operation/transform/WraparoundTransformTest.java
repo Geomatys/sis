@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import org.apache.sis.test.TestCase;
 import org.apache.sis.referencing.crs.HardCodedCRS;
+import org.apache.sis.referencing.operation.matrix.Matrices;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import static org.opengis.test.Assertions.assertMatrixEquals;
@@ -190,5 +191,24 @@ public final class WraparoundTransformTest extends TestCase {
                 MathTransforms.getMatrix(steps.get(0)),
                 1E-15,  // Tolerance
                 "normalize");
+    }
+
+    /**
+     * Tests concatenation that reduces the number of dimensions.
+     * The {@link WraparoundTransform#tryConcatenate(TransformJoiner)}
+     * should replace the four-dimensional {@link WraparoundTransform}
+     * by a two-dimensional one.
+     */
+    @Test
+    public void testDimensionReduction() {
+        MathTransform tr = MathTransforms.translation(0, 0, 0, 0);
+        tr = MathTransforms.concatenate(tr, new WraparoundTransform(4, 0, 360, 40));
+        tr = MathTransforms.concatenate(tr, MathTransforms.linear(Matrices.createDimensionSelect(4, new int[] {0, 1})));
+        final var reduced = assertInstanceOf(WraparoundTransform.class, MathTransforms.getLastStep(tr));
+        assertEquals(  2, reduced.getSourceDimensions());
+        assertEquals(  2, reduced.getTargetDimensions());
+        assertEquals(  0, reduced.wraparoundDimension);
+        assertEquals(360, reduced.period);
+        assertEquals( 40, reduced.sourceMedian);
     }
 }
