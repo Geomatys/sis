@@ -63,7 +63,7 @@ final class TiledRaster extends TiledGridCoverage {
 
         // subset.includedBands contains the indices of bands requested by the user.
         // We filter the resource bands to only keep those needed.
-        Variable[] allBands = resource.getBands();
+        Variable[] allBands = resource.getVariables().toArray(new Variable[0]);
         if (includedBands != null) {
             this.bands = new Variable[includedBands.length];
             for(int i=0; i<includedBands.length; i++) {

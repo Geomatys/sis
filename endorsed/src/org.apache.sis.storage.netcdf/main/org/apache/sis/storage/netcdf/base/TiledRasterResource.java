@@ -32,6 +32,7 @@ import org.apache.sis.measure.NumberRange;
 import org.apache.sis.referencing.CRS;
 import org.apache.sis.referencing.CommonCRS;
 import org.apache.sis.referencing.operation.transform.LinearTransform;
+import org.apache.sis.referencing.operation.transform.MathTransforms;
 import org.apache.sis.storage.AbstractGridCoverageResource;
 import org.apache.sis.storage.DataStore;
 import org.apache.sis.storage.DataStoreContentException;
@@ -50,6 +51,7 @@ import org.apache.sis.util.internal.shared.UnmodifiableArrayList;
 import org.apache.sis.util.resources.Errors;
 import org.apache.sis.util.resources.Vocabulary;
 import org.opengis.metadata.Metadata;
+import org.opengis.metadata.spatial.DimensionNameType;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.GeodeticCRS;
 import org.opengis.referencing.crs.SingleCRS;
@@ -317,8 +319,12 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
         return Arrays.equals(s1, s2);
     }
 
-    Variable[] getBands() {
-        return data;
+    /**
+     * Returns the variables managed by this resource.
+     * @return the variables managed by this resource.
+     */
+    public List<Variable> getVariables() {
+        return UnmodifiableArrayList.wrap(data);
     }
 
     /**
@@ -409,71 +415,72 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
     /**
      * Creates a single sample dimension for the given variable.
      *
-     * @param  builder  the builder to use for creating the sample dimension.
-     * @param  band     the data for which to create a sample dimension.
-     * @param  index    index in the variable dimension identified by {@link #bandDimension}.
+     * @param builder the builder to use for creating the sample dimension.
+     * @param band    the data for which to create a sample dimension.
+     * @param index   index in the variable dimension identified by {@link #bandDimension}.
      */
     private SampleDimension createSampleDimension(final SampleDimension.Builder builder, final Variable band, final int index) {
         /*
-         * Take the minimum and maximum values as determined by Apache SIS through the Convention class.  The UCAR library
-         * is used only as a fallback. We give precedence to the range computed by Apache SIS instead of the range given
-         * by UCAR because we need the range of packed values instead of the range of converted values.
+         * Take the minimum and maximum values as determined by Apache SIS through the Convention class.
+         * The UCAR library is used only as a fallback. We give precedence to the range computed by
+         * Apache SIS instead of the range given by UCAR because we need the range of packed values instead of the range of
+         * converted values.
          */
         NumberRange<?> range;
         if (!createEnumeration(builder, band) && (range = band.getValidRange()) != null) try {
-            final MathTransform1D mt = band.getTransferFunction().getTransform();
-            if (!mt.isIdentity() && range instanceof MeasurementRange<?>) {
+                final MathTransform1D mt = band.getTransferFunction().getTransform();
+                if (!mt.isIdentity() && range instanceof MeasurementRange<?>) {
+                    /*
+                     * Heuristic rule defined in UCAR documentation (see EnhanceScaleMissingUnsigned):
+                     * if the type of the range is equal to the type of the scale, and the type of the
+                     * data is not wider, then assume that the minimum and maximum are real values.
+                     * This is identified in Apache SIS by the range given as a MeasurementRange.
+                     */
+                    final MathTransform1D inverse = mt.inverse();
+                    boolean isMinIncluded = range.isMinIncluded();
+                    boolean isMaxIncluded = range.isMaxIncluded();
+                    double minimum = inverse.transform(range.getMinDouble());
+                    double maximum = inverse.transform(range.getMaxDouble());
+                    if (maximum < minimum) {
+                        final double swap = maximum;
+                        maximum = minimum;
+                        minimum = swap;
+                        final boolean sb = isMaxIncluded;
+                        isMaxIncluded = isMinIncluded;
+                        isMinIncluded = sb;
+                    }
+                    if (band.getDataType().number <= Numbers.LONG && minimum >= Long.MIN_VALUE && maximum <= Long.MAX_VALUE) {
+                        range = NumberRange.create(Math.round(minimum), isMinIncluded, Math.round(maximum), isMaxIncluded);
+                    } else {
+                        range = NumberRange.create(minimum, isMinIncluded, maximum, isMaxIncluded);
+                    }
+                }
                 /*
-                 * Heuristic rule defined in UCAR documentation (see EnhanceScaleMissingUnsigned):
-                 * if the type of the range is equal to the type of the scale, and the type of the
-                 * data is not wider, then assume that the minimum and maximum are real values.
-                 * This is identified in Apache SIS by the range given as a MeasurementRange.
+                 * Range may be empty if min/max values declared in the netCDF files are erroneous,
+                 * or if we have not read them correctly (edu.ucar:cdm:4.6.13 sometimes confuses an
+                 * unsigned integer with a signed one).
                  */
-                final MathTransform1D inverse = mt.inverse();
-                boolean isMinIncluded = range.isMinIncluded();
-                boolean isMaxIncluded = range.isMaxIncluded();
-                double minimum = inverse.transform(range.getMinDouble());
-                double maximum = inverse.transform(range.getMaxDouble());
-                if (maximum < minimum) {
-                    final double swap = maximum;
-                    maximum = minimum;
-                    minimum = swap;
-                    final boolean sb = isMaxIncluded;
-                    isMaxIncluded = isMinIncluded;
-                    isMinIncluded = sb;
-                }
-                if (band.getDataType().number <= Numbers.LONG && minimum >= Long.MIN_VALUE && maximum <= Long.MAX_VALUE) {
-                    range = NumberRange.create(Math.round(minimum), isMinIncluded, Math.round(maximum), isMaxIncluded);
+                if (range.isEmpty()) {
+                    band.warning(TiledRasterResource.class, "getSampleDimensions", null, Resources.Keys.IllegalValueRange_4,
+                            band.getFilename(), band.getName(), range.getMinValue(), range.getMaxValue());
                 } else {
-                    range = NumberRange.create(minimum, isMinIncluded, maximum, isMaxIncluded);
+                    String name = band.getDescription();
+                    if (name == null) name = band.getName();
+                    if (band.getRole() == VariableRole.DISCRETE_COVERAGE) {
+                        builder.addQualitative(name, range);
+                    } else {
+                        builder.addQuantitative(name, range, mt, band.getUnit());
+                    }
                 }
+            } catch (TransformException e) {
+                /*
+                 * This exception may happen in the call to `inverse.transform`, when we tried to convert
+                 * a range of measurement values (in the unit of measurement) to a range of sample values.
+                 * If we failed to do that, we will not add quantitative category. But we still can add
+                 * qualitative categories for "no data" sample values in the rest of this method.
+                 */
+                listeners.warning(e);
             }
-            /*
-             * Range may be empty if min/max values declared in the netCDF files are erroneous,
-             * or if we have not read them correctly (edu.ucar:cdm:4.6.13 sometimes confuses an
-             * unsigned integer with a signed one).
-             */
-            if (range.isEmpty()) {
-                band.warning(TiledRasterResource.class, "getSampleDimensions", null, Resources.Keys.IllegalValueRange_4,
-                        band.getFilename(), band.getName(), range.getMinValue(), range.getMaxValue());
-            } else {
-                String name = band.getDescription();
-                if (name == null) name = band.getName();
-                if (band.getRole() == VariableRole.DISCRETE_COVERAGE) {
-                    builder.addQualitative(name, range);
-                } else {
-                    builder.addQuantitative(name, range, mt, band.getUnit());
-                }
-            }
-        } catch (TransformException e) {
-            /*
-             * This exception may happen in the call to `inverse.transform`, when we tried to convert
-             * a range of measurement values (in the unit of measurement) to a range of sample values.
-             * If we failed to do that, we will not add quantitative category. But we still can add
-             * qualitative categories for "no data" sample values in the rest of this method.
-             */
-            listeners.warning(e);
-        }
         /*
          * Adds the "missing value" or "fill value" as qualitative categories. If the sample values are already
          * real values, then the "no data" values have been replaced by NaN values by Variable.replaceNaN(Object).
@@ -482,12 +489,12 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
         boolean setBackground = true;
         int missingValueOrdinal = 0;
         int ordinal = band.hasRealValues() ? 0 : -1;
-        for (final Map.Entry<Number,Object> entry : band.getNodataValues().entrySet()) {
+        for (final Map.Entry<Number, Object> entry : band.getNodataValues().entrySet()) {
             final Number n;
             if (ordinal >= 0) {
-                n = MathFunctions.toNanFloat(ordinal++);        // Must be consistent with Variable.replaceNaN(Object).
+                n = MathFunctions.toNanFloat(ordinal++); // Must be consistent with Variable.replaceNaN(Object).
             } else {
-                n = entry.getKey();                             // Should be real number, made unique by the HashMap.
+                n = entry.getKey(); // Should be real number, made unique by the HashMap.
             }
             CharSequence name;
             final Object label = entry.getValue();
@@ -495,7 +502,7 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
                 final boolean isFill = setBackground && (((Integer) label) & Convention.FILL_VALUE_MASK) != 0;
                 name = Vocabulary.formatInternational(isFill ? Vocabulary.Keys.FillValue : Vocabulary.Keys.MissingValue);
                 if (isFill) {
-                    setBackground = false;                      // Declare only one fill value.
+                    setBackground = false; // Declare only one fill value.
                     builder.setBackground(name, n);
                     continue;
                 }

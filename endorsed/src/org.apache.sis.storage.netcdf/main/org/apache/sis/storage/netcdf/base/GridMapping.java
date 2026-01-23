@@ -171,7 +171,10 @@ final class GridMapping {
              * We detect those cases in order to avoid logging the same warning twice.
              */
             if (!gridMapping.containsKey(name)) {
+                String[] paths = variable.decoder.getSearchPath();
+                variable.decoder.setSearchPath(variable.getGroupPath());
                 final Node mapping = variable.decoder.findNode(name);
+                variable.decoder.setSearchPath(paths);
                 if (mapping != null) {
                     gm = parse(mapping);
                 }

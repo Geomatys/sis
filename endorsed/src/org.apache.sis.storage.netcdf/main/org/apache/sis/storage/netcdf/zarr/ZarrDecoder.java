@@ -59,40 +59,50 @@ import ucar.nc2.constants.CDM;
 /**
  * Provides Zarr decoding services as a standalone library.
  * The javadoc in this class uses the "file" word for the source of data, but
- * this implementation actually works with arbitrary {@link ReadableByteChannel}.
+ * this implementation actually works with arbitrary
+ * {@link ReadableByteChannel}.
  *
- * @author  Quentin Bialota (Geomatys)
+ * @author Quentin Bialota (Geomatys)
  */
 public final class ZarrDecoder extends Decoder {
     /**
-     * The {@link ReadableByteChannel} together with a {@link ByteBuffer} for reading the data.
+     * The {@link ReadableByteChannel} together with a {@link ByteBuffer} for
+     * reading the data.
      */
     private final Path inputPath;
 
     /**
      * The metadata of the Zarr node.
-     * This is initialized in the constructor by reading the metadata from the Zarr root path.
+     * This is initialized in the constructor by reading the metadata from the Zarr
+     * root path.
      */
     private final ZarrNodeMetadata metadata;
 
     /**
      * All dimensions in the zarr structure.
+     * Key is the dimension name
+     * Value is a list of DimensionInfo objects (there may be more than one if different groups contains the same dimension name)
      */
-    private Map<String, DimensionInfo> dimensionMap = new HashMap<>();
+    private Map<String, List<DimensionInfo>> dimensionMap = new HashMap<>();
 
     /**
      * The attributes found in the zarr tree structure.
-     * Values in this map give directly the attribute value (there is no {@code Attribute} object).
-     * Values are {@link String}, wrappers such as {@link Double}, or {@link Vector} objects.
+     * Values in this map give directly the attribute value (there is no
+     * {@code Attribute} object).
+     * Values are {@link String}, wrappers such as {@link Double}, or {@link Vector}
+     * objects.
      *
      * @see #findAttribute(String)
      */
     private final Map<String, List<AttributeEntry>> attributeMap;
 
     /**
-     * Names of attributes. This is {@code attributeMap.keySet()} unless some attributes have a name
-     * containing upper case letters. In such case a separated set is created for avoiding duplicated
-     * names (the name with upper case letters + the name in all lower case letters).
+     * Names of attributes. This is {@code attributeMap.keySet()} unless some
+     * attributes have a name
+     * containing upper case letters. In such case a separated set is created for
+     * avoiding duplicated
+     * names (the name with upper case letters + the name in all lower case
+     * letters).
      *
      * @see #getAttributeNames()
      */
@@ -106,20 +116,24 @@ public final class ZarrDecoder extends Decoder {
     final VariableInfo[] variables;
 
     /**
-     * Contains all {@link #variables}, but as a map for faster lookup by name. The same {@link VariableInfo}
-     * instance may be repeated in two entries if the original variable name contains upper case letters.
-     * In such case, the value is repeated and associated to a key in all lower case key letters.
+     * Contains all {@link #variables}, but as a map for faster lookup by name. The
+     * same {@link VariableInfo}
+     * instance may be repeated in two entries if the original variable name
+     * contains upper case letters.
+     * In such case, the value is repeated and associated to a key in all lower case
+     * key letters.
      *
      * @see #findVariable(String)
      */
-    private final Map<String, VariableInfo> variableMap;
+    private final Map<String, List<VariableInfo>> variableMap;
 
     /**
      * The Zarr groups found in the zarr structure.
      */
     private Map<String, ZarrGroupMetadata> groupMap = new HashMap<>();
 
-    /** The grid geometries, created when first needed.
+    /**
+     * The grid geometries, created when first needed.
      *
      * @see #getGridCandidates()
      */
@@ -128,15 +142,18 @@ public final class ZarrDecoder extends Decoder {
     /**
      * Creates a new decoder for the given file.
      *
-     * @param  inputPath  the path of the folder where are stored the files of the Zarr format.
-     * @param  geomlib    the library for geometric objects, or {@code null} for the default.
-     * @param  listeners  where to send the warnings.
-     * @throws IOException if an error occurred while reading the channel.
-     * @throws DataStoreException if the content of the given channel is not a netCDF file.
+     * @param inputPath the path of the folder where are stored the files of the
+     *                  Zarr format.
+     * @param geomlib   the library for geometric objects, or {@code null} for the
+     *                  default.
+     * @param listeners where to send the warnings.
+     * @throws IOException         if an error occurred while reading the channel.
+     * @throws DataStoreException  if the content of the given channel is not a
+     *                             netCDF file.
      * @throws ArithmeticException if a variable is too large.
      */
     public ZarrDecoder(final Path inputPath, final GeometryLibrary geomlib,
-                       final StoreListeners listeners) throws IOException, DataStoreException {
+            final StoreListeners listeners) throws IOException, DataStoreException {
         super(geomlib, listeners);
 
         this.inputPath = inputPath;
@@ -157,43 +174,68 @@ public final class ZarrDecoder extends Decoder {
         attributeMap = toCaseInsensitiveNameMap(attributes.toArray(new AttributeEntry[0]));
         attributeNames = attributeNames(attributes, attributeMap);
 
-        variableMap = toCaseInsensitiveNameMap(this.variables);
+        variableMap = toCaseIsensitiveNameMapList(this.variables);
     }
 
     /**
-     * Creates a (<var>name</var>, <var>element</var>) mapping for the given array of elements.
-     * If the name of an element is not all lower cases, then this method also adds an entry for the
+     * Creates a (<var>name</var>, <var>element</var>) mapping for the given array
+     * of elements.
+     * If the name of an element is not all lower cases, then this method also adds
+     * an entry for the
      * lower cases version of that name in order to allow case-insensitive searches.
      *
-     * <p>Code searching in the returned map shall ask for the original (non lower-case) name
-     * <strong>before</strong> to ask for the lower-cases version of that name.</p>
+     * <p>
+     * Code searching in the returned map shall ask for the original (non
+     * lower-case) name
+     * <strong>before</strong> to ask for the lower-cases version of that name.
+     * </p>
      *
-     * @param  <E>       the type of elements.
-     * @param  elements  the elements to store in the map, or {@code null} if none.
-     * @return a (<var>name</var>, <var>element</var>) mapping with lower cases entries where possible.
-     * @throws InvalidParameterCardinalityException if the same name is used for more than one element.
+     * @param <E>      the type of elements.
+     * @param elements the elements to store in the map, or {@code null} if none.
+     * @return a (<var>name</var>, <var>element</var>) mapping with lower cases
+     *         entries where possible.
+     * @throws InvalidParameterCardinalityException if the same name is used for
+     *                                              more than one element.
      */
-    private static <E extends NamedElement> Map<String,E> toCaseInsensitiveNameMap(final E[] elements) {
-        return CollectionsExt.toCaseInsensitiveNameMap(new AbstractList<Map.Entry<String,E>>() {
+    private static <E extends NamedElement> Map<String, E> toCaseInsensitiveNameMap(final E[] elements) {
+        return CollectionsExt.toCaseInsensitiveNameMap(new AbstractList<Map.Entry<String, E>>() {
             @Override
             public int size() {
                 return elements.length;
             }
 
             @Override
-            public Map.Entry<String,E> get(final int index) {
+            public Map.Entry<String, E> get(final int index) {
                 final E e = elements[index];
                 return new AbstractMap.SimpleImmutableEntry<>(e.getName(), e);
             }
         }, Decoder.DATA_LOCALE);
     }
 
+    private static <E extends NamedElement> Map<String, List<E>> toCaseIsensitiveNameMapList(final E[] elements) {
+        if (elements == null || elements.length == 0) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, List<E>> map = new LinkedHashMap<>(elements.length);
+        for (E element : elements) {
+            String name = element.getName();
+            String lowerName = name.toLowerCase(Decoder.DATA_LOCALE);
+            map.computeIfAbsent(lowerName, k -> new ArrayList<>()).add(element);
+        }
+        return map;
+    }
+
     /**
-     * Creates a (<var>name</var>, <var>list of entries</var>) mapping for the given array of attribute entries.
-     * This method is used for storing attributes in a way that allows case-insensitive searches.
+     * Creates a (<var>name</var>, <var>list of entries</var>) mapping for the given
+     * array of attribute entries.
+     * This method is used for storing attributes in a way that allows
+     * case-insensitive searches.
      *
-     * @param entries the attribute entries to store in the map, or {@code null} if none.
-     * @return a (<var>name</var>, <var>list of entries</var>) mapping with lower cases entries where possible.
+     * @param entries the attribute entries to store in the map, or {@code null} if
+     *                none.
+     * @return a (<var>name</var>, <var>list of entries</var>) mapping with lower
+     *         cases entries where possible.
      */
     private static Map<String, List<AttributeEntry>> toCaseInsensitiveNameMap(final AttributeEntry[] entries) {
         if (entries == null || entries.length == 0) {
@@ -231,7 +273,8 @@ public final class ZarrDecoder extends Decoder {
 
     /**
      * Returns the metadata of the Zarr node.
-     * This method is used to access the metadata after the decoder has been created.
+     * This method is used to access the metadata after the decoder has been
+     * created.
      *
      * @param zarrRootPath the path to the root of the Zarr dataset.
      * @return the metadata of the Zarr node.
@@ -239,13 +282,15 @@ public final class ZarrDecoder extends Decoder {
     private static ZarrNodeMetadata decodeZarrMetadata(final Path zarrRootPath) throws IOException, DataStoreException {
         // 1. Path is directory?
         if (!Files.isDirectory(zarrRootPath)) {
-            throw new DataStoreException("Specified path is not a directory: " + zarrRootPath + ". Zarr dataset root must be a directory.");
+            throw new DataStoreException(
+                    "Specified path is not a directory: " + zarrRootPath + ". Zarr dataset root must be a directory.");
         }
 
         // 2. Directory is not empty?
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(zarrRootPath)) {
             if (!stream.iterator().hasNext()) {
-                throw new DataStoreContentException("Zarr root directory specified is empty: " + zarrRootPath + ". No data to read." );
+                throw new DataStoreContentException(
+                        "Zarr root directory specified is empty: " + zarrRootPath + ". No data to read.");
             }
         }
 
@@ -261,36 +306,41 @@ public final class ZarrDecoder extends Decoder {
     }
 
     // --------------------------------------------------------------------------------------------
-    //  DIMENSION READING / MANAGEMENT
+    // DIMENSION READING / MANAGEMENT
     // --------------------------------------------------------------------------------------------
 
     /**
      * Reads dimensions from the Zarr metadata object. The record structure is:
      *
      * <ul>
-     *   <li>The dimension name</li>
-     *   <li>The dimension length</li>
-     *   <li>The dimension array paths (list of arrays that use the dimension)</li>
+     * <li>The dimension name</li>
+     * <li>The dimension length</li>
+     * <li>The dimension array paths (list of arrays that use the dimension)</li>
      * </ul>
      *
-     * @param  metadata the root node of the Zarr metadata tree.
+     * @param metadata         the root node of the Zarr metadata tree.
      * @return the dimensions in the order they are found in the Zarr metadata tree.
      */
-    private DimensionInfo[] readDimensions(final ZarrNodeMetadata metadata) throws IOException, DataStoreException {
+    private DimensionInfo[] readDimensions(final ZarrNodeMetadata metadata)
+            throws IOException, DataStoreException {
         final List<DimensionInfo> dimensions = new ArrayList<>();
 
         extractDimensionsRecursively(metadata, dimensions, "");
 
         DimensionInfo[] array = dimensions.toArray(new DimensionInfo[0]);
-        this.dimensionMap = toCaseInsensitiveNameMap(array);
+        this.dimensionMap = toCaseIsensitiveNameMapList(array);
         return array;
     }
+
     /**
      * The letters used for dimension names in Zarr.
-     * This is a static array of characters that can be used to generate dimension names.
-     * The first 26 letters are used for the first 26 dimensions, and then it continues with 'a', 'b', etc.
+     * This is a static array of characters that can be used to generate dimension
+     * names.
+     * The first 26 letters are used for the first 26 dimensions, and then it
+     * continues with 'a', 'b', etc.
      */
-    private static final char[] DIM_LETTERS = {'x', 'y', 'z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w'};
+    private static final char[] DIM_LETTERS = { 'x', 'y', 'z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
+            'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w' };
 
     /**
      * Generate a unique dimension name based on the index and existing dimensions.
@@ -309,10 +359,12 @@ public final class ZarrDecoder extends Decoder {
 
     /**
      * Checks if a dimension name is already used with a different size.
-     * @param name the name of the dimension to check.
-     * @param size the size of the dimension to check.
+     * 
+     * @param name       the name of the dimension to check.
+     * @param size       the size of the dimension to check.
      * @param dimensions the list of existing dimensions to check against.
-     * @return {@code true} if the name is used with a different size, {@code false} otherwise.
+     * @return {@code true} if the name is used with a different size, {@code false}
+     *         otherwise.
      */
     private boolean dimensionNameUsed(String name, int size, List<DimensionInfo> dimensions) {
         for (DimensionInfo d : dimensions) {
@@ -325,14 +377,18 @@ public final class ZarrDecoder extends Decoder {
 
     /**
      * Recursively extracts dimensions from the Zarr metadata tree.
-     * @param node the current Zarr node metadata to process.
-     * @param dimensions the list to which found dimensions will be added.
-     * @param parentPath the path of the parent node, used to build the full path of the current node.
-     * @throws IOException if an I/O error occurs while reading the metadata.
-     * @throws DataStoreException if a logical error occurs while processing the metadata.
+     * 
+     * @param node             the current Zarr node metadata to process.
+     * @param dimensions       the list to which found dimensions will be added.
+     * @param parentPath       the path of the parent node, used to build the full
+     *                         path of the current node.
+     * @throws IOException        if an I/O error occurs while reading the metadata.
+     * @throws DataStoreException if a logical error occurs while processing the
+     *                            metadata.
      */
-    private void extractDimensionsRecursively(final ZarrNodeMetadata node, final List<DimensionInfo> dimensions, String parentPath) throws IOException, DataStoreException {
+    private void extractDimensionsRecursively(final ZarrNodeMetadata node, final List<DimensionInfo> dimensions, String parentPath){
         String currentPath = parentPath.isEmpty() ? "/" + node.name() : parentPath + "/" + node.name();
+        String currentGroupPath = parentPath.isEmpty() ? "/" : parentPath;
 
         if (node instanceof ZarrArrayMetadata) {
             ZarrArrayMetadata array = (ZarrArrayMetadata) node;
@@ -351,12 +407,14 @@ public final class ZarrDecoder extends Decoder {
                 DimensionInfo info = null;
                 for (DimensionInfo d : dimensions) {
                     if (d.name.equals(name) && d.length == shape[i]) {
-                        info = d;
-                        break;
+                        if (d.getZarrPath().equalsIgnoreCase(currentGroupPath)) {
+                            info = d;
+                            break;
+                        }
                     }
                 }
                 if (info == null) {
-                    info = new DimensionInfo(name, shape[i]);
+                    info = new DimensionInfo(name, shape[i], currentGroupPath);
                     dimensions.add(info);
                 }
                 info.addArrayPath(currentPath, array.dimensionNames());
@@ -371,7 +429,7 @@ public final class ZarrDecoder extends Decoder {
     }
 
     // --------------------------------------------------------------------------------------------
-    //  ATTRIBUTES READING / MANAGEMENT
+    // ATTRIBUTES READING / MANAGEMENT
     // --------------------------------------------------------------------------------------------
 
     /**
@@ -402,11 +460,14 @@ public final class ZarrDecoder extends Decoder {
          * @param value the value of the attribute.
          */
         public AttributeEntry(String path, String name, Object value) {
-            this.path = path; this.name = name; this.value = value;
+            this.path = path;
+            this.name = name;
+            this.value = value;
         }
 
         /**
          * Converts this attribute entry to a map entry.
+         * 
          * @return a map entry with the attribute name as key and the value as value.
          */
         public Map.Entry<String, Object> toMapEntry() {
@@ -415,15 +476,21 @@ public final class ZarrDecoder extends Decoder {
 
         @Override
         public String getName() {
-             return name;
+            return name;
+        }
+
+        @Override
+        public String toString() {
+            return name + " (" + path + ")";
         }
     }
 
     /**
      * Reads attributes from the Zarr metadata object.
      *
-     * @param metadata the root node of the Zarr metadata tree.
-     * @param onlyGroupAttributes if {@code true}, only attributes of groups will be extracted.
+     * @param metadata            the root node of the Zarr metadata tree.
+     * @param onlyGroupAttributes if {@code true}, only attributes of groups will be
+     *                            extracted.
      * @return a list of attributes found in the Zarr metadata tree.
      */
     private List<AttributeEntry> readAttributes(final ZarrNodeMetadata metadata, boolean onlyGroupAttributes) {
@@ -435,12 +502,15 @@ public final class ZarrDecoder extends Decoder {
     /**
      * Recursively extracts attributes from the Zarr metadata tree.
      *
-     * @param node the current Zarr node metadata to process.
-     * @param attributes the list to which found attributes will be added.
-     * @param onlyGroupAttributes if {@code true}, only attributes of groups will be extracted.
+     * @param node                the current Zarr node metadata to process.
+     * @param attributes          the list to which found attributes will be added.
+     * @param onlyGroupAttributes if {@code true}, only attributes of groups will be
+     *                            extracted.
      */
-    private void extractAttributesRecursively(final ZarrNodeMetadata node, final List<AttributeEntry> attributes, boolean onlyGroupAttributes) {
-        //Only store attributes for groups, this will exclude array attributes (also named variables attributes).
+    private void extractAttributesRecursively(final ZarrNodeMetadata node, final List<AttributeEntry> attributes,
+            boolean onlyGroupAttributes) {
+        // Only store attributes for groups, this will exclude array attributes (also
+        // named variables attributes).
         if (onlyGroupAttributes && node instanceof ZarrArrayMetadata) {
             return;
         }
@@ -448,7 +518,8 @@ public final class ZarrDecoder extends Decoder {
         if (node.attributes() != null && !node.attributes().isEmpty()) {
             for (Map.Entry<String, Object> entry : node.attributes().entrySet()) {
                 Object value = entry.getValue();
-                if (value instanceof String) value = ((String)value).trim();
+                if (value instanceof String)
+                    value = ((String) value).trim();
                 attributes.add(new AttributeEntry(node.zarrPath(), entry.getKey(), value));
             }
         }
@@ -462,15 +533,21 @@ public final class ZarrDecoder extends Decoder {
     }
 
     /**
-     * Returns the keys of {@code attributeMap} without the duplicated values caused by the change of name case.
-     * For example if an attribute {@code "Foo"} exists and a {@code "foo"} key has been generated for enabling
-     * case-insensitive search, only the {@code "Foo"} name is added in the returned set.
+     * Returns the keys of {@code attributeMap} without the duplicated values caused
+     * by the change of name case.
+     * For example if an attribute {@code "Foo"} exists and a {@code "foo"} key has
+     * been generated for enabling
+     * case-insensitive search, only the {@code "Foo"} name is added in the returned
+     * set.
      *
-     * @param  attributes    the attributes returned by {@link #readAttributes(ZarrNodeMetadata, boolean)}.
-     * @param  attributeMap  the map created by {@link CollectionsExt#toCaseInsensitiveNameMap(Collection, Locale)}.
+     * @param attributes   the attributes returned by
+     *                     {@link #readAttributes(ZarrNodeMetadata, boolean)}.
+     * @param attributeMap the map created by
+     *                     {@link CollectionsExt#toCaseInsensitiveNameMap(Collection, Locale)}.
      * @return {@code attributes.keySet()} without duplicated keys.
      */
-    private static Set<String> attributeNames(final List<AttributeEntry> attributes, final Map<String,?> attributeMap) {
+    private static Set<String> attributeNames(final List<AttributeEntry> attributes,
+            final Map<String, ?> attributeMap) {
         if (attributes.size() >= attributeMap.size()) {
             return Collections.unmodifiableSet(attributeMap.keySet());
         }
@@ -479,7 +556,8 @@ public final class ZarrDecoder extends Decoder {
         return attributeNames;
     }
 
-    private static Set<String> attributeNamesWithMapEntries(final List<Map.Entry<String, Object>> attributes, final Map<String,?> attributeMap) {
+    private static Set<String> attributeNamesWithMapEntries(final List<Map.Entry<String, Object>> attributes,
+            final Map<String, ?> attributeMap) {
         if (attributes.size() >= attributeMap.size()) {
             return Collections.unmodifiableSet(attributeMap.keySet());
         }
@@ -495,13 +573,14 @@ public final class ZarrDecoder extends Decoder {
      * The {@code name} argument is typically (but is not restricted to) one of the constants
      * defined in the {@link org.apache.sis.storage.netcdf.AttributeNames} class.
      *
-     * @param  name  the name of the attribute to search, or {@code null}.
+     * @param name the name of the attribute to search, or {@code null}.
+     * @param group the group where to search the attribute, or {@code null} for searching globally.
      * @return the attribute value, or {@code null} if none.
      *
      * @see #getAttributeNames()
      */
     @SuppressWarnings("StringEquality")
-    private AttributeEntry findAttribute(final String name) {
+    private AttributeEntry findAttribute(final String name, final ZarrGroupMetadata group) {
         if (name == null) {
             return null;
         }
@@ -509,29 +588,54 @@ public final class ZarrDecoder extends Decoder {
         String mappedName;
         final Convention convention = convention();
         while ((mappedName = convention.mapAttributeName(name, index++)) != null) {
-            AttributeEntry value = (attributeMap.get(mappedName) != null) ? attributeMap.get(mappedName).get(0) : null;
-            if (value != null) return value;
+            List<AttributeEntry> values = (attributeMap.get(mappedName) != null) ? attributeMap.get(mappedName) : null;
+            if (values != null) {
+                if (group == null) {
+                    // Global search: returns the first found value.
+                    return values.get(0);
+                } else {
+                    // Group-specific search: returns the first value defined in the given group.
+                    for (AttributeEntry entry : values) {
+                        if (entry.path.equals(group.zarrPath())) {
+                            return entry;
+                        }
+                    }
+                }
+            }
             /*
              * If no value were found for the given name, tries the following alternatives:
              *
-             *   - Same name but in lower cases.
-             *   - Alternative name specific to the non-standard convention used by current file.
-             *   - Same alternative name but in lower cases.
+             * - Same name but in lower cases.
+             * - Alternative name specific to the non-standard convention used by current file.
+             * - Same alternative name but in lower cases.
              *
-             * Identity comparisons performed between String instances below are okay since they
+             * Identity comparisons performed between String instances below are okay since
+             * they
              * are only optimizations for skipping calls to Map.get(Object) in common cases.
              */
             final String lowerCase = mappedName.toLowerCase(DATA_LOCALE);
             if (lowerCase != mappedName) {
-                value = (attributeMap.get(lowerCase) != null) ? attributeMap.get(lowerCase).get(0) : null;
-                if (value != null) return value;
+                List<AttributeEntry> lowerCaseValues = (attributeMap.get(lowerCase) != null) ? attributeMap.get(lowerCase) : null;
+                if (lowerCaseValues != null) {
+                    if (group == null) {
+                        // Global search: returns the first found value.
+                        return lowerCaseValues.get(0);
+                    } else {
+                        // Group-specific search: returns the first value defined in the given group.
+                        for (AttributeEntry entry : lowerCaseValues) {
+                            if (entry.path.equals(group.zarrPath())) {
+                                return entry;
+                            }
+                        }
+                    }
+                }
             }
         }
         return null;
     }
 
     // --------------------------------------------------------------------------------------------
-    //  VARIABLE READING / MANAGEMENT
+    // VARIABLE READING / MANAGEMENT
     // --------------------------------------------------------------------------------------------
 
     private VariableInfo[] readVariables(final ZarrNodeMetadata metadata, final DimensionInfo[] allDimensions) throws IOException, DataStoreException {
@@ -545,7 +649,8 @@ public final class ZarrDecoder extends Decoder {
             // One dimension per axis
             DimensionInfo[] dimensions = new DimensionInfo[array.shape().length];
 
-            List<Map.Entry<String, Object>> attributes = readAttributes(metadata, false).stream().map(AttributeEntry::toMapEntry).collect(Collectors.toList());
+            List<Map.Entry<String, Object>> attributes = readAttributes(metadata, false).stream()
+                    .map(AttributeEntry::toMapEntry).collect(Collectors.toList());
 
             // Handle _FillValue attribute if present
             // Zarr v3 stores fill value in array metadata instead of attributes
@@ -567,7 +672,8 @@ public final class ZarrDecoder extends Decoder {
                 attributes.add(new java.util.AbstractMap.SimpleEntry<>("_FillValue", nativeFill));
             }
 
-            final Map<String,Object> attributeMap = CollectionsExt.toCaseInsensitiveNameMap(attributes, Decoder.DATA_LOCALE);
+            final Map<String, Object> attributeMap = CollectionsExt.toCaseInsensitiveNameMap(attributes,
+                    Decoder.DATA_LOCALE);
 
             int i = 0;
             for (DimensionInfo d : allDimensions) {
@@ -576,10 +682,10 @@ public final class ZarrDecoder extends Decoder {
                     i++;
                 }
             }
-            variables.add(new VariableInfo(this, name, dimensions, attributeMap, attributeNamesWithMapEntries(attributes, attributeMap), array.dataType(), array));
+            variables.add(new VariableInfo(this, name, dimensions, attributeMap,
+                    attributeNamesWithMapEntries(attributes, attributeMap), array.dataType(), array));
 
-
-        // If Group, read its children variables recursively
+            // If Group, read its children variables recursively
         } else if (metadata instanceof ZarrGroupMetadata) {
             ZarrGroupMetadata group = (ZarrGroupMetadata) metadata;
             for (ZarrNodeMetadata child : group.getChildrenNodeMetadata().values()) {
@@ -587,20 +693,22 @@ public final class ZarrDecoder extends Decoder {
             }
         }
 
-        // Sort variables by their path in the Zarr structure for ensuring a deterministic order.
+        // Sort variables by their path in the Zarr structure for ensuring a
+        // deterministic order.
         variables.sort(Comparator.comparing(v -> v.metadata.zarrPath()));
 
         return variables.toArray(new VariableInfo[0]);
     }
 
     // --------------------------------------------------------------------------------------------
-    //  GROUPS / SEARCH PATH MANAGEMENT
+    // GROUPS / SEARCH PATH MANAGEMENT
     // --------------------------------------------------------------------------------------------
 
     /**
      * Finds a Zarr group by its path or by name.
      * If the name contains '/', it is treated as a path (absolute or relative).
-     * If the name does not contain '/', the first group with that name is returned (searched recursively).
+     * If the name does not contain '/', the first group with that name is returned
+     * (searched recursively).
      *
      * @param name The group name or path.
      * @return The found ZarrGroupMetadata, or null if not found.
@@ -658,8 +766,37 @@ public final class ZarrDecoder extends Decoder {
         return null;
     }
 
+    /**
+     * Helper to retrieve paths of groups defined in the multiscales attribute.
+     */
+    private Set<String> getMultiscaleGroupPaths(ZarrNodeMetadata root) {
+        Set<String> paths = new HashSet<>();
+        if (root instanceof ZarrGroupMetadata) {
+            List<ZarrMultiscale> multiscales = ((ZarrGroupMetadata) root).getMultiscales();
+            if (multiscales != null) {
+                for (ZarrMultiscale ms : multiscales) {
+                    if (ms.layout != null) {
+                        for (ZarrMultiscale.Level level : ms.layout) {
+                            if (level.asset != null) {
+                                // Assume asset is a relative path from root, or a top-level name.
+                                // ZarrDecoder paths usually start with "/"
+                                String p = level.asset;
+                                if (!p.startsWith("/")) {
+                                    p = "/" + p;
+                                }
+                                paths.add(p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return paths;
+    }
+
     // --------------------------------------------------------------------------------------------
-    //  Decoder API begins below this point. Above code was specific to parsing of zarr header.
+    // Decoder API begins below this point. Above code was specific to parsing of
+    // zarr header.
     // --------------------------------------------------------------------------------------------
 
     @Override
@@ -679,8 +816,10 @@ public final class ZarrDecoder extends Decoder {
     }
 
     /**
-     * Sets an identification of the file format. This method uses a reference to a database entry
-     * known to {@link org.apache.sis.metadata.sql.MetadataSource#lookup(Class, String)}.
+     * Sets an identification of the file format. This method uses a reference to a
+     * database entry
+     * known to
+     * {@link org.apache.sis.metadata.sql.MetadataSource#lookup(Class, String)}.
      */
     @Override
     public void addFormatDescription(MetadataBuilder builder) {
@@ -692,13 +831,13 @@ public final class ZarrDecoder extends Decoder {
      * Sets the search path for groups in the Zarr structure.
      * This method allows to specify a list of group names in preference order.
      * NOTE :
-     * - If a a group name contains '/' (slash), it is considered as a path to a group
-     *   (e.g. "/group/subgroup", will search for "subgroup" in the "group" group).
+     * - If a group name contains '/' (slash), it is considered as a path to a group
+     *      (e.g. "/group/subgroup", will search for "subgroup" in the "group" group).
      * - If a group name does not contain '/', it is considered as a group name, and will be searched in all the tree until a match is found.
      * - If a group name is not found in the Zarr structure, it is ignored.
      * - If a group name is {@code null}, it is ignored.
      *
-     * @param groupNames  the name of the group where to search, in preference order.
+     * @param groupNames the name of the group where to search, in preference order.
      *
      */
     @Override
@@ -717,8 +856,7 @@ public final class ZarrDecoder extends Decoder {
     }
 
     @Override
-    public String[] getSearchPath()
-    {
+    public String[] getSearchPath() {
         return this.groupMap.keySet().toArray(new String[this.groupMap.size()]);
     }
 
@@ -734,14 +872,37 @@ public final class ZarrDecoder extends Decoder {
     }
 
     /**
+     * Returns the zarr attribute of the given name, or {@code null} if none. This method is invoked for every
+     * global attributes if groupMap is not defined, or for every group in the search path otherwise.
+     * @param name the name of the attribute to search.
+     * @param groupMap the map of groups to search in, or {@code null} for searching globally.
+     * @return the attribute entry found, or {@code null} if none.
+     */
+    private AttributeEntry findAttributeInGroups(final String name, final Map<String, ZarrGroupMetadata> groupMap) {
+        if (this.groupMap.isEmpty()) {
+            // No search path defined, search everywhere.
+            return findAttribute(name, null);
+        } else {
+            for (final ZarrGroupMetadata group : this.groupMap.values()) {
+                final AttributeEntry attribute = findAttribute(name, group);
+                if (attribute != null) {
+                    return attribute;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns the value for the attribute of the given name, or {@code null} if none.
      *
-     * @param  name  the name of the attribute to search, or {@code null}.
-     * @return the attribute value, or {@code null} if none or empty or if the given name was null.
+     * @param name the name of the attribute to search, or {@code null}.
+     * @return the attribute value, or {@code null} if none or empty or if the given
+     *         name was null.
      */
     @Override
     public String stringValue(final String name) {
-        final AttributeEntry attribute = findAttribute(name);
+        AttributeEntry attribute = findAttributeInGroups(name, this.groupMap);
         if (attribute == null) {
             return null;
         }
@@ -756,7 +917,7 @@ public final class ZarrDecoder extends Decoder {
      */
     @Override
     public Number numericValue(final String name) {
-        final AttributeEntry attribute = findAttribute(name);
+        AttributeEntry attribute = findAttributeInGroups(name, this.groupMap);
         if (attribute == null) {
             return null;
         }
@@ -772,48 +933,53 @@ public final class ZarrDecoder extends Decoder {
     }
 
     /**
-     * Returns the value of the attribute of the given name as a date, or {@code null} if none.
+     * Returns the value of the attribute of the given name as a date, or
+     * {@code null} if none.
      * If there is more than one numeric value, only the first one is returned.
      *
      * @return {@inheritDoc}
      */
     @Override
     public Temporal dateValue(final String name) {
-        final AttributeEntry attribute = findAttribute(name);
+        AttributeEntry attribute = findAttributeInGroups(name, this.groupMap);
         if (attribute == null) {
             return null;
         }
-        if (attribute.value instanceof CharSequence) try {
-            return LenientDateFormat.parseBest((CharSequence) attribute.value);
-        } catch (RuntimeException e) {
-            listeners.warning(e);
-        }
+        if (attribute.value instanceof CharSequence)
+            try {
+                return LenientDateFormat.parseBest((CharSequence) attribute.value);
+            } catch (RuntimeException e) {
+                listeners.warning(e);
+            }
         return null;
     }
 
     /**
-     * Converts the given numerical values to date, using the information provided in the given unit symbol.
-     * The unit symbol is typically a string like <q>days since 1970-01-01T00:00:00Z</q>.
+     * Converts the given numerical values to date, using the information provided
+     * in the given unit symbol.
+     * The unit symbol is typically a string like
+     * <q>days since 1970-01-01T00:00:00Z</q>.
      *
-     * @param  values  the values to convert. May contain {@code null} elements.
+     * @param values the values to convert. May contain {@code null} elements.
      * @return the converted values. May contain {@code null} elements.
      */
     @Override
     public Temporal[] numberToDate(final String symbol, final Number... values) {
         final var dates = new Instant[values.length];
         final Matcher parts = Variable.TIME_UNIT_PATTERN.matcher(symbol);
-        if (parts.matches()) try {
-            final UnitConverter converter = Units.valueOf(parts.group(1)).getConverterToAny(Units.SECOND);
-            final Instant epoch = LenientDateFormat.parseInstantUTC(parts.group(2));
-            for (int i=0; i<values.length; i++) {
-                final Number value = values[i];
-                if (value != null) {
-                    dates[i] = TemporalDate.addSeconds(epoch, converter.convert(value.doubleValue()));
+        if (parts.matches())
+            try {
+                final UnitConverter converter = Units.valueOf(parts.group(1)).getConverterToAny(Units.SECOND);
+                final Instant epoch = LenientDateFormat.parseInstantUTC(parts.group(2));
+                for (int i = 0; i < values.length; i++) {
+                    final Number value = values[i];
+                    if (value != null) {
+                        dates[i] = TemporalDate.addSeconds(epoch, converter.convert(value.doubleValue()));
+                    }
                 }
+            } catch (IncommensurableException | MeasurementParseException | DateTimeException | ArithmeticException e) {
+                listeners.warning(e);
             }
-        } catch (IncommensurableException | MeasurementParseException | DateTimeException | ArithmeticException e) {
-            listeners.warning(e);
-        }
         return dates;
     }
 
@@ -861,16 +1027,67 @@ public final class ZarrDecoder extends Decoder {
             if (multiscales != null) {
                 for (ZarrMultiscale ms : multiscales) {
                     if (ms.layout != null && !ms.layout.isEmpty()) {
-                        List<Variable> pyramid = new ArrayList<>();
+
+                        // We need to group variables by their name (e.g. "temperature", "reflectance").
+                        // Key: Variable name, Value: List of variables for this pyramid (ordered by
+                        // resolution)
+                        Map<String, List<Variable>> pyramidsByName = new LinkedHashMap<>();
+
                         for (ZarrMultiscale.Level level : ms.layout) {
                             String assetPath = resolvePath(group.zarrPath(), level.asset);
+
+                            // 1. Check if asset is an existing Variable (Array)
                             Variable v = pathMap.get(assetPath);
                             if (v != null) {
-                                pyramid.add(v);
+                                // It's a single array.
+                                // In this case, usually 'multiscales' describes just THIS variable's pyramid.
+                                // But if there are multiple datasets, the structure suggests generic usage.
+                                // We use the variable's own name as key.
+                                pyramidsByName.computeIfAbsent(v.getName(), k -> new ArrayList<>()).add(v);
+                            } else {
+                                // 2. Check if asset is a Group
+                                // We search for variables that are DIRECT children of this group path.
+                                final String groupPrefix = assetPath.endsWith("/") ? assetPath : assetPath + "/";
+
+                                for (Variable candidate : variables) {
+                                    // candidate.getName() might be scoped "group:name".
+                                    // We need the path to check containment.
+                                    // VariableInfo cast is needed to access metadata path if Variable interface
+                                    // doesn't expose it fully.
+                                    // But we have pathMap? No, pathMap keys are paths.
+                                    // Let's iterate pathMap entries for efficiency? No, iterating 'variables' array
+                                    // is fine.
+
+                                    if (candidate instanceof VariableInfo) {
+                                        VariableInfo vi = (VariableInfo) candidate;
+                                        String varPath = vi.metadata.zarrPath();
+
+                                        // Check strict direct child: starts with prefix and has no more slashes after
+                                        // prefix
+                                        if (varPath.startsWith(groupPrefix)) {
+                                            String relativePath = varPath.substring(groupPrefix.length());
+                                            if (!relativePath.contains("/")) {
+                                                // It is a direct child.
+                                                // The "key" for the pyramid should be this relative name (the variable
+                                                // name).
+                                                // If we use scopeName logic, the getName() might be "r10m:b02".
+                                                // We want to group "r10m:b02" with "r20m:b02".
+                                                // So we use the unscoped name (relative path component) as the grouping
+                                                // key.
+                                                pyramidsByName.computeIfAbsent(relativePath, k -> new ArrayList<>())
+                                                        .add(vi);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
-                        if (!pyramid.isEmpty()) {
-                            result.add(pyramid);
+
+                        // Add all collected pyramids to the result
+                        for (List<Variable> pyramid : pyramidsByName.values()) {
+                            if (!pyramid.isEmpty()) {
+                                result.add(pyramid);
+                            }
                         }
                     }
                 }
@@ -889,6 +1106,10 @@ public final class ZarrDecoder extends Decoder {
     private String resolvePath(String groupPath, String asset) {
         if (asset.startsWith("/")) {
             return asset;
+        }
+        // If current group is root ("/"), handle strictly
+        if (groupPath.equals("/")) {
+            return "/" + asset;
         }
         if (groupPath.endsWith("/")) {
             return groupPath + asset;
@@ -932,10 +1153,14 @@ public final class ZarrDecoder extends Decoder {
     public Grid[] getGridCandidates() throws IOException, DataStoreException {
         if (gridGeometries == null) {
             /*
-             * First, find all variables which are used as coordinate system axis. The keys in the map are
-             * the grid dimensions which are the domain of the variable (i.e. the sources of the conversion
-             * from grid coordinates to CRS coordinates). For each key there is usually only one value, but
-             * more complicated netCDF files (e.g. using two-dimensional localisation grids) also exist.
+             * First, find all variables which are used as coordinate system axis. The keys
+             * in the map are
+             * the grid dimensions which are the domain of the variable (i.e. the sources of
+             * the conversion
+             * from grid coordinates to CRS coordinates). For each key there is usually only
+             * one value, but
+             * more complicated netCDF files (e.g. using two-dimensional localisation grids)
+             * also exist.
              */
             final var dimToAxes = new IdentityHashMap<DimensionInfo, Set<VariableInfo>>();
             for (final VariableInfo variable : variables) {
@@ -956,21 +1181,27 @@ public final class ZarrDecoder extends Decoder {
                 }
             }
             /*
-             * For each variable, get its list of axes. More than one variable may have the same list of axes,
-             * so we remember the previously created instances in order to share the grid geometry instances.
+             * For each variable, get its list of axes. More than one variable may have the
+             * same list of axes,
+             * so we remember the previously created instances in order to share the grid
+             * geometry instances.
              */
             final var axes = new LinkedHashSet<VariableInfo>(8);
             final var usedDimensions = new HashSet<DimensionInfo>(8);
-            final var shared = new LinkedHashMap<GridInfo,GridInfo>();
-nextVar:    for (final VariableInfo variable : variables) {
+            final var shared = new LinkedHashMap<GridInfo, GridInfo>();
+            nextVar: for (final VariableInfo variable : variables) {
                 if (variable.isCoordinateSystemAxis || variable.dimensions.length == 0) {
                     continue;
                 }
                 /*
-                 * The axes can be inferred in two ways: if the variable contains a "coordinates" attribute,
-                 * that attribute lists explicitly the variables to use as axes. Otherwise we have to infer
-                 * the axes from the variable dimensions, using the `dimToAxes` map computed at the beginning
-                 * of this method. If and only if we can find all axes, we create the GridGeometryInfo.
+                 * The axes can be inferred in two ways: if the variable contains a
+                 * "coordinates" attribute,
+                 * that attribute lists explicitly the variables to use as axes. Otherwise we
+                 * have to infer
+                 * the axes from the variable dimensions, using the `dimToAxes` map computed at
+                 * the beginning
+                 * of this method. If and only if we can find all axes, we create the
+                 * GridGeometryInfo.
                  * This is a "all or nothing" operation.
                  */
                 axes.clear();
@@ -979,14 +1210,17 @@ nextVar:    for (final VariableInfo variable : variables) {
                     listAxes(convention().namesOfAxisVariables(variable), axes, usedDimensions);
                 }
                 /*
-                 * In theory the "coordinates" attribute would enumerate all axes needed for covering all dimensions,
-                 * and we would not need to check for variables having dimension names. However, in practice there is
-                 * incomplete attributes, so we check for other dimensions even if the above loop did some work.
+                 * In theory the "coordinates" attribute would enumerate all axes needed for
+                 * covering all dimensions,
+                 * and we would not need to check for variables having dimension names. However,
+                 * in practice there is
+                 * incomplete attributes, so we check for other dimensions even if the above
+                 * loop did some work.
                  */
-                for (int i=0; i < variable.dimensions.length; i++) {                     // Reverse of netCDF order. (Natural)
+                for (int i = 0; i < variable.dimensions.length; i++) { // Reverse of netCDF order. (Natural)
                     final DimensionInfo dimension = variable.dimensions[i];
                     if (usedDimensions.add(dimension)) {
-                        final Set<VariableInfo> axis = dimToAxes.get(dimension);       // Should have only 1 element.
+                        final Set<VariableInfo> axis = dimToAxes.get(dimension); // Should have only 1 element.
                         if (axis == null) {
                             continue nextVar;
                         }
@@ -1002,9 +1236,12 @@ nextVar:    for (final VariableInfo variable : variables) {
                 }
 
                 /*
-                 * Creates the grid geometry using the given domain and range, reusing existing instance if one exists.
-                 * We usually try to preserve axis order as declared in the netCDF file. But if we mixed axes inferred
-                 * from the "coordinates" attribute and axes inferred from variable names matching dimension names, we
+                 * Creates the grid geometry using the given domain and range, reusing existing
+                 * instance if one exists.
+                 * We usually try to preserve axis order as declared in the netCDF file. But if
+                 * we mixed axes inferred
+                 * from the "coordinates" attribute and axes inferred from variable names
+                 * matching dimension names, we
                  * use axes from "coordinates" attribute first followed by other axes.
                  */
                 GridInfo grid = new GridInfo(reversed, axes.toArray(VariableInfo[]::new));
@@ -1020,49 +1257,52 @@ nextVar:    for (final VariableInfo variable : variables) {
     }
 
     /**
-     * Returns the dimension of the given name (eventually ignoring case), or {@code null} if none.
-     * This method searches in all dimensions found in the zarr tree structure, regardless of variables.
-     * The search will ignore case only if no exact match is found for the given name.
+     * Returns the dimension of the given name (eventually ignoring case), or
+     * {@code null} if none.
+     * This method searches in all dimensions found in the zarr tree structure,
+     * regardless of variables.
+     * The search will ignore case only if no exact match is found for the given
+     * name.
      *
-     * @param  dimName  the name of the dimension to search.
+     * @param dimName the name of the dimension to search.
      * @return dimension of the given name, or {@code null} if none.
      */
     @Override
     @SuppressWarnings("StringEquality")
     protected Dimension findDimension(final String dimName) {
-        DimensionInfo dim = dimensionMap.get(dimName);          // Give precedence to exact match before to ignore case.
-        if (dim == null) {
+        List<DimensionInfo> dims = dimensionMap.get(dimName); // Give precedence to exact match before to ignore case.
+        if (dims == null || dims.isEmpty()) {
             final String lower = dimName.toLowerCase(Decoder.DATA_LOCALE);
-            if (lower != dimName) {                             // Identity comparison is okay here.
-                dim = dimensionMap.get(lower);
+            if (lower != dimName) { // Identity comparison is okay here.
+                dims = dimensionMap.get(lower);
             }
         }
-        return dim;
+        return (dims != null && !dims.isEmpty()) ? dims.get(0) : null;
     }
 
     /**
      * Returns the netCDF variable of the given name, or {@code null} if none.
      *
-     * @param  name  the name of the variable to search, or {@code null}.
+     * @param name the name of the variable to search, or {@code null}.
      * @return the variable of the given name, or {@code null} if none.
      */
     @SuppressWarnings("StringEquality")
     private VariableInfo findVariableInfo(final String name) {
-        VariableInfo v = variableMap.get(name);
-        if (v == null && name != null) {
+        List<VariableInfo> v = variableMap.get(name);
+        if ((v == null || v.isEmpty()) && name != null) {
             final String lower = name.toLowerCase(Decoder.DATA_LOCALE);
             // Identity comparison is ok since following check is only an optimization for a common case.
             if (lower != name) {
                 v = variableMap.get(lower);
             }
         }
-        return v;
+        return (v != null && !v.isEmpty()) ? v.get(0) : null;
     }
 
     /**
      * Returns the netCDF variable of the given name, or {@code null} if none.
      *
-     * @param  name  the name of the variable to search, or {@code null}.
+     * @param name the name of the variable to search, or {@code null}.
      * @return the variable of the given name, or {@code null} if none.
      */
     @Override
@@ -1071,9 +1311,9 @@ nextVar:    for (final VariableInfo variable : variables) {
     }
 
     /**
-     * Returns the variable of the given name. Note that groups do not exist in netCDF 3.
+     * Returns the variable of the given name.
      *
-     * @param  name  the name of the variable to search, or {@code null}.
+     * @param name the name of the variable to search, or {@code null}.
      * @return the variable of the given name, or {@code null} if none.
      */
     @Override
@@ -1082,7 +1322,5 @@ nextVar:    for (final VariableInfo variable : variables) {
     }
 
     @Override
-    public void close(DataStore lock) throws IOException {
-        // input.channel.close();
-    }
+    public void close(DataStore lock) throws IOException {}
 }

@@ -17,8 +17,6 @@
 package org.apache.sis.storage.netcdf.zarr;
 
 import org.apache.sis.coverage.grid.GridExtent;
-import org.apache.sis.coverage.grid.GridGeometry;
-import org.apache.sis.coverage.grid.GridOrientation;
 import org.apache.sis.math.Vector;
 import org.apache.sis.measure.Units;
 import org.apache.sis.storage.DataStoreContentException;
@@ -33,7 +31,6 @@ import org.apache.sis.storage.netcdf.base.GridAdjustment;
 import org.apache.sis.storage.netcdf.base.Variable;
 import org.apache.sis.storage.netcdf.classic.ChannelDecoder;
 import org.apache.sis.temporal.LenientDateFormat;
-import org.apache.sis.util.ArraysExt;
 import org.apache.sis.util.CharSequences;
 import org.apache.sis.util.Classes;
 import org.apache.sis.util.Numbers;
@@ -55,7 +52,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -258,6 +254,52 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     @Override
     public String getName() {
         return name;
+    }
+
+    /**
+     * If this element is member of a group, returns the name of that group.
+     * Otherwise, returns {@code null}.
+     * @return the name of the group which contains this element, or {@code null}.
+     */
+    @Override
+    public String getGroupName() {
+        final String[] paths = metadata.zarrPath().split("/");
+        // Array is at the root of the Zarr store => No group, zarr structure is only an array
+        if (paths.length <= 2) {
+            return null;
+        }
+        // Array is under a nested group (> 3 ex /root/group/array)
+        // +or directly under the root group (== 3 ex /root/array)
+        else {
+            return paths[paths.length - 2];
+        }
+    }
+
+    /**
+     * If this element is member of a group, returns the path of that group.
+     * Otherwise, returns {@code null}.
+     * @return the path of the group which contains this element (/group1/group2), or {@code null}.
+     */
+    @Override
+    public String getGroupPath() {
+        final String[] paths = metadata.zarrPath().split("/");
+        // Array is at the root of the Zarr store => No group, zarr structure is only an array
+        if (paths.length <= 2) {
+            return null;
+        }
+        // Array is under a nested group (> 3 ex /root/group/array)
+        // +or directly under the root group (== 3 ex /root/array)
+        else {
+            // Join all elements except the last one
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < paths.length - 1; i++) {
+                if (i > 0) {
+                    sb.append('/');
+                }
+                sb.append(paths[i]);
+            }
+            return sb.toString();
+        }
     }
 
     /**
@@ -986,8 +1028,8 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
             do {
                 GridExtent extent = buildSliceExtent(idx, shape);
                 Raster raster = (this.sampleDimensionIndex < 0)
-                        ? gcr.read(new GridGeometry(extent, null, GridOrientation.REFLECTION_Y)).forConvertedValues(true).render(null).getData()
-                        : gcr.read(new GridGeometry(extent, null, GridOrientation.REFLECTION_Y), this.sampleDimensionIndex).forConvertedValues(true).render(null).getData();
+                        ? gcr.read(null).forConvertedValues(true).render(extent).getData()
+                        : gcr.read(null, this.sampleDimensionIndex).forConvertedValues(true).render(extent).getData(); // new GridGeometry(extent, null, GridOrientation.REFLECTION_Y)
                 setDataTypeFromRaster(raster);
                 rasterSlices.add(raster);
             } while (incrementIndex(idx, outerShape));

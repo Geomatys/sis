@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
@@ -31,11 +33,12 @@ import java.util.Set;
 import org.apache.sis.storage.WritableAggregate;
 import org.apache.sis.storage.netcdf.base.Encoder;
 import org.apache.sis.storage.netcdf.base.TiledRasterResource;
+import org.apache.sis.storage.netcdf.base.MultiResolutionResource;
 import org.apache.sis.storage.netcdf.base.Variable;
 import org.apache.sis.storage.netcdf.zarr.ZarrDecoder;
 import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
-import ucar.nc2.constants.ACDD;     // String constants are copied by the compiler with no UCAR reference left.
-import ucar.nc2.constants.CDM;      // idem
+import ucar.nc2.constants.ACDD; // String constants are copied by the compiler with no UCAR reference left.
+import ucar.nc2.constants.CDM; // idem
 import org.opengis.util.NameSpace;
 import org.opengis.util.NameFactory;
 import org.opengis.util.GenericName;
@@ -48,6 +51,7 @@ import org.apache.sis.storage.UnsupportedStorageException;
 import org.apache.sis.storage.StorageConnector;
 import org.apache.sis.storage.Aggregate;
 import org.apache.sis.storage.DataStoreClosedException;
+import org.apache.sis.storage.GridCoverageResource;
 import org.apache.sis.storage.Resource;
 import org.apache.sis.storage.base.URIDataStore;
 import org.apache.sis.storage.netcdf.base.Decoder;
@@ -272,46 +276,104 @@ public class NetcdfStore extends DataStore implements WritableAggregate {
     @SuppressWarnings("ReturnOfCollectionOrArrayField")
     public synchronized Collection<Resource> components() throws DataStoreException {
         if (components == null) try {
-            @SuppressWarnings("LocalVariableHidesMemberVariable")
-            final Decoder decoder = decoder();
+                final Decoder decoder = decoder();
 
-            // Fetch feature resources first
-            Resource[] features = decoder.getDiscreteSampling(this);
+                // Fetch feature resources first
+                Resource[] features = decoder.getDiscreteSampling(this);
 
-            // Try to create efficient Tiled Raster Resources if possible
-            final List<Resource> tiledGrids = TiledRasterResource.create(decoder, this);
-            final Set<GenericName> handledIdentifiers = new HashSet<>();
-            for (Resource r : tiledGrids) {
-                r.getIdentifier().ifPresent(handledIdentifiers::add);
-            }
+                // Try to create efficient Tiled Raster Resources if possible
+                final List<Resource> tiledGrids = TiledRasterResource.create(decoder, this);
 
-            // Fetch "standard" Raster Resources
-            final List<Resource> standardGrids = RasterResource.create(decoder, this);
+                // Group TiledRasterResources into MultiResolutionResource if applicable
+                final List<Resource> multiscaleGrids = new ArrayList<>();
+                final Set<Resource> usedResources = new HashSet<>();
+                final Collection<List<Variable>> pyramids = decoder.getMultiresolutionVariables();
+                if (!pyramids.isEmpty() && !tiledGrids.isEmpty()) {
+                    // Map variables to their containing resource
+                    Map<Variable, TiledRasterResource> variableToResource = new HashMap<>();
+                    for (Resource r : tiledGrids) {
+                        if (r instanceof TiledRasterResource) {
+                            for (Variable v : ((TiledRasterResource) r).getVariables()) {
+                                variableToResource.put(v, (TiledRasterResource) r);
+                            }
+                        }
+                    }
 
-            // Merge all resources, taking care to avoid duplicates
-            final List<Resource> allResources = new ArrayList<>();
-            if (features != null) {
-                Collections.addAll(allResources, features);
-            }
-
-            // Add TiledRasterResources first
-            allResources.addAll(tiledGrids);
-
-            // Add "standard" Raster resources ONLY if they weren't already handled by TiledRasterResource
-            for (Resource r : standardGrids) {
-                // If the resource identifier is known, check if we already have it
-                boolean isDuplicate = r.getIdentifier()
-                        .map(handledIdentifiers::contains)
-                        .orElse(false);
-
-                if (!isDuplicate) {
-                    allResources.add(r);
+                    for (List<Variable> pyramid : pyramids) {
+                        List<GridCoverageResource> levels = new ArrayList<>();
+                        for (Variable v : pyramid) {
+                            TiledRasterResource r = variableToResource.get(v);
+                            if (r != null) {
+                                if (!usedResources.contains(r)) { // Avoid adding same resource multiple times to same
+                                                                  // pyramid?
+                                    // Actually a resource might contain multiple variables (bands).
+                                    // If a pyramid level matches a resource, we add it.
+                                    // We should ensure we don't duplicate logic if multiple bands point to same
+                                    // resource.
+                                    // But here 'pyramid' is list of variables (one per level usually).
+                                    // If levels.contains(r) we skip?
+                                    if (!levels.contains(r))
+                                        levels.add(r);
+                                    usedResources.add(r);
+                                } else if (!levels.contains(r)) {
+                                    // Resource used in ANOTHER pyramid? Or this one?
+                                    // If used in this one (already added), we skip.
+                                    // If used in another, that's an issue (variable sharing?).
+                                    // Assume distinct resources for now.
+                                    // But if we have usedResources check, we might incorrectly exclude if we just
+                                    // check contains.
+                                    // Let's rely on levels list for current pyramid, and usedResources for global
+                                    // accounting.
+                                    levels.add(r);
+                                }
+                            }
+                        }
+                        if (!levels.isEmpty()) {
+                            multiscaleGrids.add(new MultiResolutionResource(levels));
+                        }
+                    }
+                    tiledGrids.removeAll(usedResources);
                 }
+
+                final Set<GenericName> handledIdentifiers = new HashSet<>();
+                for (Resource r : tiledGrids) {
+                    r.getIdentifier().ifPresent(handledIdentifiers::add);
+                }
+                for (Resource r : multiscaleGrids) {
+                    r.getIdentifier().ifPresent(handledIdentifiers::add);
+                }
+                for (Resource r : usedResources) {
+                    r.getIdentifier().ifPresent(handledIdentifiers::add);
+                }
+
+                // Fetch "standard" Raster Resources
+                final List<Resource> standardGrids = RasterResource.create(decoder, this);
+
+                // Merge all resources, taking care to avoid duplicates
+                final List<Resource> allResources = new ArrayList<>();
+                if (features != null) {
+                    Collections.addAll(allResources, features);
+                }
+
+                // Add TiledRasterResources first
+                allResources.addAll(multiscaleGrids);
+                allResources.addAll(tiledGrids);
+
+                // Add "standard" Raster resources ONLY if they weren't already handled by TiledRasterResource
+                for (Resource r : standardGrids) {
+                    // If the resource identifier is known, check if we already have it
+                    boolean isDuplicate = r.getIdentifier()
+                            .map(handledIdentifiers::contains)
+                            .orElse(false);
+
+                    if (!isDuplicate) {
+                        allResources.add(r);
+                    }
+                }
+                components = UnmodifiableArrayList.wrap(allResources.toArray(Resource[]::new));
+            } catch (IOException e) {
+                throw new DataStoreException(e);
             }
-            components = UnmodifiableArrayList.wrap(allResources.toArray(Resource[]::new));
-        } catch (IOException e) {
-            throw new DataStoreException(e);
-        }
         return components;
     }
 

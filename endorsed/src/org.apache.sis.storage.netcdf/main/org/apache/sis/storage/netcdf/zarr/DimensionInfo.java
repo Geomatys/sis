@@ -41,6 +41,11 @@ final class DimensionInfo extends Dimension {
     final String name;
 
     /**
+     * The Zarr path of this dimension.
+     */
+    final String zarrPath;
+
+    /**
      * The number of grid cell value along this dimension, as an unsigned number.
      */
     final int length;
@@ -70,6 +75,22 @@ final class DimensionInfo extends Dimension {
     public DimensionInfo(final String name, final int length) {
         this.name        = name;
         this.length      = length;
+        this.zarrPath   = null;
+        this.arrayPaths = new ArrayList<>();
+        this.sourceNames = new HashMap<>();
+    }
+
+    /**
+     * Creates a new dimension of the given name and length.
+     *
+     * @param name the dimension name.
+     * @param length      the number of grid cell value along this dimension, as an unsigned number.
+     * @param zarrPath   the Zarr path of this dimension.
+     */
+    public DimensionInfo(final String name, final int length, final String zarrPath) {
+        this.name        = name;
+        this.length      = length;
+        this.zarrPath   = zarrPath;
         this.arrayPaths = new ArrayList<>();
         this.sourceNames = new HashMap<>();
     }
@@ -80,6 +101,13 @@ final class DimensionInfo extends Dimension {
     @Override
     public String getName() {
         return name;
+    }
+
+    /**
+     * Returns the Zarr path of this dimension.
+     */
+    public String getZarrPath() {
+        return zarrPath;
     }
 
     /**
@@ -134,5 +162,10 @@ final class DimensionInfo extends Dimension {
         } else {
             this.sourceNames.put(arrayPath, null);
         }
+    }
+
+    @Override
+    public String toString() {
+        return name + "[" + Integer.toUnsignedLong(length) + "] (" + zarrPath + ")";
     }
 }

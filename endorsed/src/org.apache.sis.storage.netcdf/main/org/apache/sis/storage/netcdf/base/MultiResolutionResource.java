@@ -16,16 +16,12 @@
  */
 package org.apache.sis.storage.netcdf.base;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.sis.coverage.grid.GridExtent;
-import org.apache.sis.referencing.internal.shared.DirectPositionView;
-import org.apache.sis.storage.Query;
-import org.apache.sis.storage.UnsupportedQueryException;
-import org.opengis.geometry.DirectPosition;
+import org.apache.sis.storage.GridCoverageResource;
+import org.opengis.referencing.operation.Matrix;
 import org.opengis.util.FactoryException;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
@@ -34,8 +30,6 @@ import org.apache.sis.coverage.grid.GridCoverage;
 import org.apache.sis.coverage.grid.GridGeometry;
 import org.apache.sis.coverage.grid.PixelInCell;
 import org.apache.sis.geometry.GeneralDirectPosition;
-import org.apache.sis.image.internal.shared.RasterFactory;
-import org.apache.sis.math.MathFunctions;
 import org.apache.sis.referencing.CRS;
 import org.apache.sis.referencing.operation.matrix.MatrixSIS;
 import org.apache.sis.storage.DataStore;
@@ -43,8 +37,7 @@ import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.DataStoreReferencingException;
 import org.apache.sis.storage.base.GridResourceWrapper;
 import org.apache.sis.storage.base.StoreResource;
-
-import static org.apache.sis.storage.geotiff.reader.GridGeometryBuilder.BIDIMENSIONAL;
+import org.apache.sis.util.Utilities;
 
 /**
  * A resource that aggregates multiple grid coverage resources representing the
@@ -56,10 +49,11 @@ public final class MultiResolutionResource extends GridResourceWrapper implement
     /**
      * The resources at different resolutions, ordered from finest to coarsest.
      */
-    private final TiledRasterResource[] levels;
+    private final GridCoverageResource[] levels;
 
     /**
-     * Resolutions (in units of CRS axes) of each level from finest to coarsest resolution.
+     * Resolutions (in units of CRS axes) of each level from finest to coarsest
+     * resolution.
      * Array elements may be {@code null} if not yet computed.
      */
     private final double[][] resolutions;
@@ -70,8 +64,8 @@ public final class MultiResolutionResource extends GridResourceWrapper implement
      * @param levels the resources at different resolutions, ordered from finest to
      *               coarsest.
      */
-    public MultiResolutionResource(List<TiledRasterResource> levels) {
-        this.levels = levels.toArray(TiledRasterResource[]::new);
+    public MultiResolutionResource(List<GridCoverageResource> levels) {
+        this.levels = levels.toArray(GridCoverageResource[]::new);
         this.resolutions = new double[this.levels.length][];
     }
 
@@ -80,7 +74,10 @@ public final class MultiResolutionResource extends GridResourceWrapper implement
      */
     @Override
     public DataStore getOriginator() {
-        return levels[0].getOriginator();
+        if (levels[0] instanceof StoreResource) {
+            return ((StoreResource) levels[0]).getOriginator();
+        }
+        return null;
     }
 
     /**
@@ -92,11 +89,15 @@ public final class MultiResolutionResource extends GridResourceWrapper implement
     }
 
     /**
-     * Returns the object on which to perform all synchronizations for thread-safety.
+     * Returns the object on which to perform all synchronizations for
+     * thread-safety.
      */
     @Override
     protected final Object getSynchronizationLock() {
-        return levels[0].getOriginator();
+        if (levels[0] instanceof StoreResource) {
+            return ((StoreResource) levels[0]).getOriginator();
+        }
+        return null;
     }
 
     /**
@@ -104,92 +105,75 @@ public final class MultiResolutionResource extends GridResourceWrapper implement
      * The source is the first image, the one having finest resolution.
      */
     @Override
-    protected TiledRasterResource createSource() throws DataStoreException {
+    protected GridCoverageResource createSource() throws DataStoreException {
         return levels[0];
     }
 
     /**
      * Returns the resolution (in units of CRS axes) for the given level.
      *
-     * @param level the desired resolution level, numbered from finest to coarsest resolution.
-     * @return resolution at the specified level, not cloned (caller shall not modify).
+     * @param level the desired resolution level, numbered from finest to coarsest
+     *              resolution.
+     * @return resolution at the specified level, not cloned (caller shall not
+     *         modify).
      */
     private double[] resolution(final int level) throws DataStoreException {
         double[] resolution = resolutions[level];
-        if (resolution == null) try {
-            final TiledRasterResource variable = levels[level];
-            final TiledRasterResource base  = levels[level];
+        if (resolution == null) {
+            GridGeometry geometry = levels[level].getGridGeometry();
+            if (geometry.isDefined(GridGeometry.RESOLUTION)) {
+                resolution = geometry.getResolution(true);
+            } else if (geometry.isDefined(GridGeometry.GRID_TO_CRS) && geometry.isDefined(GridGeometry.EXTENT)) {
+                try {
+                    Matrix derivative = geometry.getGridToCRS(PixelInCell.CELL_CENTER)
+                            .derivative(new GeneralDirectPosition(
+                                    geometry.getExtent().getPointOfInterest(PixelInCell.CELL_CENTER)));
 
-            final double[] scales = variable.initReducedResolution(base);
-            final GridGeometry geometry = base.getGridGeometry();
+                    resolution = MatrixSIS.castOrCopy(derivative).multiply(new double[derivative.getNumCol()]);
+                } catch (TransformException e) {
+                    throw new DataStoreReferencingException(e);
+                }
+            }
 
-            if (geometry.isDefined(GridGeometry.GRID_TO_CRS)) {
-                final GridExtent fullExtent = geometry.getExtent();
-                DirectPosition poi = new DirectPositionView.Double(fullExtent.getPointOfInterest(PixelInCell.CELL_CENTER));
-                MatrixSIS gridToCRS = MatrixSIS.castOrCopy(geometry.getGridToCRS(PixelInCell.CELL_CENTER).derivative(poi));
-                resolution = gridToCRS.multiply(scales);
-            } else {
-                // Assume an identity transform for the `gridToCRS` of full resolution image.
-                resolution = scales;
+            if (resolution == null && level > 0) {
+                resolution = deriveResolutionFromRelativeSize(level);
             }
-            // Set to NaN only after all matrix multiplications are done.
-            int i = Math.min(BIDIMENSIONAL, resolution.length);
-            Arrays.fill(scales, BIDIMENSIONAL, i, Double.NaN);
-            while (--i >= 0) {
-                resolution[i] = Math.abs(resolution[i]);
-            }
+
             resolutions[level] = resolution;
-        } catch (TransformException e) {
-            throw new DataStoreReferencingException(e.getMessage(), e);
-        } catch (IOException e) {
-            throw levels[level].reader.store.errorIO(e);
         }
         return resolution;
-
-
-
-
-
-
-
-
-//        double[] resolution = resolutions[level];
-//        if (resolution == null) {
-//            GridGeometry geometry = levels[level].getGridGeometry();
-//            if (geometry.isDefined(GridGeometry.RESOLUTION)) {
-//                resolution = geometry.getResolution(true);
-//            } else if (geometry.isDefined(GridGeometry.GRID_TO_CRS) && geometry.isDefined(GridGeometry.EXTENT)) {
-//                // Fallback: estimate resolution from the transform at the center
-//                try {
-//                    MatrixSIS derivative = geometry.getGridToCRS(PixelInCell.CELL_CENTER)
-//                            .derivative(new GeneralDirectPosition(
-//                                    geometry.getExtent().getPointOfInterest(PixelInCell.CELL_CENTER)));
-//                    resolution = MatrixSIS.castOrCopy(derivative).multiply(new double[derivative.getNumCol()]); // Provide
-//                                                                                                                // unit
-//                                                                                                                // vector?
-//                    // Actually SIS GridGeometry.getResolution does this better. If it's missing, it
-//                    // might be tricky.
-//                    // Let's assume for now we can rely on SIS resolution computation if gridToCRS
-//                    // is present.
-//                    // But if getResolution(true) returned null/empty, we might be in trouble.
-//                    // Re-using logic from MultiResolutionImage might be safer if we had the scales.
-//                    // Here we don't have explicit scales, so we rely on the sub-resources to know
-//                    // their geometry.
-//                } catch (TransformException e) {
-//                    throw new DataStoreReferencingException(e);
-//                }
-//            }
-//
-//            // If still null, we might need a better heuristic or just error out.
-//            // For now, let's assume getResolution(true) works for TiledRasterResource.
-//            resolutions[level] = resolution;
-//        }
-//        return resolution;
     }
 
     /**
-     * Returns the preferred resolutions (in units of CRS axes) for read operations in this data store.
-     * Elements are ordered from finest (smallest numbers) to coarsest (largest numbers) resolution.
+     * Estimates resolution by comparing the grid size of the given level to the
+     * base level.
+     */
+    private double[] deriveResolutionFromRelativeSize(int level) throws DataStoreException {
+        final GridGeometry baseGeom = levels[0].getGridGeometry();
+        final GridGeometry levelGeom = levels[level].getGridGeometry();
+
+        if (baseGeom.isDefined(GridGeometry.EXTENT) && levelGeom.isDefined(GridGeometry.EXTENT)) {
+            double[] baseResolution = resolution(0);
+            if (baseResolution == null)
+                return null;
+
+            double[] derived = new double[baseResolution.length];
+            for (int i = 0; i < derived.length; i++) {
+                long baseSpan = baseGeom.getExtent().getSize(i);
+                long levelSpan = levelGeom.getExtent().getSize(i);
+                double scale = (double) baseSpan / (double) levelSpan;
+                derived[i] = baseResolution[i] * scale;
+            }
+            return derived;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the preferred resolutions (in units of CRS axes) for read operations
+     * in this data store.
+     * Elements are ordered from finest (smallest numbers) to coarsest (largest
+     * numbers) resolution.
      */
     @Override
     public List<double[]> getResolutions() throws DataStoreException {
@@ -216,7 +200,8 @@ public final class MultiResolutionResource extends GridResourceWrapper implement
                 final GridGeometry gg = getGridGeometry();
                 final CoordinateReferenceSystem myCrs = gg.getCoordinateReferenceSystem();
 
-                if (!CRS.equalsIgnoreMetadata(crs, myCrs)) {
+                if (!Utilities.equalsIgnoreMetadata(crs, myCrs)) {
+
                     // Simplified transform logic compared to MultiResolutionImage for brevity,
                     // but ideally should be robust.
                     MathTransform op = CRS.findOperation(crs, myCrs, null).getMathTransform();
