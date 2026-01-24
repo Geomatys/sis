@@ -35,7 +35,7 @@ import org.opengis.filter.InvalidFilterValueException;
 /**
  * Temporal operations between a period and a Java temporal object or between two periods.
  * The base class represents the general case when we don't know which operands are periods.
- * The subclasses represent specializations when the type of temporal values is known in advance.
+ * The subclasses provide specializations when the types of temporal values are known in advance.
  *
  * <p>In the context of this class, "instant" can be understood as <abbr>ISO</abbr> 19108 instant
  * or as the various {@link java.time} objects, not restricted to {@link java.time.Instant}.</p>

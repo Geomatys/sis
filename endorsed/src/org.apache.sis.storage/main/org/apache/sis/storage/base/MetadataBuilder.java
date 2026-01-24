@@ -1145,8 +1145,8 @@ public class MetadataBuilder {
         for (final Iterator<CitationDate> it = dates.iterator(); it.hasNext();) {
             final CitationDate existing = it.next();
             if (type.equals(existing.getDateType())) {
-                final int method = type.name().startsWith("LATE_") ? TimeMethods.BEFORE : TimeMethods.AFTER;
-                if (TimeMethods.compareAny(method, existing.getReferenceDate(), date.getReferenceDate())) {
+                TimeMethods.Test method = type.name().startsWith("LATE_") ? TimeMethods.Test.BEFORE : TimeMethods.Test.AFTER;
+                if (TimeMethods.compareLenient(method, existing.getReferenceDate(), date.getReferenceDate())) {
                     it.remove();
                     break;
                 }

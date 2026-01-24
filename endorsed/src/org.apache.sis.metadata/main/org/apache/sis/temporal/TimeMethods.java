@@ -18,6 +18,7 @@ package org.apache.sis.temporal;
 
 import java.util.Map;
 import java.util.Date;
+import java.util.Calendar;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.function.BiFunction;
@@ -79,11 +80,81 @@ public class TimeMethods<T> implements Serializable {
     public final Class<T> type;
 
     /**
-     * Enumeration values for a test to apply.
+     * The test to apply: equal, before or after.
      *
-     * @see #compare(int, T, TemporalAccessor)
+     * @see #compare(Test, T, TemporalAccessor)
      */
-    public static final int BEFORE=1, AFTER=2, EQUAL=0;
+    public enum Test {
+        /** Identifies the <var>A</var> = <var>B</var> test. */
+        EQUAL() {
+            @Override <T> BiPredicate<T,T> predicate(TimeMethods<T> m) {return m.isEqual;}
+            @Override <T> boolean compare(TimeMethods<T> m, T a, T b)  {return m.isEqual.test(a, b);}
+            @Override     boolean fromCompareTo(int result)            {return result == 0;}
+        },
+
+        /** Identifies the <var>A</var> {@literal <} <var>B</var> test. */
+        BEFORE() {
+            @Override <T> BiPredicate<T,T> predicate(TimeMethods<T> m) {return m.isBefore;}
+            @Override <T> boolean compare(TimeMethods<T> m, T a, T b)  {return m.isBefore.test(a, b);}
+            @Override     boolean fromCompareTo(int result)            {return result < 0;}
+        },
+
+        /** Identifies the <var>A</var> {@literal >} <var>B</var> test. */
+        AFTER() {
+            @Override <T> BiPredicate<T,T> predicate(TimeMethods<T> m) {return m.isAfter;}
+            @Override <T> boolean compare(TimeMethods<T> m, T a, T b)  {return m.isAfter.test(a, b);}
+            @Override     boolean fromCompareTo(int result)            {return result > 0;}
+        },
+
+        /** Identifies the <var>A</var> ≠ <var>B</var> test. */
+        NOT_EQUAL() {
+            @Override <T> BiPredicate<T,T> predicate(TimeMethods<T> m) {return  m.isEqual.negate();}
+            @Override <T> boolean compare(TimeMethods<T> m, T a, T b)  {return !m.isEqual.test(a, b);}
+            @Override     boolean fromCompareTo(int result)            {return result != 0;}
+        },
+
+        /** Identifies the <var>A</var> ≥ <var>B</var> test. */
+        NOT_BEFORE() {
+            @Override <T> BiPredicate<T,T> predicate(TimeMethods<T> m) {return  m.isBefore.negate();}
+            @Override <T> boolean compare(TimeMethods<T> m, T a, T b)  {return !m.isBefore.test(a, b);}
+            @Override     boolean fromCompareTo(int result)            {return result >= 0;}
+        },
+
+        /** Identifies the <var>A</var> ≤ <var>B</var> test. */
+        NOT_AFTER() {
+            @Override <T> BiPredicate<T,T> predicate(TimeMethods<T> m)  {return  m.isAfter.negate();}
+            @Override <T> boolean compare(TimeMethods<T> m, T a, T b)   {return !m.isAfter.test(a, b);}
+            @Override     boolean fromCompareTo(int result)             {return result <= 0;}
+        };
+
+        /**
+         * Returns the predicate to use for this test.
+         *
+         * @param  <T>  the type of temporal objects expected by the predicate.
+         * @param  m    the collection of predicate for the type of temporal objects.
+         * @return the predicate for this test.
+         */
+        abstract <T> BiPredicate<T,T> predicate(TimeMethods<T> m);
+
+        /**
+         * Executes the test between the given temporal objects.
+         *
+         * @param  <T>    the type of temporal objects expected by the predicate.
+         * @param  m      the collection of predicate for the type of temporal objects.
+         * @param  self   the object on which to invoke the method identified by this test.
+         * @param  other  the argument to give to the test method call.
+         * @return the result of performing the comparison identified by this test.
+         */
+        abstract <T> boolean compare(TimeMethods<T> m, T self, T other);
+
+        /**
+         * Returns whether the test pass according the result of a {@code compareTo(…)} method.
+         *
+         * @param  result  the {@code compareTo(…)} result.
+         * @return whether the test pass.
+         */
+        abstract boolean fromCompareTo(int result);
+    }
 
     /**
      * Predicate to execute for testing the ordering between temporal objects.
@@ -148,37 +219,40 @@ public class TimeMethods<T> implements Serializable {
     }
 
     /**
+     * Returns the predicate to use for this test.
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @return the predicate for the requested test.
+     */
+    public final BiPredicate<T,T> predicate(final Test test) {
+        return test.predicate(this);
+    }
+
+    /**
      * Delegates the comparison to the method identified by the {@code test} argument.
      * This method is overridden in subclasses where the delegation can be more direct.
      *
-     * @param  test   {@link #BEFORE}, {@link #AFTER} or {@link #EQUAL}.
+     * @param  test   the test to apply (before, after and/or equal).
      * @param  self   the object on which to invoke the method identified by {@code test}.
      * @param  other  the argument to give to the test method call.
      * @return the result of performing the comparison identified by {@code test}.
      */
-    boolean delegate(final int test, final T self, final T other) {
-        final BiPredicate<T,T> p;
-        switch (test) {
-            case BEFORE: p = isBefore; break;
-            case AFTER:  p = isAfter;  break;
-            case EQUAL:  p = isEqual;  break;
-            default: throw new AssertionError(test);
-        }
-        return p.test(self, other);
+    boolean delegate(final Test test, final T self, final T other) {
+        return test.compare(this, self, other);
     }
 
     /**
      * Compares an object of class {@code <T>} with a temporal object of unknown class.
      * The other object is typically the beginning or ending of a period.
      *
-     * @param  test   {@link #BEFORE}, {@link #AFTER} or {@link #EQUAL}.
+     * @param  test   the test to apply (before, after and/or equal).
      * @param  self   the object on which to invoke the method identified by {@code test}.
      * @param  other  the argument to give to the test method call.
      * @return the result of performing the comparison identified by {@code test}.
      * @throws DateTimeException if the two objects cannot be compared.
      */
     @SuppressWarnings("unchecked")
-    public final boolean compare(final int test, final T self, final TemporalAccessor other) {
+    public final boolean compare(final Test test, final T self, final TemporalAccessor other) {
         if (type.isInstance(other)) {
             return delegate(test, self, (T) other);         // Safe because of above `isInstance(…)` check.
         }
@@ -186,20 +260,191 @@ public class TimeMethods<T> implements Serializable {
     }
 
     /**
+     * Returns {@code TRUE} if both arguments are non-null and the specified comparison evaluates to {@code true}.
+     * If the two objects are not of compatible type, they are converted. If at least one object is not temporal,
+     * then this method returns {@code null} rather than throwing {@link DateTimeException}.
+     *
+     * <p>This method should be used in last resort because it may be expensive.</p>
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @param  self   the object on which to invoke the method identified by {@code test}, or {@code null} if none.
+     * @param  other  the argument to give to the test method call, or {@code null} if none.
+     * @return the comparison result, or {@code null} if the given objects were not recognized as temporal.
+     * @throws DateTimeException if the two objects are temporal objects but cannot be compared.
+     */
+    public static Boolean compareIfTemporal(final Test test, Object self, Object other) {
+        if (self == null || other == null) {
+            return Boolean.FALSE;
+        }
+        boolean isTemporal = false;
+        if (self  instanceof TemporalDate) {self  = ((TemporalDate)  self).temporal; isTemporal = true;}
+        if (other instanceof TemporalDate) {other = ((TemporalDate) other).temporal; isTemporal = true;}
+        /*
+         * For legacy java.util.Date, the compareTo(…) method is consistent only for dates of the same class.
+         * Otherwise A.compareTo(B) and B.compareTo(A) are inconsistent if one object is a java.util.Date and
+         * the other object is a java.sql.Timestamp. In such case, we compare the dates as java.time objects.
+         */
+        if (self instanceof Date && other instanceof Date) {
+            if (self.getClass() == other.getClass()) {
+                return test.fromCompareTo(((Date) self).compareTo((Date) other));
+            }
+            self  = fromLegacy((Date) self);
+            other = fromLegacy((Date) other);
+            isTemporal = true;          // For skipping unecessary `if (x instanceof Temporal)` checks.
+        }
+        // Use `||` because an operand by still be a `java.utl.Date`.
+        if (isTemporal || self instanceof Temporal || other instanceof Temporal) {
+            return compareAny(test, self, other);
+        }
+        return null;
+    }
+
+    /**
      * Returns {@code true} if both arguments are non-null and the specified comparison evaluates to {@code true}.
      * The type of the objects being compared is determined dynamically, which has a performance cost.
      * The {@code compare(…)} methods should be preferred when the type is known in advance.
      *
-     * @param  test   {@link #BEFORE}, {@link #AFTER} or {@link #EQUAL}.
+     * @param  test   the test to apply (before, after and/or equal).
      * @param  self   the object on which to invoke the method identified by {@code test}, or {@code null} if none.
      * @param  other  the argument to give to the test method call, or {@code null} if none.
      * @return the result of performing the comparison identified by {@code test}.
      * @throws DateTimeException if the two objects cannot be compared.
      */
-    @SuppressWarnings("unchecked")
-    public static boolean compareAny(final int test, final Temporal self, final Temporal other) {
-        return (self != null) && (other != null)
-                && compare(test, (Class) Classes.findCommonClass(self.getClass(), other.getClass()), self, other);
+    public static boolean compareLenient(final Test test, final Temporal self, final Temporal other) {
+        if (self != null && other != null) {
+            Boolean c = compareAny(test, self, other);
+            if (c != null) return c;
+        }
+        return false;
+    }
+
+    /**
+     * Implementation of lenient comparisons.
+     * Temporal objects have complex conversion rules. We take Instant as the most accurate and unambiguous type.
+     * So if at least one value is an Instant, try to unconditionally promote the other value to an Instant too.
+     * This conversion will fail if the other object has some undefined fields. For example {@link java.sql.Date}
+     * has no time fields (we do not assume that the values of those fields are zero).
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @param  self   the object on which to invoke the method identified by {@code test}.
+     * @param  other  the argument to give to the test method call.
+     * @return the comparison result, or {@code null} if the given objects were not recognized as temporal.
+     * @throws DateTimeException if the two objects cannot be compared.
+     */
+    private static Boolean compareAny(final Test test, Object self, Object other) {
+        Class<?> type = self.getClass();
+adapt:  if (self != other.getClass()) {
+            Temporal converted;
+            /*
+             * OffsetTime and OffsetDateTime are final classes that do not implement a java.time.chrono interface.
+             * Note that OffsetDateTime is convertible into OffsetTime by dropping the date fields, but we do not
+             * (for now) perform comparisons that would ignore the date fields of an operand.
+             */
+            if (self instanceof Instant) {
+                converted = toInstant(other);
+                if (converted != null) {
+                    other = converted;
+                    type  = Instant.class;
+                    break adapt;
+                }
+            } else if (other instanceof Instant) {
+                converted = toInstant(self);
+                if (converted != null) {
+                    self = converted;
+                    type = Instant.class;
+                    break adapt;
+                }
+            } else if (self instanceof OffsetDateTime) {
+                converted = toOffsetDateTime(other);
+                if (converted != null) {
+                    other = converted;
+                    type  = OffsetDateTime.class;
+                    break adapt;
+                }
+            } else if (other instanceof OffsetDateTime) {
+                converted = toOffsetDateTime(self);
+                if (converted != null) {
+                    self = converted;
+                    type = OffsetDateTime.class;
+                    break adapt;
+                }
+            }
+            /*
+             * Comparisons of temporal objects implementing java.time.chrono interfaces. We need to check the most
+             * complete types first. If the type are different, we reduce to the type of the less smallest operand.
+             * For example if an operand is a date+time and the other operand is only a date, then the time fields
+             * will be ignored and a warning will be reported.
+             */
+            if (self instanceof ChronoLocalDateTime<?>) {
+                converted = toLocalDateTime(other);
+                if (converted != null) {
+                    other = converted;
+                    type  = ChronoLocalDateTime.class;
+                    break adapt;
+                }
+            } else if (other instanceof ChronoLocalDateTime<?>) {
+                converted = toLocalDateTime(self);
+                if (converted != null) {
+                    self = converted;
+                    type = ChronoLocalDateTime.class;
+                    break adapt;
+                }
+            }
+            // No else, we want this as a fallback.
+            if (self instanceof ChronoLocalDate) {
+                converted = toLocalDate(other);
+                if (converted != null) {
+                    other = converted;
+                    type  = ChronoLocalDate.class;
+                    break adapt;
+                }
+            } else if (other instanceof ChronoLocalDate) {
+                converted = toLocalDate(self);
+                if (converted != null) {
+                    self = converted;
+                    type = ChronoLocalDate.class;
+                    break adapt;
+                }
+            }
+            // No else, we want this as a fallback.
+            if (self instanceof LocalTime) {
+                converted = toLocalTime(other);
+                if (converted != null) {
+                    other = converted;
+                    type  = LocalTime.class;
+                    break adapt;
+                }
+            } else if (other instanceof LocalTime) {
+                converted = toLocalTime(self);
+                if (converted != null) {
+                    self = converted;
+                    type = LocalTime.class;
+                    break adapt;
+                }
+            }
+            // No else, we want this as a fallback.
+            if (self instanceof Temporal && other instanceof Temporal) {
+                type  = Classes.findCommonClass(self.getClass(), other.getClass());
+            } else {
+                return null;
+            }
+        }
+        return castAndCompare(test, type, self, other);
+    }
+
+    /**
+     * Delegates to {@link #compare(int, Class, Object, Object)} after verification of the type.
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @param  type   base class of the {@code self} and {@code other} arguments.
+     * @param  self   the object on which to invoke the method identified by {@code test}.
+     * @param  other  the argument to give to the test method call.
+     * @return the result of performing the comparison identified by {@code test}.
+     * @throws ClassCastException if {@code self} or {@code other} is not an instance of {@code type}.
+     * @throws DateTimeException if the two objects cannot be compared.
+     */
+    private static <T> boolean castAndCompare(Test test, Class<T> type, Object self, Object other) {
+        return compare(test, type, type.cast(self), type.cast(other));
     }
 
     /**
@@ -208,14 +453,14 @@ public class TimeMethods<T> implements Serializable {
      * are not always the same as {@code compareTo(…)}.
      *
      * @param  <T>    base class of the objects to compare.
-     * @param  test   {@link #BEFORE}, {@link #AFTER} or {@link #EQUAL}.
+     * @param  test   the test to apply (before, after and/or equal).
      * @param  type   base class of the {@code self} and {@code other} arguments.
      * @param  self   the object on which to invoke the method identified by {@code test}.
      * @param  other  the argument to give to the test method call.
      * @return the result of performing the comparison identified by {@code test}.
      * @throws DateTimeException if the two objects cannot be compared.
      */
-    public static <T> boolean compare(final int test, final Class<T> type, final T self, final T other) {
+    public static <T> boolean compare(final Test test, final Class<T> type, final T self, final T other) {
         /*
          * The following cast is not strictly true, it should be `<? extends T>`.
          * However, because of the `isInstance(…)` check and because <T> is used
@@ -230,19 +475,10 @@ public class TimeMethods<T> implements Serializable {
             /*
              * Found one of the special cases listed in `INTERFACES` or `FINAL_TYPE`.
              * If the other type is compatible, the comparison is executed directly.
-             * Note: the `switch` statement is equivalent to `tc.compare(test, …)`,
-             * but is inlined because that method is never overridden in this context.
              */
             if (tc.type.isInstance(other)) {
                 assert tc.type.isAssignableFrom(type) : tc;     // Those types are not necessarily equal.
-                final BiPredicate<? super T, ? super T> p;
-                switch (test) {
-                    case BEFORE: p = tc.isBefore; break;
-                    case AFTER:  p = tc.isAfter;  break;
-                    case EQUAL:  p = tc.isEqual;  break;
-                    default: throw new AssertionError(test);
-                }
-                return p.test(self, other);
+                return test.compare(tc, self, other);
             }
         } else if (self instanceof Comparable<?> && self.getClass().isInstance(other)) {
             /*
@@ -253,12 +489,7 @@ public class TimeMethods<T> implements Serializable {
              */
             @SuppressWarnings("unchecked")          // Safe because verification done by `isInstance(…)`.
             final int c = ((Comparable) self).compareTo(other);
-            switch (test) {
-                case BEFORE: return c <  0;
-                case AFTER:  return c >  0;
-                case EQUAL:  return c == 0;
-                default: throw new AssertionError(test);
-            }
+            return test.fromCompareTo(c);
         }
         /*
          * If we reach this point, the two operands are of different classes and we cannot compare them directly.
@@ -285,23 +516,20 @@ public class TimeMethods<T> implements Serializable {
      * Compares two temporal objects as instants.
      * This is a last-resort fallback, when objects cannot be compared by their own methods.
      *
-     * @param  test   {@link #BEFORE}, {@link #AFTER} or {@link #EQUAL}.
+     * @param  test   the test to apply (before, after and/or equal).
      * @param  self   the object on which to invoke the method identified by {@code test}.
      * @param  other  the argument to give to the test method call.
      * @return the result of performing the comparison identified by {@code test}.
      * @throws DateTimeException if the two objects cannot be compared.
      */
-    private static boolean compareAsInstants(final int test, final TemporalAccessor self, final TemporalAccessor other) {
+    private static boolean compareAsInstants(final Test test, final TemporalAccessor self, final TemporalAccessor other) {
         long t1 =  self.getLong(ChronoField.INSTANT_SECONDS);
         long t2 = other.getLong(ChronoField.INSTANT_SECONDS);
         if (t1 == t2) {
             t1 =  self.getLong(ChronoField.NANO_OF_SECOND);     // Should be present according Javadoc.
             t2 = other.getLong(ChronoField.NANO_OF_SECOND);
-            if (t1 == t2) {
-                return test == EQUAL;
-            }
         }
-        return test == ((t1 < t2) ? BEFORE : AFTER);
+        return test.fromCompareTo(Long.compare(t1, t2));
     }
 
     /**
@@ -367,15 +595,15 @@ public class TimeMethods<T> implements Serializable {
      */
     private static <T> TimeMethods<? super T> fallback(final Class<T> type) {
         return new TimeMethods<>(type,
-                (self, other) -> compare(BEFORE, type, self, other),
-                (self, other) -> compare(AFTER,  type, self, other),
-                (self, other) -> compare(EQUAL,  type, self, other),
+                (self, other) -> compare(Test.BEFORE, type, self, other),
+                (self, other) -> compare(Test.AFTER,  type, self, other),
+                (self, other) -> compare(Test.EQUAL,  type, self, other),
                 null, null, false)
         {
             @Override public boolean isDynamic() {
                 return true;
             }
-            @Override boolean delegate(final int test, final T self, final T other) {
+            @Override boolean delegate(final Test test, final T self, final T other) {
                 return compare(test, type, self, other);
             }
         };
@@ -429,9 +657,10 @@ public class TimeMethods<T> implements Serializable {
      *   </li>
      * </ul>
      *
+     * @param  <T>       type of the {@code time} argument.
      * @param  time      the temporal object to return with the specified timezone, or {@code null} if none.
      * @param  timezone  the desired timezone. Cannot be {@code null}.
-     * @param  allowAdd
+     * @param  allowAdd  whether to allow the addition of a time zone in an object that initially had none.
      * @return a temporal object with the specified timezone, if it was possible to apply a timezone.
      */
     public static <T> Optional<Temporal> withZone(final T time, final ZoneId timezone, final boolean allowAdd) {
@@ -539,6 +768,147 @@ public class TimeMethods<T> implements Serializable {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Converts a legacy {@code Date} object to an object from the {@link java.time} package.
+     * We performs this conversion before to compare to {@code Date} instances that are not of
+     * the same class, because the {@link Date#compareTo(Date)} method in such case is not well
+     * defined.
+     */
+    private static Temporal fromLegacy(final Date value) {
+        if (value instanceof java.sql.Timestamp) {
+            return ((java.sql.Timestamp) value).toLocalDateTime();
+        } else if (value instanceof java.sql.Date) {
+            return ((java.sql.Date) value).toLocalDate();
+        } else if (value instanceof java.sql.Time) {
+            return ((java.sql.Time) value).toLocalTime();
+        } else {
+            // Implementation of above toFoo() methods use system default time zone.
+            return LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
+        }
+    }
+
+    /**
+     * Converts the given object to an {@link Instant}, or returns {@code null} if unconvertible.
+     * This method handles a few types from the {@link java.time} package and legacy types like
+     * {@link Date} (with a special case for SQL dates) and {@link Calendar}.
+     */
+    private static Instant toInstant(final Object value) {
+        if (value instanceof Instant) {
+            return (Instant) value;
+        } else if (value instanceof OffsetDateTime) {
+            return ((OffsetDateTime) value).toInstant();
+        } else if (value instanceof ChronoZonedDateTime) {
+            return ((ChronoZonedDateTime) value).toInstant();
+        } else if (value instanceof Date) {
+            try {
+                return ((Date) value).toInstant();
+            } catch (UnsupportedOperationException e) {
+                /*
+                 * java.sql.Date and java.sql.Time cannot be converted to Instant because a part
+                 * of their coordinates on the timeline is undefined.  For example in the case of
+                 * java.sql.Date the hours, minutes and seconds are unspecified (which is not the
+                 * same thing as assuming that those values are zero).
+                 */
+            }
+        } else if (value instanceof Calendar) {
+            return ((Calendar) value).toInstant();
+        }
+        return null;
+    }
+
+    /**
+     * Converts the given object to an {@link OffsetDateTime}, or returns {@code null} if unconvertible.
+     */
+    private static OffsetDateTime toOffsetDateTime(final Object value) {
+        if (value instanceof OffsetDateTime) {
+            return (OffsetDateTime) value;
+        } else if (value instanceof ZonedDateTime) {
+            return ((ZonedDateTime) value).toOffsetDateTime();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Converts the given object to a {@link ChronoLocalDateTime}, or returns {@code null} if unconvertible.
+     * This method handles the case of legacy SQL {@link java.sql.Timestamp} objects.
+     * Conversion may lost timezone information.
+     */
+    private static ChronoLocalDateTime<?> toLocalDateTime(final Object value) {
+        if (value instanceof ChronoLocalDateTime<?>) {
+            return (ChronoLocalDateTime<?>) value;
+        } else if (value instanceof ChronoZonedDateTime) {
+            ignoringField(ChronoField.OFFSET_SECONDS);
+            return ((ChronoZonedDateTime) value).toLocalDateTime();
+        } else if (value instanceof OffsetDateTime) {
+            ignoringField(ChronoField.OFFSET_SECONDS);
+            return ((OffsetDateTime) value).toLocalDateTime();
+        } else if (value instanceof java.sql.Timestamp) {
+            return ((java.sql.Timestamp) value).toLocalDateTime();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Converts the given object to a {@link ChronoLocalDate}, or returns {@code null} if unconvertible.
+     * This method handles the case of legacy SQL {@link java.sql.Date} objects.
+     * Conversion may lost timezone information and time fields.
+     */
+    private static ChronoLocalDate toLocalDate(final Object value) {
+        if (value instanceof ChronoLocalDate) {
+            return (ChronoLocalDate) value;
+        } else if (value instanceof ChronoLocalDateTime) {
+            ignoringField(ChronoField.SECOND_OF_DAY);
+            return ((ChronoLocalDateTime) value).toLocalDate();
+        } else if (value instanceof ChronoZonedDateTime) {
+            ignoringField(ChronoField.SECOND_OF_DAY);
+            return ((ChronoZonedDateTime) value).toLocalDate();
+        } else if (value instanceof OffsetDateTime) {
+            ignoringField(ChronoField.SECOND_OF_DAY);
+            return ((OffsetDateTime) value).toLocalDate();
+        } else if (value instanceof java.sql.Date) {
+            return ((java.sql.Date) value).toLocalDate();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Converts the given object to a {@link LocalTime}, or returns {@code null} if unconvertible.
+     * This method handles the case of legacy SQL {@link java.sql.Time} objects.
+     * Conversion may lost timezone information.
+     */
+    private static LocalTime toLocalTime(final Object value) {
+        if (value instanceof LocalTime) {
+            return (LocalTime) value;
+        } else if (value instanceof OffsetTime) {
+            ignoringField(ChronoField.OFFSET_SECONDS);
+            return ((OffsetTime) value).toLocalTime();
+        } else if (value instanceof java.sql.Time) {
+            return ((java.sql.Time) value).toLocalTime();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Invoked when a conversion cause a field to be ignored. For example if a "date+time" object is compared
+     * with a "date" object, the "time" field is ignored. Expected values are:
+     *
+     * <ul>
+     *   <li>{@link ChronoField#OFFSET_SECONDS}: time zone is ignored.</li>
+     *   <li>{@link ChronoField#SECOND_OF_DAY}:  time of dat and time zone are ignored.</li>
+     * </ul>
+     *
+     * @param  field  the field which is ignored.
+     *
+     * @see <a href="https://issues.apache.org/jira/browse/SIS-460">SIS-460</a>
+     */
+    private static void ignoringField(final ChronoField field) {
+        // TODO
     }
 
     /**

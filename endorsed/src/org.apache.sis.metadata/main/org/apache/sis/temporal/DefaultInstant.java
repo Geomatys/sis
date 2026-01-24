@@ -283,8 +283,12 @@ cmp:    if (canTestBefore | canTestAfter | canTestEqual) {
                     return true;
                 }
                 final Temporal other = that.getPosition();
-                return Objects.equals(position, other) ||       // Needed in all cases for testing null values.
-                        (mode.isIgnoringMetadata() && TimeMethods.compareAny(TimeMethods.EQUAL, position, other));
+                if (Objects.equals(position, other)) {       // Needed anyway for testing null values.
+                    return true;
+                }
+                if (mode.isIgnoringMetadata()) {
+                    return TimeMethods.compareLenient(TimeMethods.Test.EQUAL, position, other);
+                }
             }
         }
         return false;
