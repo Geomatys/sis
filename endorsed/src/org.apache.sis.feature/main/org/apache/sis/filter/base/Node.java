@@ -91,7 +91,7 @@ public abstract class Node implements Serializable {
      *
      * @param  <T>   compile-time value of {@code type}.
      * @param  type  type of values in the attribute.
-     * @param  name  name of the attribute to create.
+     * @param  name  name of the attribute to create as a {@link org.opengis.util.GenericName} or a {@link String}.
      * @return an attribute of the given type and name.
      *
      * @see Expression#getFunctionName()

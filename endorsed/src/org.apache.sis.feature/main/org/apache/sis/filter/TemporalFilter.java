@@ -33,9 +33,12 @@ import org.opengis.filter.InvalidFilterValueException;
 
 
 /**
- * Temporal operations between a period and an instant or between two periods.
- * The base class represents the general case when don't know if the the argument are periods or not.
- * The subclasses represent specializations when at least one of the arguments is known to be a period.
+ * Temporal operations between a period and a Java temporal object or between two periods.
+ * The base class represents the general case when we don't know which operands are periods.
+ * The subclasses represent specializations when the type of temporal values is known in advance.
+ *
+ * <p>In the context of this class, "instant" can be understood as <abbr>ISO</abbr> 19108 instant
+ * or as the various {@link java.time} objects, not restricted to {@link java.time.Instant}.</p>
  *
  * @author  Johann Sorel (Geomatys)
  * @author  Martin Desruisseaux (Geomatys)
@@ -74,9 +77,11 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
     /**
      * Creates a new temporal function.
      *
+     * @param  <R>          the type of resources (e.g. {@code Feature}) used as inputs.
+     * @param  <v>          compile-type value of the {@code type} argument.
+     * @param  type         the base type of values computed by the two given operands.
      * @param  expression1  the first of the two expressions to be used by this function.
      * @param  expression2  the second of the two expressions to be used by this function.
-     * @param  operation    the operation to apply on instants or periods.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static <R,V> TemporalFilter<R,?> create(
@@ -209,7 +214,9 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
 
 
     /**
-     * A temporal filters where both operands are ISO 19108 instants.
+     * A temporal filters where both operands are <abbr>ISO</abbr> 19108 instants.
+     * Instants can be represented by the GeoAPI interface or by the various
+     * {@link java.time} objects, not restricted to {@link java.time.Instant}.
      *
      * @param  <R>  the type of resources used as inputs.
      * @param  <T>  the base type of temporal objects.

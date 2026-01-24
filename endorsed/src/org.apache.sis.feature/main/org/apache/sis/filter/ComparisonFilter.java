@@ -368,7 +368,7 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
      * This method handles a few types from the {@link java.time} package and legacy types like
      * {@link Date} (with a special case for SQL dates) and {@link Calendar}.
      */
-    static Instant toInstant(final Object value) {
+    private static Instant toInstant(final Object value) {
         if (value instanceof Instant) {
             return (Instant) value;
         } else if (value instanceof OffsetDateTime) {

@@ -30,8 +30,10 @@ import org.opengis.filter.Expression;
 
 
 /**
- * An operation upon two numerical operands. Inputs are {@link Number} instances
- * which will be converted to {@link Double}. Output are {@link Double}.
+ * An operation upon two numerical operands.
+ * Inputs are {@link Number} instances that are unconditionally converted to {@code double} type
+ * (i.e., there is no specialized code for specific numeric classes such as {@code BigDecimal}).
+ * Output are {@link Double}.
  *
  * <h2>Terminology</h2>
  * "Binary operator" is a specialization of "binary function" in that it restricts
@@ -96,8 +98,7 @@ final class BinaryOperator<R> extends BinaryFunction<R, Number, Number>
     }
 
     /**
-     * Provides the type of results computed by this expression. That type depends only
-     * on the {@code ArithmeticFunction} subclass and is given by {@link #expectedType()}.
+     * Provides the type of results computed by this expression.
      */
     @Override
     public final FeatureProjectionBuilder.Item expectedType(FeatureProjectionBuilder addTo) {
