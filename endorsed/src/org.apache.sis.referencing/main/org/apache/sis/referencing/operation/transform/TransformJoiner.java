@@ -199,6 +199,23 @@ valid:  if (i >= 0 && i < steps.size()) {
     }
 
     /**
+     * Creates a diagonal matrix of the dimensions of the transform at the given relative index.
+     *
+     * @param  relativeIndex  index of the matrix to get,
+     *         relative to the transform on which {@code tryConcatenate(…)} has been invoked.
+     * @return a diagonal matrix for the number of dimensions of the transform at the given index.
+     */
+    private Matrix createDiagonalMatrix(final int relativeIndex) {
+        final MathTransform step = getTransform(relativeIndex).orElseThrow();
+        final int srcDim = step.getSourceDimensions();
+        final int tgtDim = step.getTargetDimensions();
+        final Matrix matrix = Matrices.createDiagonal(tgtDim + 1, srcDim + 1);
+        if (tgtDim < srcDim) matrix.setElement(tgtDim, tgtDim, 0);
+        matrix.setElement(tgtDim, srcDim, 1);
+        return matrix;
+    }
+
+    /**
      * If the specified range of dimensions is unused by the specified neighbor transform, removes those dimensions.
      * A range of dimensions is considered unused by a neighbor if
      * <code>{@link #getTransform(int) getTransform}(relativeIndex)</code> returns a
@@ -573,25 +590,43 @@ valid:  if (i >= 0 && i < steps.size()) {
          * The unsafe case of the former was handled in code above by removing the keys that are too large.
          */
         final MatrixSIS simplified = Matrices.copy(moveFromBeforeToAfter ? before : after);
+        final int lastSimplifiedRow = simplified.getNumRow() - 1;
+        final int lastSimplifiedCol = simplified.getNumCol() - 1;
         final int dim = moveFromBeforeToAfter ? after.getNumCol() : before.getNumRow();
         final MatrixSIS moved = Matrices.create(dim, dim, ExtendedPrecisionMatrix.CREATE_IDENTITY);
         for (final Map.Entry<Integer, Integer> entry : dimensions.entrySet()) {
             final int srcRow = entry.getKey();
             final int tgtRow = entry.getValue();
-            moved.setElement(tgtRow, tgtRow, 0);    // Remove the 1 on the diagonal for that row.
+            moved.setElement(tgtRow, tgtRow, 0);    // Clear the diagonal for having 0 in all columns of this row.
             /*
              * See the comment in `removeInvalidPassThrough(…)` for an explanation about why we need this check.
-             * Note: when `moveFromBeforeToAfter` is false (which is the only case where we need bound check),
-             * `simplified` is of the size of `after`.
+             * Summary: in the "move after to before" case, the `simplified` matrix is the `after` matrix and may
+             * be reducing the number of dimensions, in which case it has less rows than `moved`. It is okay when
+             * the rows were only pass-through dimensions.
              */
-            if (moveFromBeforeToAfter || srcRow < simplified.getNumRow()) {
+            if (moveFromBeforeToAfter || srcRow <= lastSimplifiedRow) {
                 dimensions.forEach((srcCol, tgtCol) -> {
                     moved.setNumber(tgtRow, tgtCol, simplified.getElement(srcRow, srcCol));
                 });
-                // Simplify the row only after all elements have been copied.
-                for (int i = simplified.getNumCol(); --i >= 0;) {
-                    simplified.setElement(srcRow, i, (i == srcRow) ? 1 : 0);
-                }
+                // Set the row to an identity operation only after all elements have been copied.
+                for (int i = 0; i <= lastSimplifiedCol; i++) simplified.setElement(srcRow, i, 0);
+                simplified.setElement(srcRow, (srcRow != lastSimplifiedRow) ? srcRow : lastSimplifiedCol, 1);
+            }
+        }
+        /*
+         * The last row of the simplified matrix should have been moved to the last row of the `moved` matrix.
+         * That row is not associated to a dimension of coordinate tuples, and is usually only [0 0 0 … 0 1].
+         * The row is already at the correct location if `simplified` is square, but needs to be moved if the
+         * `simplified` matrix is reducing the number of dimensions (i.e. has less rows than `moved` matrix).
+         * Implementation note: we don't proceed by modifying `tgtRow` in above loop because of complication
+         * that duplicated `tgtRow` values would cause.
+         */
+        final int lastRow = moved.getNumRow() - 1;
+        final int tgtRow = dimensions.getOrDefault(lastSimplifiedRow, lastRow);
+        if (tgtRow != lastRow) {
+            for (int i = moved.getNumCol(); --i >= 0;) {
+                moved.setNumber(lastRow, i, moved.getNumber(tgtRow, i));
+                moved.setElement(tgtRow, i, 0);
             }
         }
         /*
@@ -737,7 +772,21 @@ valid:  if (i >= 0 && i < steps.size()) {
      * If one of above cases is detected, then this method moves partially the linear step on the
      * other side for reducing the number of dimensions on which the transform at index 0 operates.
      * Such reduction can help {@link TransformSeparator} to separate the transform.
+     * The main transform is reduced by the {@code reducer} argument,
+     * which will receive the following arguments:
      *
+     * <ul>
+     *   <li>A {@link BitSet} with the dimensions to retain.</li>
+     *   <li>An {@link Integer} with value -1 if the {@code BitSet} specifies input dimensions,
+     *       or +1 if the {@code BitSet} specifies output dimensions of the transform.</li>
+     * </ul>
+     *
+     * The {@code reducer} shall return a transform with a number of input or output dimensions
+     * (depending on the second argument) equals to {@link BitSet#cardinality()}, or {@code null}
+     * if the reducer cannot build the transform.
+     *
+     * @param  inputDimensions   dimensions of coordinates used by the main transform.
+     * @param  outputDimensions  dimensions of coordinates with a value modified by the transform.
      * @param  reducer  a constructor accepting selected dimension and returning the new transform.
      * @return whether  the transform chain has been modified as a result of this method call.
      * @throws FactoryException if the concatenation is not a valid replacement.
@@ -772,6 +821,7 @@ prepare:    if (relativeIndex < 0) {
                  * We only need to keep the rows which modify the input coordinates of the main transform.
                  */
                 inputDimensions.forEach(rowsToKeep::set);
+                if (rowsToKeep.length() >= numCol) continue;
             } else {
                 /*
                  * Case where `matrix` is after the main transform and reduces the number of dimensions.
@@ -783,6 +833,11 @@ prepare:    if (relativeIndex < 0) {
                         if (move.getElement(j, i) != 0) {
                             rowsToKeep.set(j);
                         }
+                    }
+                }
+                if (rowsToKeep.isEmpty()) {
+                    if (replace(0, factory.createAffineTransform(createDiagonalMatrix(0)))) {
+                        return true;
                     }
                 }
                 /*
@@ -840,7 +895,7 @@ prepare:    if (relativeIndex < 0) {
                 prefix = move;
                 suffix = keep;
             }
-            colsToKeep.clear(numCol - 1);
+            colsToKeep.clear(numCol - 1);   // Ignore translation column or last row of affine transform.
             MathTransform concatenation = reducer.apply(colsToKeep, relativeIndex);
             if (concatenation != null) {
                 concatenation = factory.createConcatenatedTransform(factory.createAffineTransform(prefix), concatenation);
