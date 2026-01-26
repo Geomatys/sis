@@ -1493,4 +1493,13 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     protected Object getAttributeValue(final String attributeName) {
         return attributes.get(attributeName);
     }
+
+    /**
+     * Returns a string representation of this variable.
+     * @return string representation of this variable.
+     */
+    @Override
+    public String toString() {
+        return name + " [" + dataType + "] [" + metadata.zarrPath() + "] [" + Arrays.toString(metadata.shape()) + "]";
+    }
 }

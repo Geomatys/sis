@@ -146,7 +146,7 @@ public abstract class Decoder extends ReferencingFactoryContainer {
      *
      * @see GridMapping#forVariable(Variable)
      */
-    final Map<String,GridMapping> gridMapping;
+    protected final Map<String, List<GridMapping>> gridMapping;
 
     /**
      * Cache of localization grids created for a given pair of (<var>x</var>,<var>y</var>) axes.
@@ -525,6 +525,49 @@ public abstract class Decoder extends ReferencingFactoryContainer {
      * @return the variable or group of the given name, or {@code null} if none.
      */
     protected abstract Node findNode(String name);
+
+    /**
+     * Returns the grid mapping of the given name, or {@code null} if none.
+     *
+     * @param  name  the name of the grid mapping to search.
+     * @param variable  the variable for which the grid mapping is requested.
+     * @return the grid mapping of the given name, or {@code null} if none.
+     */
+    protected GridMapping findGridMapping(String name, Variable variable) {
+        /*
+        * In the majority of cases, there is only one GridMapping instance per name.
+        * So, in this "base" Decoder, we only return the first one. In subclasses,
+        * we may override this method if we want to apply more sophisticated logic.
+        *
+        * For example, in a Zarr store, there me be multiple variables sharing the same
+        * name but in different groups. In such case, we need to check which variable
+        * is requesting the grid mapping. And we store multiple GridMapping instances, one
+        * per variable.
+        */
+        List<GridMapping> mappings = gridMapping.get(name);
+        return (mappings != null && !mappings.isEmpty()) ? mappings.get(0) : null;
+    }
+
+    /**
+     * Adds a grid mapping for the given name.
+     *
+     * @param  name     the name of the grid mapping.
+     * @param  mapping  the grid mapping to add.
+     */
+    protected void addGridMapping(String name, GridMapping mapping) {
+        gridMapping.computeIfAbsent(name, k -> new ArrayList<>()).add(mapping);
+    }
+
+    /**
+     * Returns {@code true} if a grid mapping of the given name exists.
+     *
+     * @param  name  the name of the grid mapping to search.
+     * @param variable  the variable for which the grid mapping is requested.
+     * @return {@code true} if a grid mapping of the given name exists.
+     */
+    protected boolean validGridMappingStored(String name, Variable variable) {
+        return gridMapping.containsKey(name);
+    }
 
     /**
      * Logs a message about a potentially slow operation. This method does use the listeners registered to the netCDF reader
