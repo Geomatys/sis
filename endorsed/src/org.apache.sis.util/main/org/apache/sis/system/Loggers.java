@@ -42,8 +42,7 @@ public final class Loggers {
     public static final String ROOT = "org.apache.sis";
 
     /**
-     * The logger for Apache SIS internal operations. The name of this logger does not match the package name
-     * of the classes using it, because this logger name does not have the {@code "internal"} part in it.
+     * The logger for Apache SIS internal operations.
      */
     public static final String SYSTEM = "org.apache.sis.system";
 

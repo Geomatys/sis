@@ -27,7 +27,15 @@ import org.apache.sis.math.FunctionProperty;
 /**
  * Handles conversions from {@link Date} to various objects.
  * Note that there is no converter between {@link String} and {@link java.util.Date}.
- * The {@link java.time.Instant} class should be used instead.
+ * For conversions from {@code String}, use the {@link java.time.Instant} class instead.
+ *
+ * <h2>Unconvertible dates</h2>
+ * While {@link java.util.Date} is generally convertible to {@link java.time.Instant},
+ * the {@link java.sql.Date} and {@link java.sql.Time} subclasses are not convertible:
+ * e.g. {@link java.sql.Date#toInstant()} throws {@link UnsupportedOperationException}.
+ * We could handle this special case in {@link SystemRegistry} for detecting early that
+ * a conversion will never succeed, but it does not seem worth to add this complexity
+ * for now, especially since users could override the above-cited method.
  *
  * <h2>Immutability and thread safety</h2>
  * This base class and all inner classes are immutable, and thus inherently thread-safe.
@@ -129,7 +137,7 @@ abstract class DateConverter<T> extends SystemConverter<Date,T> {
     }
 
     /**
-     * From {@code Date} to SQL {@code Date}.
+     * From {@code Date} to <abbr>SQL</abbr> {@code Date}.
      * The inverse of this converter is the identity conversion.
      */
     public static final class SQL extends DateConverter<java.sql.Date> {
@@ -149,7 +157,7 @@ abstract class DateConverter<T> extends SystemConverter<Date,T> {
     }
 
     /**
-     * From {@code Date} to SQL {@code Timestamp}.
+     * From {@code Date} to <abbr>SQL</abbr> {@code Timestamp}.
      * The inverse of this converter is the identity conversion.
      */
     public static final class Timestamp extends DateConverter<java.sql.Timestamp> {

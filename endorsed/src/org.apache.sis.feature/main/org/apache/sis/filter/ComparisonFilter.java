@@ -19,8 +19,6 @@ package org.apache.sis.filter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.DateTimeException;
-import java.time.temporal.Temporal;
-import java.util.Date;
 import java.util.List;
 import java.util.Collection;
 import java.util.Objects;
@@ -170,15 +168,17 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         final Filter<R> result = Optimization.OnFilter.super.optimize(optimization);
         if (result instanceof ComparisonFilter<?>) {
             final var optimized = (ComparisonFilter<R>) result;
-            final var numeric = optimized.new Numeric();
-            if (numeric.evaluator != null) {
-                return numeric;
-            }
-            final Class<?> type1, type2;
-            if (isTemporal(type1 = getResultClass(expression1)) && isTemporal(type2 = getResultClass(expression2))) {
-                final TimeMethods<?> methods = TimeMethods.forTypes(type1, type2);
-                if (methods != null) {
-                    return optimized.new Time(methods.predicate(temporalTest(), type2));
+            final Class<?> t1, t2;
+            if (isSpecialized(t1 = getResultClass(expression1)) &&
+                isSpecialized(t2 = getResultClass(expression2)))
+            {
+                final var numeric = optimized.new Numeric();
+                if (numeric.evaluator != null) {
+                    return numeric;
+                }
+                final var temporal = new Time<>(TimeMethods.forTypes(t1, t2), t2);
+                if (temporal.evaluator != null) {
+                    return temporal;
                 }
             }
         }
@@ -186,12 +186,12 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     }
 
     /**
-     * Returns whether the given type is considered temporal for the purpose of the comparison filter.
-     * This is necessary for avoiding the comparable objects such as {@link String} are wrongly handled
-     * by {@link TimeMethods}.
+     * Returns whether the given type is non-null and something more specialized than {@code Object}.
+     * This is used for avoiding unnecessary class-loading of {@link Numeric} and {@link Time} when
+     * they are sure to be unsuccessful.
      */
-    private static boolean isTemporal(final Class<?> type) {
-        return (type != null) && (Temporal.class.isAssignableFrom(type) || Date.class.isAssignableFrom(type));
+    private static boolean isSpecialized(final Class<?> type) {
+        return (type != null) && (type != Object.class);
     }
 
     /**
@@ -222,15 +222,17 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     /**
      * An optimized versions of this filter for the case where the operands are temporal.
      */
-    private final class Time extends Node implements Filter<R> {
+    private final class Time<T,S> extends Node implements Filter<R> {
         /** For cross-version compatibility during (de)serialization. */
         private static final long serialVersionUID = -5132906457258846016L;
 
         /** The function which performs the comparisons. */
-        @SuppressWarnings("serial") final BiPredicate<?,?> evaluator;
+        @SuppressWarnings("serial") final BiPredicate<T,S> evaluator;
 
-        /** Creates a new filter. */
-        Time(final BiPredicate<?,?> evaluator) {this.evaluator = evaluator;}
+        /** Creates a new filter. Callers must verifies that {@link #evaluator} is non-null. */
+        Time(final TimeMethods<T> methods, final Class<S> otherType) {
+            evaluator = (methods != null) ? methods.predicate(temporalTest(), otherType) : null;
+        }
 
         /** Delegates to the enclosing class.*/
         @Override public    CodeList<?>           getOperatorType()  {return ComparisonFilter.this.getOperatorType();}
@@ -239,13 +241,14 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected Collection<?>         getChildren()      {return ComparisonFilter.this.getChildren();}
 
         /** Determines if the test represented by this filter passes with the given operands. */
-        @SuppressWarnings("unchecked")
         @Override public boolean test(final R candidate) {
-            final Object left = expression1.apply(candidate);
+            @SuppressWarnings("unchecked")
+            final T left = (T) expression1.apply(candidate);
             if (left != null) {
-                final Object right = expression2.apply(candidate);
+                @SuppressWarnings("unchecked")
+                final S right = (S) expression2.apply(candidate);
                 if (right != null) {
-                    return ((BiPredicate) evaluator).test(left, right);
+                    return evaluator.test(left, right);
                 }
             }
             return false;

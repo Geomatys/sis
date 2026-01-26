@@ -28,7 +28,7 @@ import org.apache.sis.system.Modules;
 
 
 /**
- * The Apache SIS system-wide {@link ConverterRegistry}.
+ * The Apache <abbr>SIS</abbr> system-wide {@link ConverterRegistry}.
  * This class serves two purposes:
  *
  * <ul>

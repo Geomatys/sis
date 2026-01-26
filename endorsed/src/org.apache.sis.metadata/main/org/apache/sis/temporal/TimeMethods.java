@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Date;
 import java.util.Calendar;
 import java.util.Optional;
+import java.util.logging.Logger;
 import java.util.function.Supplier;
 import java.util.function.Function;
 import java.util.function.BiFunction;
@@ -47,7 +48,10 @@ import java.lang.reflect.Modifier;
 import java.io.Serializable;
 import java.io.ObjectStreamException;
 import org.apache.sis.util.Classes;
+import org.apache.sis.util.ObjectConverters;
+import org.apache.sis.util.UnconvertibleObjectException;
 import org.apache.sis.util.internal.shared.Strings;
+import org.apache.sis.util.logging.Logging;
 import org.apache.sis.util.resources.Errors;
 
 
@@ -70,6 +74,11 @@ import org.apache.sis.util.resources.Errors;
  * @author  Martin Desruisseaux (Geomatys)
  */
 public final class TimeMethods<T> implements Serializable {
+    /**
+     * Logger for warnings.
+     */
+    private static final Logger LOGGER = Logger.getLogger("org.apache.sis.temporal");
+
     /**
      * The test to apply: equal, before or after.
      *
@@ -160,8 +169,21 @@ public final class TimeMethods<T> implements Serializable {
     /**
      * Converter from an object of arbitrary class to an object of class {@code <T>}, or {@code null} if none.
      * The function may return {@code null} if the given object is an instance of unsupported type.
+     *
+     * <p><b>Design note:</b> the purpose of this field overlaps with {@link org.apache.sis.util.ObjectConverters}.
+     * Those converters are not yet registered as {@link org.apache.sis.util.ObjectConverter}s because they expect
+     * {@code Object} in argument (which is too generic for {@code ObjectConverter}) for performance reasons,
+     * conversions may lost information, and we may report these lost with {@link #ignoringField(ChronoField)}
+     * in the future. Another difference is that the function returns {@code null} instead of throwing an exception
+     * if an operand is not recognized.</p>
+     *
+     * @see #toOffsetDateTime(Object)
+     * @see #toLocalDateTime(Object)
+     * @see #toLocalDate(Object)
+     * @see #toLocalTime(Object)
+     * @see #toInstant(Object)
      */
-    public final transient Function<Object, T> converter;
+    private final transient Function<Object, T> converter;
 
     /**
      * Predicate to execute for testing the ordering between temporal objects.
@@ -176,7 +198,7 @@ public final class TimeMethods<T> implements Serializable {
      *
      * @see #now()
      */
-    public final transient Supplier<T> now;
+    private final transient Supplier<T> now;
 
     /**
      * Function to execute for getting another temporal object with the given timezone, or {@code null} if none.
@@ -188,7 +210,7 @@ public final class TimeMethods<T> implements Serializable {
      *
      * @see #withZone(Object, ZoneId, boolean)
      */
-    public final transient BiFunction<T, ZoneId, Temporal> withZone;
+    private final transient BiFunction<T, ZoneId, Temporal> withZone;
 
     /**
      * Whether the temporal object have a time zone, explicitly or implicitly.
@@ -227,23 +249,66 @@ public final class TimeMethods<T> implements Serializable {
     }
 
     /**
+     * Returns a converter from {@code otherType} to {@link #type},
+     * or {@code null} if there is no need for converter.
+     *
+     * @param  <S>        compile-time value of {@code otherType}.
+     * @param  otherType  the type of values expected as input by the converter.
+     * @return converter from {@code otherType} to {@link #type}, or {@code null}.
+     */
+    @SuppressWarnings("unchecked")
+    private <S> Function<? super S, T> converter(final Class<S> otherType) {
+        if (type.isAssignableFrom(otherType)) {
+            return null;
+        }
+        /*
+         * Check for more specific conversions before to fallback on `converter` because the most specific
+         * cases are likely to be more efficient. We must exclude the `java.util.Date` type because of the
+         * complication of the `java.sql.Date` and `java.sql.Time` subtypes.
+         */
+        if (otherType != Object.class && !Date.class.isAssignableFrom(otherType)) try {
+            final Function<? super S, ? extends T> castOrConvert = ObjectConverters.find(otherType, type);
+            return (S other) -> {
+                try {
+                    return castOrConvert.apply(other);
+                } catch (UnconvertibleObjectException e) {
+                    Logging.ignorableException(LOGGER, TimeMethods.class, "converter", e);
+                    return null;
+                }
+            };
+        } catch (UnconvertibleObjectException e) {
+            Logging.ignorableException(LOGGER, TimeMethods.class, "converter", e);
+        }
+        if (converter != null) {
+            return converter;
+        }
+        @SuppressWarnings("LocalVariableHidesMemberVariable")
+        final Class<T> type = this.type;
+        return (S other) -> type.isInstance(other) ? (T) other : null;
+    }
+
+    /**
      * Returns the predicate to use for this test.
      * The expected type of the first operand is always {@code <T>}.
      * The expected type of the second operand will be either {@code <T>} or {@code Object},
      * depending on the value of {@code t2}.
      *
-     * @param  test  the test to apply (before, after and/or equal).
-     * @param  t2    expected class of the second operand.
+     * @param  <S>        compile-time value of {@code otherType}.
+     * @param  test       the test to apply (before, after and/or equal).
+     * @param  otherType  expected class of the second operand.
      * @return the predicate for the requested test.
      */
-    public final BiPredicate<T,?> predicate(final Test test, final Class<?> t2) {
+    @SuppressWarnings("unchecked")
+    public final <S> BiPredicate<T,S> predicate(final Test test, final Class<S> otherType) {
         final BiPredicate<T,T> predicate = test.predicate(this);
-        if (type.isAssignableFrom(t2)) {
-            return predicate;
+        final Function<? super S, T> castOrConvert = converter(otherType);
+        if (castOrConvert == null) {
+            return (BiPredicate) predicate;
         }
-        @SuppressWarnings("LocalVariableHidesMemberVariable")
-        Function<Object, T> converter = this.converter;
-        return (T self, Object other) -> predicate.test(self, converter.apply(other));
+        return (T self, S other) -> {
+            final T converted = castOrConvert.apply(other);
+            return (converted != null) && predicate.test(self, converted);
+        };
     }
 
     /**
@@ -303,6 +368,14 @@ public final class TimeMethods<T> implements Serializable {
             return compareTemporalOrDate(test, self, other);
         }
         return null;
+    }
+
+    /**
+     * Returns whether the given type is considered temporal. This is necessary for avoiding that
+     * comparable objects such as {@link String} are wrongly handled by {@code TimeMethods}.
+     */
+    private static boolean isTemporal(final Class<?> type) {
+        return (type != null) && (Temporal.class.isAssignableFrom(type) || Date.class.isAssignableFrom(type));
     }
 
     /**
@@ -432,7 +505,7 @@ adapt:  if (type != other.getClass()) {
             final TimeMethods<?> methods = forTypes(self.getClass(), other.getClass(), false);
             if (methods != null && !methods.isDynamic) {
                 assert methods.type.isInstance(self) : self;
-                return ((TimeMethods) methods).convertAndCompareObject(test, self, other);
+                return ((TimeMethods) methods).convertAndCompare(test, self, other);
             }
             throw new DateTimeException(Errors.format(Errors.Keys.CannotCompareInstanceOf_2, self.getClass(), other.getClass()));
         }
@@ -460,16 +533,20 @@ adapt:  if (type != other.getClass()) {
 
     /**
      * Compares an object of class {@code <T>} with a temporal object of arbitrary class.
+     * The other object is typically the beginning or ending instant of a period and may
+     * be converted to the {@code <T>} type before comparison.
+     *
+     * <p>The type of the {@code other} argument should be {@link TemporalAccessor},
+     * but the method signature uses {@code Object} for accepting also {@link Date}.</p>
      *
      * @param  test   the test to apply (before, after and/or equal).
      * @param  self   the object on which to invoke the method identified by {@code test}.
-     * @param  other  the argument to give to the test method call.
+     * @param  other  the argument to give to the test method call after conversion.
      * @return the result of performing the comparison identified by {@code test}.
-     * @throws ClassCastException if {@code self} or {@code other} is not an instance of {@code type}.
      * @throws DateTimeException if the two objects cannot be compared.
      */
     @SuppressWarnings("unchecked")
-    private boolean convertAndCompareObject(final Test test, final T self, final Object other) {
+    public boolean convertAndCompare(final Test test, final T self, final Object other) {
         if (converter != null) {
             final T converted = converter.apply(other);
             if (converted != null) {
@@ -481,21 +558,6 @@ adapt:  if (type != other.getClass()) {
             return compareAsInstants(test, accessor(self), (TemporalAccessor) other);
         }
         throw new DateTimeException(Errors.format(Errors.Keys.CannotCompareInstanceOf_2, self.getClass(), other.getClass()));
-    }
-
-    /**
-     * Compares an object of class {@code <T>} with a temporal object of arbitrary class.
-     * The other object is typically the beginning or ending instant of a period and may
-     * be converted to the {@code <T>} type before comparison.
-     *
-     * @param  test   the test to apply (before, after and/or equal).
-     * @param  self   the object on which to invoke the method identified by {@code test}.
-     * @param  other  the argument to give to the test method call.
-     * @return the result of performing the comparison identified by {@code test}.
-     * @throws DateTimeException if the two objects cannot be compared.
-     */
-    public final boolean convertAndCompare(final Test test, final T self, final TemporalAccessor other) {
-        return convertAndCompareObject(test, self, other);
     }
 
     /**
@@ -549,7 +611,10 @@ adapt:  if (type != other.getClass()) {
      * @return set of comparison methods for operands of the given types, or {@code null} if not found.
      */
     public static TimeMethods<?> forTypes(final Class<?> self, final Class<?> other) {
-        return forTypes(self, other, true);
+        if (isTemporal(self) && isTemporal(other)) {
+            return forTypes(self, other, true);
+        }
+        return null;
     }
 
     /**
@@ -857,7 +922,7 @@ adapt:  if (type != other.getClass()) {
             } catch (UnsupportedOperationException e) {
                 /*
                  * java.sql.Date and java.sql.Time cannot be converted to Instant because a part
-                 * of their coordinates on the timeline is undefined.  For example in the case of
+                 * of their coordinates on the timeline is undefined. For example, in the case of
                  * java.sql.Date the hours, minutes and seconds are unspecified (which is not the
                  * same thing as assuming that those values are zero).
                  */
@@ -950,7 +1015,7 @@ adapt:  if (type != other.getClass()) {
      *
      * <ul>
      *   <li>{@link ChronoField#OFFSET_SECONDS}: time zone is ignored.</li>
-     *   <li>{@link ChronoField#SECOND_OF_DAY}:  time of dat and time zone are ignored.</li>
+     *   <li>{@link ChronoField#SECOND_OF_DAY}:  time of {@code DateTime} and time zone are ignored.</li>
      * </ul>
      *
      * @param  field  the field which is ignored.
