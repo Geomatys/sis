@@ -40,9 +40,8 @@ import org.opengis.filter.Expression;
  * @author  Martin Desruisseaux (Geomatys)
  *
  * @param  <R>  the type of resources (typically {@code Feature}) used as inputs.
- * @param  <A>  the type of value computed by the two expressions used as inputs.
  */
-public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunctionWidening<R, A, A>
+public abstract class ArithmeticFunction<R> extends BinaryFunctionWidening<R, Number, Number>
         implements FeatureExpression<R, Number>, Optimization.OnExpression<R, Number>
 {
     /**
@@ -56,8 +55,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
      * @param  expression1  the first of the two expressions to be used by this function.
      * @param  expression2  the second of the two expressions to be used by this function.
      */
-    protected ArithmeticFunction(final Expression<R, ? extends A> expression1,
-                                 final Expression<R, ? extends A> expression2)
+    protected ArithmeticFunction(final Expression<R, ? extends Number> expression1,
+                                 final Expression<R, ? extends Number> expression2)
     {
         super(expression1, expression2);
     }
@@ -94,7 +93,7 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
      * @param  name  name of the attribute to create.
      * @return an attribute of the given name for numbers.
      */
-    private static AttributeType<Number> createNumericType(final String name) {
+    private static AttributeType<Number> createNumericType(final ScopedName name) {
         return createType(Number.class, name);
     }
 
@@ -137,8 +136,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
     @SuppressWarnings("unchecked")
     public final Expression<R, ? extends Number> optimize(final Optimization optimization) {
         final Expression<R, ? extends Number> result = Optimization.OnExpression.super.optimize(optimization);
-        if (result instanceof ArithmeticFunction<?,?>) {
-            final var optimized = ((ArithmeticFunction<R,?>) result).specialize();
+        if (result instanceof ArithmeticFunction<?>) {
+            final var optimized = ((ArithmeticFunction<R>) result).specialize();
             if (optimized != null) {
                 return optimized;
             }
@@ -175,9 +174,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
      * The "Add" (+) expression.
      *
      * @param  <R>  the type of resources (typically {@code Feature}) used as inputs.
-     * @param  <V>  the type of value computed by the two expressions used as inputs.
      */
-    public static final class Add<R, V extends Number> extends ArithmeticFunction<R,V> {
+    public static final class Add<R> extends ArithmeticFunction<R> {
         /** For cross-version compatibility during (de)serialization. */
         private static final long serialVersionUID = 5445433312445869201L;
 
@@ -187,8 +185,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
          * @param  expression1  the first of the two expressions to be used by this operation.
          * @param  expression2  the second of the two expressions to be used by this operation.
          */
-        public Add(final Expression<R, ? extends V> expression1,
-                   final Expression<R, ? extends V> expression2)
+        public Add(final Expression<R, ? extends Number> expression1,
+                   final Expression<R, ? extends Number> expression2)
         {
             super(expression1, expression2);
         }
@@ -199,14 +197,11 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
                              effective[1].toValueType(Number.class));
         }
 
-        /** Description of results of the {@code "Add"} expression. */
-        @Override protected AttributeType<Number> expectedType() {return TYPE;}
-        private static final AttributeType<Number> TYPE = createNumericType(FunctionNames.Add);
-
-        /** Representation of the {@code "Add"} operation. */
-        @Override protected char symbol() {return '+';}
-        @Override public ScopedName getFunctionName() {return NAME;}
         private static final ScopedName NAME = createName(FunctionNames.Add);
+        private static final AttributeType<Number> TYPE = createNumericType(NAME);
+        @Override protected AttributeType<Number> expectedType() {return TYPE;}
+        @Override public ScopedName getFunctionName() {return NAME;}
+        @Override protected char symbol() {return '+';}
 
         /** Applies this expression to the given operands. */
         @Override protected Number applyAsDouble  (double     left, double     right) {return left + right;}
@@ -221,9 +216,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
      * The "Subtract" (−) expression.
      *
      * @param  <R>  the type of resources (typically {@code Feature}) used as inputs.
-     * @param  <V>  the type of value computed by the two expressions used as inputs.
      */
-    public static final class Subtract<R, V extends Number> extends ArithmeticFunction<R,V> {
+    public static final class Subtract<R> extends ArithmeticFunction<R> {
         /** For cross-version compatibility during (de)serialization. */
         private static final long serialVersionUID = 3048878022726271508L;
 
@@ -233,8 +227,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
          * @param  expression1  the first of the two expressions to be used by this operation.
          * @param  expression2  the second of the two expressions to be used by this operation.
          */
-        public Subtract(final Expression<R, ? extends V> expression1,
-                        final Expression<R, ? extends V> expression2)
+        public Subtract(final Expression<R, ? extends Number> expression1,
+                        final Expression<R, ? extends Number> expression2)
         {
             super(expression1, expression2);
         }
@@ -245,14 +239,11 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
                                   effective[1].toValueType(Number.class));
         }
 
-        /** Description of results of the {@code "Subtract"} expression. */
-        @Override protected AttributeType<Number> expectedType() {return TYPE;}
-        private static final AttributeType<Number> TYPE = createNumericType(FunctionNames.Subtract);
-
-        /** Representation of the {@code "Subtract"} operation. */
-        @Override protected char symbol() {return '−';}
-        @Override public ScopedName getFunctionName() {return NAME;}
         private static final ScopedName NAME = createName(FunctionNames.Subtract);
+        private static final AttributeType<Number> TYPE = createNumericType(NAME);
+        @Override protected AttributeType<Number> expectedType() {return TYPE;}
+        @Override public ScopedName getFunctionName() {return NAME;}
+        @Override protected char symbol() {return '−';}
 
         /** Applies this expression to the given operands. */
         @Override protected Number applyAsDouble  (double     left, double     right) {return left - right;}
@@ -267,9 +258,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
      * The "Multiply" (×) expression.
      *
      * @param  <R>  the type of resources (typically {@code Feature}) used as inputs.
-     * @param  <V>  the type of value computed by the two expressions used as inputs.
      */
-    public static final class Multiply<R, V extends Number> extends ArithmeticFunction<R,V> {
+    public static final class Multiply<R> extends ArithmeticFunction<R> {
         /** For cross-version compatibility during (de)serialization. */
         private static final long serialVersionUID = -1300022614832645625L;
 
@@ -279,8 +269,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
          * @param  expression1  the first of the two expressions to be used by this operation.
          * @param  expression2  the second of the two expressions to be used by this operation.
          */
-        public Multiply(final Expression<R, ? extends V> expression1,
-                        final Expression<R, ? extends V> expression2)
+        public Multiply(final Expression<R, ? extends Number> expression1,
+                        final Expression<R, ? extends Number> expression2)
         {
             super(expression1, expression2);
         }
@@ -291,14 +281,11 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
                                   effective[1].toValueType(Number.class));
         }
 
-        /** Description of results of the {@code "Multiply"} expression. */
-        @Override protected AttributeType<Number> expectedType() {return TYPE;}
-        private static final AttributeType<Number> TYPE = createNumericType(FunctionNames.Multiply);
-
-        /** Representation of the {@code "Multiply"} operation. */
-        @Override protected char symbol() {return '×';}
-        @Override public ScopedName getFunctionName() {return NAME;}
         private static final ScopedName NAME = createName(FunctionNames.Multiply);
+        private static final AttributeType<Number> TYPE = createNumericType(NAME);
+        @Override protected AttributeType<Number> expectedType() {return TYPE;}
+        @Override public ScopedName getFunctionName() {return NAME;}
+        @Override protected char symbol() {return '×';}
 
         /** Applies this expression to the given operands. */
         @Override protected Number applyAsDouble  (double     left, double     right) {return left * right;}
@@ -313,9 +300,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
      * The "Divide" (÷) expression.
      *
      * @param  <R>  the type of resources (typically {@code Feature}) used as inputs.
-     * @param  <V>  the type of value computed by the two expressions used as inputs.
      */
-    public static final class Divide<R, V extends Number> extends ArithmeticFunction<R,V> {
+    public static final class Divide<R> extends ArithmeticFunction<R> {
         /** For cross-version compatibility during (de)serialization. */
         private static final long serialVersionUID = -7709291845568648891L;
 
@@ -325,8 +311,8 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
          * @param  expression1  the first of the two expressions to be used by this operation.
          * @param  expression2  the second of the two expressions to be used by this operation.
          */
-        public Divide(final Expression<R, ? extends V> expression1,
-                      final Expression<R, ? extends V> expression2)
+        public Divide(final Expression<R, ? extends Number> expression1,
+                      final Expression<R, ? extends Number> expression2)
         {
             super(expression1, expression2);
         }
@@ -337,16 +323,13 @@ public abstract class ArithmeticFunction<R, A extends Number> extends BinaryFunc
                                 effective[1].toValueType(Number.class));
         }
 
-        /** Description of results of the {@code "Divide"} expression. */
-        @Override protected AttributeType<Number> expectedType() {return TYPE;}
-        private static final AttributeType<Number> TYPE = createNumericType(FunctionNames.Divide);
-
-        /** Representation of the {@code "Divide"} operation. */
-        @Override protected char symbol() {return '÷';}
-        @Override public ScopedName getFunctionName() {return NAME;}
         private static final ScopedName NAME = createName(FunctionNames.Divide);
+        private static final AttributeType<Number> TYPE = createNumericType(NAME);
+        @Override protected AttributeType<Number> expectedType() {return TYPE;}
+        @Override public ScopedName getFunctionName() {return NAME;}
+        @Override protected char symbol() {return '÷';}
 
-        /** Divides the given integers, changing the type if the result is not an integer. */
+        /** Applies this expression to the given operands. */
         @Override protected Number applyAsDouble  (double     left, double     right) {return left / right;}
         @Override protected Number applyAsFraction(Fraction   left, Fraction   right) {return left.divide(right);}
         @Override protected Number applyAsDecimal (BigDecimal left, BigDecimal right) {return left.divide(right);}

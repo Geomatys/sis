@@ -87,8 +87,7 @@ final class UnaryOperator<R> extends UnaryFunction<R, Number>
     }
 
     /**
-     * Provides the type of results computed by this expression. That type depends only
-     * on the {@code ArithmeticFunction} subclass and is given by {@link #expectedType()}.
+     * Provides the type of results computed by this expression.
      */
     @Override
     public final FeatureProjectionBuilder.Item expectedType(FeatureProjectionBuilder addTo) {

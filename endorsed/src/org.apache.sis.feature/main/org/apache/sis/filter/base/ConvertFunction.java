@@ -97,14 +97,14 @@ public final class ConvertFunction<R,S,V> extends UnaryFunction<R,S>
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Expression<R,V> recreate(Expression<R,?>[] effective) {
         final Expression<R,?> e = effective[0];
-        if (e instanceof FeatureExpression<?,?>) {
-            final Class<? extends V> target = getResultClass();                         // This is <V>.
-            final Class<?> source = ((FeatureExpression<?,?>) e).getResultClass();      // May become <S>.
-            if (target.isAssignableFrom(source)) {
+        final Class<?> result = getResultClass(e);                  // May become <S>.
+        if (result != null) {
+            final Class<? extends V> target = getResultClass();     // This is <V>.
+            if (target.isAssignableFrom(result)) {
                 return (Expression<R,V>) e;
             }
-            if (source != Object.class) {
-                return new ConvertFunction(e, source, target);
+            if (result != Object.class) {
+                return new ConvertFunction(e, result, target);
             }
         }
         final Class<? super S> source = converter.getSourceClass();

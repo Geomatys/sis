@@ -826,13 +826,6 @@ public class PassThroughTransform extends AbstractMathTransform implements Seria
          * which above loop was executed.
          */
         if (m == null) {
-            /*
-             * Do not invoke `super.tryConcatenate(context)`. We do not want to test if this transform
-             * is the inverse of the `other` transform because this check is costly and unnecessary.
-             * If the two transforms were the inverse of each other, then the concatenation of
-             * `this.subTransform` with `other.subTransform` done at the beginning of this method
-             * would have produced the identity transform already.
-             */
             return;
         }
         /*
@@ -853,6 +846,9 @@ public class PassThroughTransform extends AbstractMathTransform implements Seria
             }
         }
         /*
+         * TODO: replace the remaining code by a call to `TransformJoiner.reduceDimension(…)`.
+         * But first, we need to verify if this is really equivalent.
+         *
          * Verify if matrix discards the sub-transform. If it does not, then we need to keep all the sub-transform
          * dimensions (discarding them is a "all or nothing" operation). Other dimensions (leading and trailing)
          * can be keep or discarded on a case-by-case basis.

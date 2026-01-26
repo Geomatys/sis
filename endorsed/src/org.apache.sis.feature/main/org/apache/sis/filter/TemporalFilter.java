@@ -33,9 +33,12 @@ import org.opengis.filter.InvalidFilterValueException;
 
 
 /**
- * Temporal operations between a period and an instant or between two periods.
- * The base class represents the general case when don't know if the the argument are periods or not.
- * The subclasses represent specializations when at least one of the arguments is known to be a period.
+ * Temporal operations between a period and a Java temporal object or between two periods.
+ * The base class represents the general case when we don't know which operands are periods.
+ * The subclasses provide specializations when the types of temporal values are known in advance.
+ *
+ * <p>In the context of this class, "instant" can be understood as <abbr>ISO</abbr> 19108 instant
+ * or as the various {@link java.time} objects, not restricted to {@link java.time.Instant}.</p>
  *
  * @author  Johann Sorel (Geomatys)
  * @author  Martin Desruisseaux (Geomatys)
@@ -72,11 +75,14 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
     }
 
     /**
-     * Creates a new temporal function.
+     * Creates a new temporal filter. This is the implementation of {@link DefaultFilterFactory} methods
+     * which create {@link TemporalOperator} instances.
      *
+     * @param  <R>          the type of resources (e.g. {@code Feature}) used as inputs.
+     * @param  <v>          compile-type value of the {@code type} argument.
+     * @param  type         the base type of values computed by the two given operands.
      * @param  expression1  the first of the two expressions to be used by this function.
      * @param  expression2  the second of the two expressions to be used by this function.
-     * @param  operation    the operation to apply on instants or periods.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static <R,V> TemporalFilter<R,?> create(
@@ -109,9 +115,9 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
          * Creations of `TemporalFilter` instances below are safe because `TimeMethods.type` is a parent
          * of both `expression1` and `expression2` value types (verified by assertions). Therefore, with
          * `commonType` of type `Class<T>` no matter if <T> is a super-type or a sub-type of <V>, we can
-         * assert that the parmeterized type of the two expressions is `<? extends T>`.
+         * assert that the parameterized type of the two expressions is `<? extends T>`.
          */
-        final TemporalOperation<?> operation = factory.create(TimeMethods.find(commonType)).unique();
+        final TemporalOperation<?> operation = factory.create(TimeMethods.forType(commonType)).unique();
         assert operation.comparators.type.isAssignableFrom(commonType) : commonType;
         assert commonType.isAssignableFrom(c1) : c1;
         assert commonType.isAssignableFrom(c2) : c2;
@@ -119,7 +125,7 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
             // Safe because `commonType` extends both Period and T.
             return new Periods(operation, expression1, expression2);
         }
-        if (operation.comparators.isDynamic()) {
+        if (operation.comparators.isDynamic) {
             return new TemporalFilter(operation, expression1, expression2);
         }
         return new Instants(operation, expression1, expression2);
@@ -209,7 +215,9 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
 
 
     /**
-     * A temporal filters where both operands are ISO 19108 instants.
+     * A temporal filters where both operands are <abbr>ISO</abbr> 19108 instants.
+     * Instants can be represented by the GeoAPI interface or by the various
+     * {@link java.time} objects, not restricted to {@link java.time.Instant}.
      *
      * @param  <R>  the type of resources used as inputs.
      * @param  <T>  the base type of temporal objects.
