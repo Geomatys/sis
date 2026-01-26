@@ -442,7 +442,7 @@ public class ConverterRegistry {
     public <S,T> ObjectConverter<? super S, ? extends T> find(final Class<S> sourceClass, final Class<T> targetClass)
             throws UnconvertibleObjectException
     {
-        final ClassPair<S,T> key = new ClassPair<>(sourceClass, targetClass);
+        final var key = new ClassPair<S,T>(sourceClass, targetClass);
         synchronized (converters) {
             ObjectConverter<? super S, ? extends T> converter = get(key);
             if (converter != null) {

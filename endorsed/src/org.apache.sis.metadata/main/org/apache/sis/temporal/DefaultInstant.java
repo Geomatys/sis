@@ -240,18 +240,18 @@ cmp:    if (canTestBefore | canTestAfter | canTestEqual) {
             if (oip == IndeterminateValue.NOW) {
                 t1 = position;
                 if (t1 == null) break cmp;
-                comparators = TimeMethods.find(t1.getClass());
+                comparators = TimeMethods.forType(t1.getClass());
                 t2 = comparators.now();
             } else {
                 t2 = other.getPosition();
                 if (t2 == null) break cmp;
                 if (indeterminate == IndeterminateValue.NOW) {
-                    comparators = TimeMethods.find(t2.getClass());
+                    comparators = TimeMethods.forType(t2.getClass());
                     t1 = comparators.now();
                 } else {
                     t1 = position;
                     if (t1 == null) break cmp;
-                    comparators = TimeMethods.find(Classes.findCommonClass(t1.getClass(), t2.getClass()));
+                    comparators = TimeMethods.forType(Classes.findCommonClass(t1.getClass(), t2.getClass()));
                 }
             }
             // This is where the @SuppressWarnings(…) apply.
@@ -282,8 +282,12 @@ cmp:    if (canTestBefore | canTestAfter | canTestEqual) {
                     return true;
                 }
                 final Temporal other = that.getPosition();
-                return Objects.equals(position, other) ||       // Needed in all cases for testing null values.
-                        (mode.isIgnoringMetadata() && TimeMethods.compareAny(TimeMethods.EQUAL, position, other));
+                if (Objects.equals(position, other)) {       // Needed anyway for testing null values.
+                    return true;
+                }
+                if (mode.isIgnoringMetadata()) {
+                    return TimeMethods.compareLenient(TimeMethods.Test.EQUAL, position, other);
+                }
             }
         }
         return false;

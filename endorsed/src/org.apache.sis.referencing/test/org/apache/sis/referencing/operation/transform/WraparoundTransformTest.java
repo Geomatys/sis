@@ -31,6 +31,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import org.apache.sis.test.TestCase;
 import org.apache.sis.referencing.crs.HardCodedCRS;
+import org.apache.sis.referencing.operation.matrix.Matrices;
+import org.apache.sis.referencing.operation.matrix.MatrixSIS;
 
 // Specific to the main branch:
 import static org.apache.sis.test.GeoapiAssert.assertMatrixEquals;
@@ -190,5 +192,75 @@ public final class WraparoundTransformTest extends TestCase {
                 MathTransforms.getMatrix(steps.get(0)),
                 1E-15,  // Tolerance
                 "normalize");
+    }
+
+    /**
+     * Tests concatenation that reduces the number of dimensions.
+     * The {@link WraparoundTransform#tryConcatenate(TransformJoiner)} method should
+     * replace the four-dimensional {@link WraparoundTransform} by a two-dimensional one.
+     */
+    @Test
+    public void testDimensionReduction() {
+        final MathTransform prefix = MathTransforms.translation(10, 7, 12, -4);
+        final MathTransform suffix = MathTransforms.linear(Matrices.createDimensionSelect(4, new int[] {0, 1}));
+        for (int dim = 0; dim <= 3; dim++) {
+            final var wraparound = new WraparoundTransform(4, dim, 360, 40);
+            final MathTransform tr = MathTransforms.concatenate(prefix, wraparound, suffix);
+            final var head = assertInstanceOf(LinearTransform.class, MathTransforms.getFirstStep(tr));
+            if (dim >= 2) {
+                assertSame(head, tr);
+            } else {
+                final var reduced = assertInstanceOf(WraparoundTransform.class, MathTransforms.getLastStep(tr));
+                assertEquals(  2, reduced.getSourceDimensions());
+                assertEquals(  2, reduced.getTargetDimensions());
+                assertEquals(dim, reduced.wraparoundDimension);
+                assertEquals(360, reduced.period);
+                assertEquals( 40, reduced.sourceMedian);
+            }
+            assertMatrixEquals(Matrices.create(3, 5, new double[] {
+                    1, 0, 0, 0, 10,
+                    0, 1, 0, 0,  7,
+                    0, 0, 0, 0,  1}), head.getMatrix(), "Dimension reduction");
+        }
+    }
+
+    /**
+     * Tests concatenation that increases the number of dimensions.
+     * The {@link WraparoundTransform#tryConcatenate(TransformJoiner)} method should
+     * replace the four-dimensional {@link WraparoundTransform} by a two-dimensional one.
+     */
+    @Test
+    public void testDimensionIncrease() {
+        final MatrixSIS diagonal = Matrices.createDiagonal(5, 3);
+        diagonal.setElement(2, 2, 0);
+        diagonal.setElement(4, 2, 1);
+        final MathTransform prefix = MathTransforms.linear(diagonal);
+        final MathTransform suffix = MathTransforms.translation(10, 7, 12, -4);
+        for (int dim = 0; dim <= 3; dim++) {
+            final var wraparound = new WraparoundTransform(4, dim, 360, 40);
+            final MathTransform tr = MathTransforms.concatenate(prefix, wraparound, suffix);
+            if (dim >= 2) {
+                final List<MathTransform> steps = MathTransforms.getSteps(tr);
+                assertSame(prefix,     steps.get(0));
+                assertSame(wraparound, steps.get(1));
+                assertSame(suffix,     steps.get(2));
+                assertEquals(3,        steps.size());
+            } else {
+                final var reduced = assertInstanceOf(WraparoundTransform.class, MathTransforms.getFirstStep(tr));
+                assertEquals(  2, reduced.getSourceDimensions());
+                assertEquals(  2, reduced.getTargetDimensions());
+                assertEquals(dim, reduced.wraparoundDimension);
+                assertEquals(360, reduced.period);
+                assertEquals( 40, reduced.sourceMedian);
+
+                final var tail = assertInstanceOf(LinearTransform.class, MathTransforms.getLastStep(tr));
+                assertMatrixEquals(Matrices.create(5, 3, new double[] {
+                        1, 0, 10,
+                        0, 1,  7,
+                        0, 0, 12,
+                        0, 0, -4,
+                        0, 0,  1}), tail.getMatrix(), "Dimension increase");
+            }
+        }
     }
 }

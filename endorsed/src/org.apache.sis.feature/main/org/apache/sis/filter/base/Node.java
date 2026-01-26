@@ -89,7 +89,7 @@ public abstract class Node implements Serializable {
      *
      * @param  <T>   compile-time value of {@code type}.
      * @param  type  type of values in the attribute.
-     * @param  name  name of the attribute to create.
+     * @param  name  name of the attribute to create as a {@link org.opengis.util.GenericName} or a {@link String}.
      * @return an attribute of the given type and name.
      *
      * @see Expression#getFunctionName()
@@ -118,6 +118,18 @@ public abstract class Node implements Serializable {
             if (t2.isAssignableFrom(t1)) return t1;
         }
         return null;
+    }
+
+    /**
+     * Returns the type of values computed by the given expression.
+     *
+     * @param  <V>         compile-time type of values.
+     * @param  expression  the expression for which to get the runtime type of values.
+     * @return the type of values computed by the given expression.
+     */
+    protected static <V> Class<? extends V> getResultClass(final Expression<?,V> expression) {
+        return (expression instanceof FeatureExpression<?,?>)
+                ? ((FeatureExpression<?,V>) expression).getResultClass() : null;
     }
 
     /**
@@ -299,6 +311,16 @@ public abstract class Node implements Serializable {
     @SuppressWarnings("ReturnOfCollectionOrArrayField")             // Because immutable.
     public static <R> Set<FunctionProperty> transitiveProperties(final Iterable<Expression<R,?>> operands) {
         return isVolatile(operands) ? TRANSITIVE_PROPERTIES : Set.of();
+    }
+
+    /**
+     * Whether to convert literals to the same type as non-literal parameters during the optimization phase.
+     * This is invoked by {@link Optimization} for deciding whether to attempt such replacement.
+     *
+     * @return whether it is okay to convert literals in advance.
+     */
+    public boolean allowLiteralConversions() {
+        return false;
     }
 
     /**

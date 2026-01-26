@@ -136,7 +136,7 @@ class ClassPair<S,T> implements Serializable {
     @Override
     public boolean equals(final Object other) {
         if (other instanceof ClassPair<?,?>) {
-            final ClassPair<?,?> that = (ClassPair<?,?>) other;
+            final var that = (ClassPair<?,?>) other;
             return sourceClass == that.sourceClass &&
                    targetClass == that.targetClass;
         }

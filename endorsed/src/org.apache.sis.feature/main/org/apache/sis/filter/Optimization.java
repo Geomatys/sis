@@ -32,10 +32,14 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.BiPredicate;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.apache.sis.feature.internal.shared.AttributeConvention;
 import org.apache.sis.feature.Features;
+import org.apache.sis.feature.internal.shared.FeatureExpression;
+import org.apache.sis.feature.internal.shared.AttributeConvention;
 import org.apache.sis.geometry.wrapper.Geometries;
 import org.apache.sis.math.FunctionProperty;
+import org.apache.sis.util.Classes;
+import org.apache.sis.util.ObjectConverters;
+import org.apache.sis.util.UnconvertibleObjectException;
 import org.apache.sis.util.resources.Errors;
 import org.apache.sis.util.collection.Containers;
 import org.apache.sis.util.logging.Logging;
@@ -394,6 +398,54 @@ public class Optimization {
     }
 
     /**
+     * Returns whether all expressions are literal. In such case, the expression can be evaluated immediately.
+     *
+     * @param  effective  the expressions optimized by {@link OnFilter} or {@link OnExpression}.
+     * @return whether the given expressions contain only literals.
+     */
+    private static boolean isImmediate(final Expression<?,?>[] effective) {
+        for (int i = effective.length; --i >= 0;) {
+            if (!(effective[i] instanceof Literal<?,?>)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Converts all literal to the same class as result of non-literal parameters.
+     * This is useful for example in {@link ComparisonFilter} for avoiding to perform
+     * the same conversion of literal value each time that the filter is executed.
+     *
+     * @param  effective  the expressions optimized by {@link OnFilter} or {@link OnExpression}.
+     * @return whether at less one literal has been converted.
+     */
+    private boolean convertLiterals(final Expression<?,?>[] effective) {
+        Class<?> type = null;
+        for (final Expression<?,?> e : effective) {
+            if (e instanceof FeatureExpression<?,?> && !(e instanceof Literal<?,?>)) {
+                type = Classes.findCommonClass(type, ((FeatureExpression<?,?>) e).getResultClass());
+            }
+        }
+        boolean changed = false;
+        if (type != null && type != Object.class) {
+            for (int i = effective.length; --i >= 0;) {
+                Expression<?,?> e = effective[i];
+                if (e instanceof Literal<?,?>) try {
+                    Object value = ((Literal<?,?>) e).getValue();
+                    if (value != (value = ObjectConverters.convert(value, type))) {
+                        effective[i] = literal(value);
+                        changed = true;
+                    }
+                } catch (UnconvertibleObjectException ex) {
+                    warning(ex, false);
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
      * Returns whether a call to {@code apply(…)} is the first of possibly recursive calls.
      * This method shall be invoked in all {@code apply(…)} methods before to do the optimization.
      *
@@ -502,24 +554,27 @@ public class Optimization {
          * @return the simplified or optimized filter, or {@code this} if no optimization has been applied.
          */
         default Filter<R> optimize(final Optimization optimization) {
-            final List<Expression<R,?>> expressions = getExpressions();
             @SuppressWarnings({"unchecked", "rawtypes"})
-            final Expression<R,?>[] effective = new Expression[expressions.size()];
-            boolean unchanged = true;       // Will be `false` if at least one optimization has been applied.
-            boolean immediate = true;
+            final Expression<R,?>[] effective = getExpressions().toArray(Expression[]::new);
+            Filter<R> optimized = this;
+            boolean changed = false;
             for (int i=0; i<effective.length; i++) {
-                Expression<R,?> e = expressions.get(i);
-                unchanged &= (e == (e = optimization.apply(e)));
-                immediate &= (e instanceof Literal<?,?>);
-                effective[i] = e;
+                Expression<R,?> e = effective[i];
+                if (e != (e = optimization.apply(e))) {
+                    effective[i] = e;
+                    changed = true;
+                }
             }
-            if (immediate) {
-                return test(null) ? Filter.include() : Filter.exclude();
-            } else if (unchanged) {
-                return this;
-            } else {
-                return recreate(effective);
+            if (this instanceof Node && ((Node) this).allowLiteralConversions()) {
+                changed |= optimization.convertLiterals(effective);
             }
+            if (changed) {
+                optimized = recreate(effective);
+            }
+            if (isImmediate(effective)) {
+                return optimized.test(null) ? Filter.include() : Filter.exclude();
+            }
+            return optimized;
         }
 
         /**
@@ -677,24 +732,27 @@ public class Optimization {
          * @return the simplified or optimized expression, or {@code this} if no optimization has been applied.
          */
         default Expression<R, ? extends V> optimize(final Optimization optimization) {
-            final List<Expression<R,?>> parameters = getParameters();
             @SuppressWarnings({"unchecked", "rawtypes"})
-            final Expression<R,?>[] effective = new Expression[parameters.size()];
-            boolean unchanged = true;       // Will be `false` if at least one optimization has been applied.
-            boolean immediate = true;
+            final Expression<R,?>[] effective = getParameters().toArray(Expression[]::new);
+            Expression<R, ? extends V> optimized = this;
+            boolean changed = false;
             for (int i=0; i<effective.length; i++) {
-                Expression<R,?> e = parameters.get(i);
-                unchanged &= (e == (e = optimization.apply(e)));
-                immediate &= (e instanceof Literal<?,?>);
-                effective[i] = e;
+                Expression<R,?> e = effective[i];
+                if (e != (e = optimization.apply(e))) {
+                    effective[i] = e;
+                    changed = true;
+                }
             }
-            if (immediate && !properties(this).contains(FunctionProperty.VOLATILE)) {
-                return literal(apply(null));
-            } else if (unchanged) {
-                return this;
-            } else {
-                return recreate(effective);
+            if (this instanceof Node && ((Node) this).allowLiteralConversions()) {
+                changed |= optimization.convertLiterals(effective);
             }
+            if (changed) {
+                optimized = recreate(effective);
+            }
+            if (isImmediate(effective) && !properties(this).contains(FunctionProperty.VOLATILE)) {
+                return literal(optimized.apply(null));
+            }
+            return optimized;
         }
 
         /**

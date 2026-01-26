@@ -247,6 +247,8 @@ public enum Function implements FunctionIdentifier, AvailableFunction {
 
     /**
      * Returns the function name.
+     *
+     * @return the function name.
      */
     @Override
     public LocalName getName() {
@@ -283,6 +285,8 @@ public enum Function implements FunctionIdentifier, AvailableFunction {
 
     /**
      * Returns the type of return value.
+     *
+     * @return the type of return value.
      */
     @Override
     public TypeName getReturnType() {
@@ -296,6 +300,8 @@ public enum Function implements FunctionIdentifier, AvailableFunction {
 
     /**
      * Returns the list of arguments expected by the function.
+     *
+     * @return the function operands.
      */
     @Override
     public List<? extends ParameterDescriptor<?>> getArguments() {

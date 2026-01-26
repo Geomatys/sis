@@ -18,26 +18,15 @@ package org.apache.sis.filter;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.DateTimeException;
 import java.util.List;
 import java.util.Collection;
-import java.util.Date;
-import java.util.Calendar;
 import java.util.Objects;
-import java.time.Instant;
-import java.time.LocalTime;
-import java.time.OffsetTime;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZonedDateTime;
-import java.time.ZoneId;
-import java.time.chrono.ChronoLocalDate;
-import java.time.chrono.ChronoLocalDateTime;
-import java.time.chrono.ChronoZonedDateTime;
-import java.time.temporal.ChronoField;
-import java.time.temporal.Temporal;
+import java.util.function.BiPredicate;
 import org.apache.sis.math.Fraction;
 import org.apache.sis.filter.base.Node;
 import org.apache.sis.filter.base.BinaryFunctionWidening;
+import org.apache.sis.temporal.TimeMethods;
 
 // Specific to the main branch:
 import org.apache.sis.pending.geoapi.filter.MatchAction;
@@ -163,6 +152,118 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     }
 
     /**
+     * Whether to convert literals to the same type as non-literal parameters during the optimization phase.
+     * This is invoked by {@link Optimization} for deciding whether to attempt such replacement.
+     *
+     * @return whether it is okay to convert literals in advance.
+     */
+    @Override
+    public final boolean allowLiteralConversions() {
+        return true;
+    }
+
+    /**
+     * Tries to optimize this filter. Fist, this method applies the optimization documented
+     * in the {@linkplain Optimization.OnFilter#optimize default method impmementation}.
+     * Then, if it is possible to avoid to inspect the number types every time that the
+     * filter is evaluated, this method returns a more direct implementation.
+     *
+     * @param  optimization  the simplifications or optimizations to apply on this filter.
+     * @return the simplified or optimized filter, or {@code this} if no optimization has been applied.
+     */
+    @Override
+    public final Filter<R> optimize(final Optimization optimization) {
+        final Filter<R> result = Optimization.OnFilter.super.optimize(optimization);
+        if (result instanceof ComparisonFilter<?>) {
+            final var optimized = (ComparisonFilter<R>) result;
+            final Class<?> t1, t2;
+            if (isSpecialized(t1 = getResultClass(expression1)) &&
+                isSpecialized(t2 = getResultClass(expression2)))
+            {
+                final var numeric = optimized.new Numeric();
+                if (numeric.evaluator != null) {
+                    return numeric;
+                }
+                final var temporal = new Time<>(TimeMethods.forTypes(t1, t2), t2);
+                if (temporal.evaluator != null) {
+                    return temporal;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns whether the given type is non-null and something more specialized than {@code Object}.
+     * This is used for avoiding unnecessary class-loading of {@link Numeric} and {@link Time} when
+     * they are sure to be unsuccessful.
+     */
+    private static boolean isSpecialized(final Class<?> type) {
+        return (type != null) && (type != Object.class);
+    }
+
+    /**
+     * An optimized versions of this filter for the case where the operands are numeric.
+     */
+    private final class Numeric extends Node implements Filter<R> {
+        /** For cross-version compatibility during (de)serialization. */
+        private static final long serialVersionUID = 4969425622445580192L;
+
+        /** The expression which performs the comparison and returns the result as an integer. */
+        @SuppressWarnings("serial") final Expression<R, ? extends Number> evaluator;
+
+        /** Creates a new filter. Callers must verifies that {@link #evaluator} is non-null. */
+        Numeric() {evaluator = specialize();}
+
+        /** Delegates to the enclosing class.*/
+        @Override public    Enum<?>               getOperatorType()  {return ComparisonFilter.this.getOperatorType();}
+        @Override public    Class<? super R>      getResourceClass() {return ComparisonFilter.this.getResourceClass();}
+        @Override public    List<Expression<R,?>> getExpressions()   {return ComparisonFilter.this.getExpressions();}
+        @Override protected Collection<?>         getChildren()      {return ComparisonFilter.this.getChildren();}
+
+        /** Determines if the test represented by this filter passes with the given operands. */
+        @Override public boolean test(final R candidate) {
+            return ((Integer) evaluator.apply(candidate)) != 0;
+        }
+    }
+
+    /**
+     * An optimized versions of this filter for the case where the operands are temporal.
+     */
+    private final class Time<T,S> extends Node implements Filter<R> {
+        /** For cross-version compatibility during (de)serialization. */
+        private static final long serialVersionUID = -5132906457258846016L;
+
+        /** The function which performs the comparisons. */
+        @SuppressWarnings("serial") final BiPredicate<T,S> evaluator;
+
+        /** Creates a new filter. Callers must verifies that {@link #evaluator} is non-null. */
+        Time(final TimeMethods<T> methods, final Class<S> otherType) {
+            evaluator = (methods != null) ? methods.predicate(temporalTest(), otherType) : null;
+        }
+
+        /** Delegates to the enclosing class.*/
+        @Override public    Enum<?>               getOperatorType()  {return ComparisonFilter.this.getOperatorType();}
+        @Override public    Class<? super R>      getResourceClass() {return ComparisonFilter.this.getResourceClass();}
+        @Override public    List<Expression<R,?>> getExpressions()   {return ComparisonFilter.this.getExpressions();}
+        @Override protected Collection<?>         getChildren()      {return ComparisonFilter.this.getChildren();}
+
+        /** Determines if the test represented by this filter passes with the given operands. */
+        @Override public boolean test(final R candidate) {
+            @SuppressWarnings("unchecked")
+            final T left = (T) expression1.apply(candidate);
+            if (left != null) {
+                @SuppressWarnings("unchecked")
+                final S right = (S) expression2.apply(candidate);
+                if (right != null) {
+                    return evaluator.test(left, right);
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
      * Determines if the test(s) represented by this filter passes with the given operands.
      * Values of {@link #expression1} and {@link #expression2} can be two single values,
      * or at most one expression can produce a collection.
@@ -201,7 +302,9 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
                             pass = evaluate(left, element);
                         }
                         switch (matchAction) {
-                            default: return false;              // Unknown enumeration.
+                            default: {
+                                return false;                   // Unknown enumeration.
+                            }
                             case ALL: {
                                 if (!pass) return false;
                                 match = true;                   // Remember that we have at least 1 value.
@@ -228,6 +331,7 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
 
     /**
      * Compares the given objects. If both values are numerical, then this method delegates to an {@code applyAs…} method.
+     * If both values are temporal, then this method delegates to {@link TimeMethods} with runtime detection of the type.
      * For other kind of objects, this method delegates to a {@code compare(…)} method. If the two objects are not of the
      * same type, then the less accurate one is converted to the most accurate type if possible.
      *
@@ -246,71 +350,12 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
             final Number r = apply((Number) left, (Number) right);
             if (r != null) return r.intValue() != 0;
         }
-        /*
-         * For legacy java.util.Date, the compareTo(…) method is consistent only for dates of the same class.
-         * Otherwise A.compareTo(B) and B.compareTo(A) are inconsistent if one object is a java.util.Date and
-         * the other object is a java.sql.Timestamp. In such case, we compare the dates as java.time objects.
-         */
-        if (left instanceof Date && right instanceof Date) {
-            if (left.getClass() == right.getClass()) {
-                return fromCompareTo(((Date) left).compareTo((Date) right));
-            }
-            left  = fromLegacy((Date) left);
-            right = fromLegacy((Date) right);
-        }
-        /*
-         * Temporal objects have complex conversion rules. We take Instant as the most accurate and unambiguous type.
-         * So if at least one value is an Instant, try to unconditionally promote the other value to an Instant too.
-         * This conversion will fail if the other object has some undefined fields; for example java.sql.Date has no
-         * time fields (we do not assume that the values of those fields are zero).
-         *
-         * OffsetTime and OffsetDateTime are final classes that do not implement a java.time.chrono interface.
-         * Note that OffsetDateTime is convertible into OffsetTime by dropping the date fields, but we do not
-         * (for now) perform comparisons that would ignore the date fields of an operand.
-         */
-        if (left instanceof Temporal || right instanceof Temporal) {        // Use || because an operand may be Date.
-            if (left instanceof Instant) {
-                final Instant t = toInstant(right);
-                if (t != null) return fromCompareTo(((Instant) left).compareTo(t));
-            } else if (right instanceof Instant) {
-                final Instant t = toInstant(left);
-                if (t != null) return fromCompareTo(t.compareTo((Instant) right));
-            } else if (left instanceof OffsetDateTime) {
-                final OffsetDateTime t = toOffsetDateTime(right);
-                if (t != null) return compare((OffsetDateTime) left, t);
-            } else if (right instanceof OffsetDateTime) {
-                final OffsetDateTime t = toOffsetDateTime(left);
-                if (t != null) return compare(t, (OffsetDateTime) right);
-            } else if (left instanceof OffsetTime && right instanceof OffsetTime) {
-                return compare((OffsetTime) left, (OffsetTime) right);
-            }
-            /*
-             * Comparisons of temporal objects implementing java.time.chrono interfaces. We need to check the most
-             * complete types first. If the type are different, we reduce to the type of the less smallest operand.
-             * For example if an operand is a date+time and the other operand is only a date, then the time fields
-             * will be ignored and a warning will be reported.
-             */
-            if (left instanceof ChronoLocalDateTime<?>) {
-                final ChronoLocalDateTime<?> t = toLocalDateTime(right);
-                if (t != null) return compare((ChronoLocalDateTime<?>) left, t);
-            } else if (right instanceof ChronoLocalDateTime<?>) {
-                final ChronoLocalDateTime<?> t = toLocalDateTime(left);
-                if (t != null) return compare(t, (ChronoLocalDateTime<?>) right);
-            }
-            if (left instanceof ChronoLocalDate) {
-                final ChronoLocalDate t = toLocalDate(right);
-                if (t != null) return compare((ChronoLocalDate) left, t);
-            } else if (right instanceof ChronoLocalDate) {
-                final ChronoLocalDate t = toLocalDate(left);
-                if (t != null) return compare(t, (ChronoLocalDate) right);
-            }
-            if (left instanceof LocalTime) {
-                final LocalTime t = toLocalTime(right);
-                if (t != null) return fromCompareTo(((LocalTime) left).compareTo(t));
-            } else if (right instanceof LocalTime) {
-                final LocalTime t = toLocalTime(left);
-                if (t != null) return fromCompareTo(t.compareTo((LocalTime) right));
-            }
+        try {
+            Boolean c = TimeMethods.compareIfTemporal(temporalTest(), left, right);
+            if (c != null) return c;
+        } catch (DateTimeException e) {
+            warning(e);
+            return false;
         }
         /*
          * Test character strings only after all specialized types have been tested. The intent is that if an
@@ -343,148 +388,7 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     }
 
     /**
-     * Converts a legacy {@code Date} object to an object from the {@link java.time} package.
-     * We performs this conversion before to compare to {@code Date} instances that are not of
-     * the same class, because the {@link Date#compareTo(Date)} method in such case is not well
-     * defined.
-     */
-    private static Temporal fromLegacy(final Date value) {
-        if (value instanceof java.sql.Timestamp) {
-            return ((java.sql.Timestamp) value).toLocalDateTime();
-        } else if (value instanceof java.sql.Date) {
-            return ((java.sql.Date) value).toLocalDate();
-        } else if (value instanceof java.sql.Time) {
-            return ((java.sql.Time) value).toLocalTime();
-        } else {
-            // Implementation of above toFoo() methods use system default time zone.
-            return LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
-        }
-    }
-
-    /**
-     * Converts the given object to an {@link Instant}, or returns {@code null} if unconvertible.
-     * This method handles a few types from the {@link java.time} package and legacy types like
-     * {@link Date} (with a special case for SQL dates) and {@link Calendar}.
-     */
-    static Instant toInstant(final Object value) {
-        if (value instanceof Instant) {
-            return (Instant) value;
-        } else if (value instanceof OffsetDateTime) {
-            return ((OffsetDateTime) value).toInstant();
-        } else if (value instanceof ChronoZonedDateTime) {
-            return ((ChronoZonedDateTime) value).toInstant();
-        } else if (value instanceof Date) {
-            try {
-                return ((Date) value).toInstant();
-            } catch (UnsupportedOperationException e) {
-                /*
-                 * java.sql.Date and java.sql.Time cannot be converted to Instant because a part
-                 * of their coordinates on the timeline is undefined.  For example in the case of
-                 * java.sql.Date the hours, minutes and seconds are unspecified (which is not the
-                 * same thing as assuming that those values are zero).
-                 */
-            }
-        } else if (value instanceof Calendar) {
-            return ((Calendar) value).toInstant();
-        }
-        return null;
-    }
-
-    /**
-     * Converts the given object to an {@link OffsetDateTime}, or returns {@code null} if unconvertible.
-     */
-    private static OffsetDateTime toOffsetDateTime(final Object value) {
-        if (value instanceof OffsetDateTime) {
-            return (OffsetDateTime) value;
-        } else if (value instanceof ZonedDateTime) {
-            return ((ZonedDateTime) value).toOffsetDateTime();
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Converts the given object to a {@link ChronoLocalDateTime}, or returns {@code null} if unconvertible.
-     * This method handles the case of legacy SQL {@link java.sql.Timestamp} objects.
-     * Conversion may lost timezone information.
-     */
-    private static ChronoLocalDateTime<?> toLocalDateTime(final Object value) {
-        if (value instanceof ChronoLocalDateTime<?>) {
-            return (ChronoLocalDateTime<?>) value;
-        } else if (value instanceof ChronoZonedDateTime) {
-            ignoringField(ChronoField.OFFSET_SECONDS);
-            return ((ChronoZonedDateTime) value).toLocalDateTime();
-        } else if (value instanceof OffsetDateTime) {
-            ignoringField(ChronoField.OFFSET_SECONDS);
-            return ((OffsetDateTime) value).toLocalDateTime();
-        } else if (value instanceof java.sql.Timestamp) {
-            return ((java.sql.Timestamp) value).toLocalDateTime();
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Converts the given object to a {@link ChronoLocalDate}, or returns {@code null} if unconvertible.
-     * This method handles the case of legacy SQL {@link java.sql.Date} objects.
-     * Conversion may lost timezone information and time fields.
-     */
-    private static ChronoLocalDate toLocalDate(final Object value) {
-        if (value instanceof ChronoLocalDate) {
-            return (ChronoLocalDate) value;
-        } else if (value instanceof ChronoLocalDateTime) {
-            ignoringField(ChronoField.SECOND_OF_DAY);
-            return ((ChronoLocalDateTime) value).toLocalDate();
-        } else if (value instanceof ChronoZonedDateTime) {
-            ignoringField(ChronoField.SECOND_OF_DAY);
-            return ((ChronoZonedDateTime) value).toLocalDate();
-        } else if (value instanceof OffsetDateTime) {
-            ignoringField(ChronoField.SECOND_OF_DAY);
-            return ((OffsetDateTime) value).toLocalDate();
-        } else if (value instanceof java.sql.Date) {
-            return ((java.sql.Date) value).toLocalDate();
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Converts the given object to a {@link LocalTime}, or returns {@code null} if unconvertible.
-     * This method handles the case of legacy SQL {@link java.sql.Time} objects.
-     * Conversion may lost timezone information.
-     */
-    private static LocalTime toLocalTime(final Object value) {
-        if (value instanceof LocalTime) {
-            return (LocalTime) value;
-        } else if (value instanceof OffsetTime) {
-            ignoringField(ChronoField.OFFSET_SECONDS);
-            return ((OffsetTime) value).toLocalTime();
-        } else if (value instanceof java.sql.Time) {
-            return ((java.sql.Time) value).toLocalTime();
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Invoked when a conversion cause a field to be ignored. For example if a "date+time" object is compared
-     * with a "date" object, the "time" field is ignored. Expected values are:
-     *
-     * <ul>
-     *   <li>{@link ChronoField#OFFSET_SECONDS}: time zone is ignored.</li>
-     *   <li>{@link ChronoField#SECOND_OF_DAY}:  time of dat and time zone are ignored.</li>
-     * </ul>
-     *
-     * @param  field  the field which is ignored.
-     *
-     * @see <a href="https://issues.apache.org/jira/browse/SIS-460">SIS-460</a>
-     */
-    private static void ignoringField(final ChronoField field) {
-        // TODO
-    }
-
-    /**
-     * Converts the boolean result as an integer for use as a return value of the {@code applyAs…} methods.
+     * Converts the Boolean result as an integer for use as a return value of the {@code applyAs…} methods.
      * This is a helper class for subclasses.
      */
     private static Number number(final boolean result) {
@@ -497,37 +401,14 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     protected abstract boolean fromCompareTo(int result);
 
     /**
-     * Compares two times with time-zone information. Implementations shall not use {@code compareTo(…)} because
-     * that method compares more information than desired in order to ensure consistency with {@code equals(…)}.
-     */
-    protected abstract boolean compare(OffsetTime left, OffsetTime right);
-
-    /**
-     * Compares two dates with time-zone information. Implementations shall not use {@code compareTo(…)} because
-     * that method compares more information than desired in order to ensure consistency with {@code equals(…)}.
-     */
-    protected abstract boolean compare(OffsetDateTime left, OffsetDateTime right);
-
-    /**
-     * Compares two dates without time-of-day and time-zone information. Implementations shall not use
-     * {@code compareTo(…)} because that method also compares chronology, which is not desired for the
-     * purpose of "is before" or "is after" comparison functions.
-     */
-    protected abstract boolean compare(ChronoLocalDate left, ChronoLocalDate right);
-
-    /**
-     * Compares two dates without time-zone information. Implementations shall not use {@code compareTo(…)}
-     * because that method also compares chronology, which is not desired for the purpose of "is before" or
-     * "is after" comparison functions.
-     */
-    protected abstract boolean compare(ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right);
-
-    /**
-     * Compares two dates with time-zone information. Implementations shall not use {@code compareTo(…)}
-     * because that method also compares chronology, which is not desired for the purpose of "is before"
+     * Returns an identification of the test to use if the operands are temporal.
+     * We do not use {@code compareTo(…)} for temporal objects because that method
+     * also compares chronology, which is not desired for the purpose of "is before"
      * or "is after" comparison functions.
+     *
+     * @return identification of the test to apply on temporal objects.
      */
-    protected abstract boolean compare(ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right);
+    protected abstract TimeMethods.Test temporalTest();
 
     /** Delegates to {@link BigDecimal#compareTo(BigDecimal)} and interprets the result with {@link #fromCompareTo(int)}. */
     @Override protected final Number applyAsDecimal (BigDecimal left, BigDecimal right) {return number(fromCompareTo(left.compareTo(right)));}
@@ -567,13 +448,11 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected boolean fromCompareTo(final int result) {return result < 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left < right);}
-        @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left < right);}
-        @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return left.isBefore(right);}
-        @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return left.isBefore(right);}
-        @Override protected boolean compare      (ChronoLocalDate        left, ChronoLocalDate        right) {return left.isBefore(right);}
-        @Override protected boolean compare      (ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right) {return left.isBefore(right);}
-        @Override protected boolean compare      (ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right) {return left.isBefore(right);}
+        @Override protected Number  applyAsDouble(double left, double right) {return number(left < right);}
+        @Override protected Number  applyAsLong  (long   left, long   right) {return number(left < right);}
+
+        /** For comparisons of temporal objects. */
+        @Override protected TimeMethods.Test temporalTest() {return TimeMethods.Test.BEFORE;}
     }
 
 
@@ -609,13 +488,11 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected boolean fromCompareTo(final int result) {return result <= 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left <= right);}
-        @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left <= right);}
-        @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return !left.isAfter(right);}
-        @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return !left.isAfter(right);}
-        @Override protected boolean compare      (ChronoLocalDate        left, ChronoLocalDate        right) {return !left.isAfter(right);}
-        @Override protected boolean compare      (ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right) {return !left.isAfter(right);}
-        @Override protected boolean compare      (ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right) {return !left.isAfter(right);}
+        @Override protected Number  applyAsDouble(double left, double right) {return number(left <= right);}
+        @Override protected Number  applyAsLong  (long   left, long   right) {return number(left <= right);}
+
+        /** For comparisons of temporal objects. */
+        @Override protected TimeMethods.Test temporalTest() {return TimeMethods.Test.NOT_AFTER;}
     }
 
 
@@ -651,13 +528,11 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected boolean fromCompareTo(final int result) {return result > 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left > right);}
-        @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left > right);}
-        @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return left.isAfter(right);}
-        @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return left.isAfter(right);}
-        @Override protected boolean compare      (ChronoLocalDate        left, ChronoLocalDate        right) {return left.isAfter(right);}
-        @Override protected boolean compare      (ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right) {return left.isAfter(right);}
-        @Override protected boolean compare      (ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right) {return left.isAfter(right);}
+        @Override protected Number  applyAsDouble(double left, double right) {return number(left > right);}
+        @Override protected Number  applyAsLong  (long   left, long   right) {return number(left > right);}
+
+        /** For comparisons of temporal objects. */
+        @Override protected TimeMethods.Test temporalTest() {return TimeMethods.Test.AFTER;}
     }
 
 
@@ -693,13 +568,11 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected boolean fromCompareTo(final int result) {return result >= 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left >= right);}
-        @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left >= right);}
-        @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return !left.isBefore(right);}
-        @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return !left.isBefore(right);}
-        @Override protected boolean compare      (ChronoLocalDate        left, ChronoLocalDate        right) {return !left.isBefore(right);}
-        @Override protected boolean compare      (ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right) {return !left.isBefore(right);}
-        @Override protected boolean compare      (ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right) {return !left.isBefore(right);}
+        @Override protected Number  applyAsDouble(double left, double right) {return number(left >= right);}
+        @Override protected Number  applyAsLong  (long   left, long   right) {return number(left >= right);}
+
+        /** For comparisons of temporal objects. */
+        @Override protected TimeMethods.Test temporalTest() {return TimeMethods.Test.NOT_BEFORE;}
     }
 
 
@@ -735,13 +608,11 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected boolean fromCompareTo(final int result) {return result == 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left == right);}
-        @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left == right);}
-        @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return left.isEqual(right);}
-        @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return left.isEqual(right);}
-        @Override protected boolean compare      (ChronoLocalDate        left, ChronoLocalDate        right) {return left.isEqual(right);}
-        @Override protected boolean compare      (ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right) {return left.isEqual(right);}
-        @Override protected boolean compare      (ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right) {return left.isEqual(right);}
+        @Override protected Number  applyAsDouble(double left, double right) {return number(left == right);}
+        @Override protected Number  applyAsLong  (long   left, long   right) {return number(left == right);}
+
+        /** For comparisons of temporal objects. */
+        @Override protected TimeMethods.Test temporalTest() {return TimeMethods.Test.EQUAL;}
     }
 
 
@@ -777,13 +648,11 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
         @Override protected boolean fromCompareTo(final int result) {return result != 0;}
 
         /** Performs the comparison and returns the result as 0 (false) or 1 (true). */
-        @Override protected Number  applyAsDouble(double                 left, double                 right) {return number(left != right);}
-        @Override protected Number  applyAsLong  (long                   left, long                   right) {return number(left != right);}
-        @Override protected boolean compare      (OffsetTime             left, OffsetTime             right) {return !left.isEqual(right);}
-        @Override protected boolean compare      (OffsetDateTime         left, OffsetDateTime         right) {return !left.isEqual(right);}
-        @Override protected boolean compare      (ChronoLocalDate        left, ChronoLocalDate        right) {return !left.isEqual(right);}
-        @Override protected boolean compare      (ChronoLocalDateTime<?> left, ChronoLocalDateTime<?> right) {return !left.isEqual(right);}
-        @Override protected boolean compare      (ChronoZonedDateTime<?> left, ChronoZonedDateTime<?> right) {return !left.isEqual(right);}
+        @Override protected Number  applyAsDouble(double  left, double right) {return number(left != right);}
+        @Override protected Number  applyAsLong  (long    left, long   right) {return number(left != right);}
+
+        /** For comparisons of temporal objects. */
+        @Override protected TimeMethods.Test temporalTest() {return TimeMethods.Test.NOT_EQUAL;}
     }
 
 

@@ -14,7 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.sis.filter;
+package org.apache.sis.filter.math;
+
+import org.apache.sis.filter.DefaultFilterFactory;
 
 // Test dependencies
 import org.junit.jupiter.api.Test;
@@ -31,7 +33,6 @@ import org.apache.sis.feature.AbstractFeature;
  *
  * @author  Johann Sorel (Geomatys)
  */
-@SuppressWarnings("exports")
 public final class ArithmeticFunctionTest extends TestCase {
     /**
      * The factory to use for creating the objects to test.

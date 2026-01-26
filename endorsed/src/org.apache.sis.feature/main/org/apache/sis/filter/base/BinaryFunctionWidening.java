@@ -118,8 +118,7 @@ public abstract class BinaryFunctionWidening<R, A1, A2> extends BinaryFunction<R
      * @see FeatureExpression#getResultClass()
      */
     private static NumberType getNumberType(final Expression<?,?> expression) {
-        return (expression instanceof FeatureExpression<?,?>)
-                ? NumberType.forClass(((FeatureExpression<?,?>) expression).getResultClass()).orElse(NumberType.NULL) : NumberType.NULL;
+        return NumberType.forClass(getResultClass(expression)).orElse(NumberType.NULL);
     }
 
     /**
