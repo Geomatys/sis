@@ -316,6 +316,16 @@ public abstract class Node implements Serializable {
     }
 
     /**
+     * Whether to convert literals to the same type as non-literal parameters during the optimization phase.
+     * This is invoked by {@link Optimization} for deciding whether to attempt such replacement.
+     *
+     * @return whether it is okay to convert literals in advance.
+     */
+    public boolean allowLiteralConversions() {
+        return false;
+    }
+
+    /**
      * Returns the children of this node, or an empty collection if none. This is used
      * for information purpose, for example in order to build a string representation.
      *

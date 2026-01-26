@@ -155,6 +155,17 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     }
 
     /**
+     * Whether to convert literals to the same type as non-literal parameters during the optimization phase.
+     * This is invoked by {@link Optimization} for deciding whether to attempt such replacement.
+     *
+     * @return whether it is okay to convert literals in advance.
+     */
+    @Override
+    public final boolean allowLiteralConversions() {
+        return true;
+    }
+
+    /**
      * Tries to optimize this filter. Fist, this method applies the optimization documented
      * in the {@linkplain Optimization.OnFilter#optimize default method impmementation}.
      * Then, if it is possible to avoid to inspect the number types every time that the
