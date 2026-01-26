@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
 import java.awt.geom.Point2D;
 import org.opengis.metadata.acquisition.GeometryType;
 import org.apache.sis.feature.Features;
@@ -96,7 +97,7 @@ public final class FeatureQueryTest extends TestCase {
      * Creates a simple feature with a property flagged as an identifier.
      */
     private void createFeatureWithIdentifier() {
-        final FeatureTypeBuilder ftb = new FeatureTypeBuilder().setName("Test");
+        final var ftb = new FeatureTypeBuilder().setName("Test");
         ftb.addAttribute(String.class).setName("id").addRole(AttributeRole.IDENTIFIER_COMPONENT);
         final FeatureType type = ftb.build();
         features = new Feature[] {
@@ -115,7 +116,7 @@ public final class FeatureQueryTest extends TestCase {
      * @return the points created by this method in no particular order.
      */
     private Set<Point2D.Double> createFeaturesWithGeometry(final GeometryLibrary library) {
-        final FeatureTypeBuilder ftb = new FeatureTypeBuilder(null, library, null).setName("Test");
+        final var ftb = new FeatureTypeBuilder(null, library, null).setName("Test");
         ftb.addAttribute(GeometryType.POINT).setCRS(HardCodedCRS.WGS84_LATITUDE_FIRST).setName("point");
         final FeatureType type = ftb.build();
         final var points = new HashSet<Point2D.Double>();
@@ -128,7 +129,7 @@ public final class FeatureQueryTest extends TestCase {
             final Feature f = type.newInstance();
             f.setPropertyValue("point", factory.createPoint(point.x, point.y));
             features[i] = f;
-        };
+        }
         this.features = features;
         featureSet = new MemoryFeatureSet(null, type, Arrays.asList(features));
         return points;
@@ -288,6 +289,40 @@ public final class FeatureQueryTest extends TestCase {
         query.setSelection(ff.equal(ff.property("dependency/value3"), ff.literal(18)));
         assertXPathsEqual("dependency/value3");
         verifyQueryResult(3);
+    }
+
+    /**
+     * Verifies the effect of {@link FeatureQuery#setSelection(Filter)} on a property having a date.
+     *
+     * @throws DataStoreException if an error occurred while executing the query.
+     */
+    @Test
+    public void testSelectionOfDate() throws DataStoreException {
+        // Prepare the feature instances.
+        {
+            final var ftb = new FeatureTypeBuilder().setName("Test");
+            ftb.addAttribute(LocalDate.class).setName("value1");
+            final FeatureType type = ftb.build();
+            features = new Feature[4];
+            Arrays.setAll(features, (i) -> {
+                Feature feature = type.newInstance();
+                feature.setPropertyValue("value1", LocalDate.of(2000, 1, 10 + i));
+                return feature;
+            });
+            featureSet = new MemoryFeatureSet(null, type, Arrays.asList(features));
+        }
+        // Prepare the query.
+        {
+            final FilterFactory<Feature,?,?> ff = DefaultFilterFactory.forFeatures();
+            query.setSelection(ff.lessOrEqual(
+                    ff.property("value1", LocalDate.class),
+                    ff.literal(LocalDate.of(2000, 1, 12))));
+            assertXPathsEqual("value1");
+        }
+        // Verify the result.
+        final FeatureSet fs = query.execute(featureSet);
+        final Feature[] result = fs.features(false).toArray(Feature[]::new);
+        assertArrayEquals(Arrays.copyOf(features, 3), result);
     }
 
     /**

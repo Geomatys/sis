@@ -75,7 +75,8 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
     }
 
     /**
-     * Creates a new temporal function.
+     * Creates a new temporal filter. This is the implementation of {@link DefaultFilterFactory} methods
+     * which create {@link TemporalOperator} instances.
      *
      * @param  <R>          the type of resources (e.g. {@code Feature}) used as inputs.
      * @param  <v>          compile-type value of the {@code type} argument.
@@ -114,9 +115,9 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
          * Creations of `TemporalFilter` instances below are safe because `TimeMethods.type` is a parent
          * of both `expression1` and `expression2` value types (verified by assertions). Therefore, with
          * `commonType` of type `Class<T>` no matter if <T> is a super-type or a sub-type of <V>, we can
-         * assert that the parmeterized type of the two expressions is `<? extends T>`.
+         * assert that the parameterized type of the two expressions is `<? extends T>`.
          */
-        final TemporalOperation<?> operation = factory.create(TimeMethods.find(commonType)).unique();
+        final TemporalOperation<?> operation = factory.create(TimeMethods.forType(commonType)).unique();
         assert operation.comparators.type.isAssignableFrom(commonType) : commonType;
         assert commonType.isAssignableFrom(c1) : c1;
         assert commonType.isAssignableFrom(c2) : c2;
@@ -124,7 +125,7 @@ class TemporalFilter<R,T> extends BinaryFunction<R,T,T>
             // Safe because `commonType` extends both Period and T.
             return new Periods(operation, expression1, expression2);
         }
-        if (operation.comparators.isDynamic()) {
+        if (operation.comparators.isDynamic) {
             return new TemporalFilter(operation, expression1, expression2);
         }
         return new Instants(operation, expression1, expression2);

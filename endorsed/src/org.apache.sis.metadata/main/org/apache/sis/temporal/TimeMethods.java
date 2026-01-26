@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.Calendar;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.time.Instant;
@@ -68,21 +69,11 @@ import org.apache.sis.util.resources.Errors;
  *
  * @author  Martin Desruisseaux (Geomatys)
  */
-public class TimeMethods<T> implements Serializable {
-    /**
-     * For cross-version compatibility.
-     */
-    private static final long serialVersionUID = 1075289362575825939L;
-
-    /**
-     * The type of temporal objects accepted by this set of operations.
-     */
-    public final Class<T> type;
-
+public final class TimeMethods<T> implements Serializable {
     /**
      * The test to apply: equal, before or after.
      *
-     * @see #compare(Test, T, TemporalAccessor)
+     * @see #convertAndCompare(Test, T, TemporalAccessor)
      */
     public enum Test {
         /** Identifies the <var>A</var> = <var>B</var> test. */
@@ -157,6 +148,22 @@ public class TimeMethods<T> implements Serializable {
     }
 
     /**
+     * For cross-version compatibility.
+     */
+    private static final long serialVersionUID = 3421610320642857317L;
+
+    /**
+     * The type of temporal objects accepted by this set of operations.
+     */
+    public final Class<T> type;
+
+    /**
+     * Converter from an object of arbitrary class to an object of class {@code <T>}, or {@code null} if none.
+     * The function may return {@code null} if the given object is an instance of unsupported type.
+     */
+    public final transient Function<Object, T> converter;
+
+    /**
      * Predicate to execute for testing the ordering between temporal objects.
      * This comparison operator differs from the {@code compareTo(…)} method in that it compares only the
      * positions on the timeline, ignoring metadata such as the calendar used for representing positions.
@@ -186,77 +193,76 @@ public class TimeMethods<T> implements Serializable {
     /**
      * Whether the temporal object have a time zone, explicitly or implicitly.
      */
-    private final boolean hasZone;
+    private final transient boolean hasZone;
+
+    /**
+     * Whether the end point will be determined dynamically every time that a method is invoked.
+     */
+    public final transient boolean isDynamic;
 
     /**
      * Creates a new set of operators. This method is for subclasses only.
-     * For getting a {@code TimeMethods} instance, see {@link #find(Class)}.
+     * For getting a {@code TimeMethods} instance, see {@link #forType(Class)}.
      */
-    private TimeMethods(final Class<T> type,
-            final BiPredicate<T,T> isBefore,
-            final BiPredicate<T,T> isAfter,
-            final BiPredicate<T,T> isEqual,
-            final Supplier<T> now,
+    private TimeMethods(
+            final Class<T>           type,
+            final Function<Object,T> converter,
+            final BiPredicate<T,T>   isBefore,
+            final BiPredicate<T,T>   isAfter,
+            final BiPredicate<T,T>   isEqual,
+            final Supplier<T>        now,
             final BiFunction<T, ZoneId, Temporal> withZone,
-            final boolean hasZone)
+            final boolean hasZone,
+            final boolean isDynamic)
     {
-        this.type     = type;
-        this.isBefore = isBefore;
-        this.isAfter  = isAfter;
-        this.isEqual  = isEqual;
-        this.now      = now;
-        this.withZone = withZone;
-        this.hasZone  = hasZone;
-    }
-
-    /**
-     * Returns whether the end point will be determined dynamically every time that a method is invoked.
-     *
-     * @return whether the methods are determined dynamically on an instance-by-instance basis.
-     */
-    public boolean isDynamic() {
-        return false;
+        this.type      = type;
+        this.converter = converter;
+        this.isBefore  = isBefore;
+        this.isAfter   = isAfter;
+        this.isEqual   = isEqual;
+        this.now       = now;
+        this.withZone  = withZone;
+        this.hasZone   = hasZone;
+        this.isDynamic = isDynamic;
     }
 
     /**
      * Returns the predicate to use for this test.
+     * The expected type of the first operand is always {@code <T>}.
+     * The expected type of the second operand will be either {@code <T>} or {@code Object},
+     * depending on the value of {@code t2}.
      *
-     * @param  test   the test to apply (before, after and/or equal).
+     * @param  test  the test to apply (before, after and/or equal).
+     * @param  t2    expected class of the second operand.
      * @return the predicate for the requested test.
      */
-    public final BiPredicate<T,T> predicate(final Test test) {
-        return test.predicate(this);
-    }
-
-    /**
-     * Delegates the comparison to the method identified by the {@code test} argument.
-     * This method is overridden in subclasses where the delegation can be more direct.
-     *
-     * @param  test   the test to apply (before, after and/or equal).
-     * @param  self   the object on which to invoke the method identified by {@code test}.
-     * @param  other  the argument to give to the test method call.
-     * @return the result of performing the comparison identified by {@code test}.
-     */
-    boolean delegate(final Test test, final T self, final T other) {
-        return test.compare(this, self, other);
-    }
-
-    /**
-     * Compares an object of class {@code <T>} with a temporal object of unknown class.
-     * The other object is typically the beginning or ending of a period.
-     *
-     * @param  test   the test to apply (before, after and/or equal).
-     * @param  self   the object on which to invoke the method identified by {@code test}.
-     * @param  other  the argument to give to the test method call.
-     * @return the result of performing the comparison identified by {@code test}.
-     * @throws DateTimeException if the two objects cannot be compared.
-     */
-    @SuppressWarnings("unchecked")
-    public final boolean compare(final Test test, final T self, final TemporalAccessor other) {
-        if (type.isInstance(other)) {
-            return delegate(test, self, (T) other);         // Safe because of above `isInstance(…)` check.
+    public final BiPredicate<T,?> predicate(final Test test, final Class<?> t2) {
+        final BiPredicate<T,T> predicate = test.predicate(this);
+        if (type.isAssignableFrom(t2)) {
+            return predicate;
         }
-        return compareAsInstants(test, accessor(self), other);
+        @SuppressWarnings("LocalVariableHidesMemberVariable")
+        Function<Object, T> converter = this.converter;
+        return (T self, Object other) -> predicate.test(self, converter.apply(other));
+    }
+
+    /**
+     * Returns {@code true} if both arguments are non-null and this comparison evaluates to {@code true}.
+     * The type of the objects being compared is determined dynamically, which has a performance cost.
+     * The {@code TimeMethods.compare(…)} methods should be preferred when the type is known in advance.
+     *
+     * <p>This method is equivalent to {@link #compareIfTemporal(Test, Object, Object)} except for the
+     * return type, which is simplified to the primitive type.</p>
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @param  self   the object on which to invoke the method identified by {@code test}, or {@code null} if none.
+     * @param  other  the argument to give to the test method call, or {@code null} if none.
+     * @return the comparison result, or {@code false} if the given objects were not recognized as temporal.
+     * @throws DateTimeException if the two objects are temporal objects but cannot be compared.
+     */
+    private static boolean compareIfTemporalElseFalse(final Test test, final Object self, final Object other) {
+        Boolean c = compareIfTemporal(test, self, other);
+        return (c != null) && c;
     }
 
     /**
@@ -294,7 +300,7 @@ public class TimeMethods<T> implements Serializable {
         }
         // Use `||` because an operand by still be a `java.utl.Date`.
         if (isTemporal || self instanceof Temporal || other instanceof Temporal) {
-            return compareAny(test, self, other);
+            return compareTemporalOrDate(test, self, other);
         }
         return null;
     }
@@ -311,15 +317,14 @@ public class TimeMethods<T> implements Serializable {
      * @throws DateTimeException if the two objects cannot be compared.
      */
     public static boolean compareLenient(final Test test, final Temporal self, final Temporal other) {
-        if (self != null && other != null) {
-            Boolean c = compareAny(test, self, other);
-            if (c != null) return c;
+        if (self == null || other == null) {
+            return false;
         }
-        return false;
+        return compareTemporalOrDate(test, self, other);
     }
 
     /**
-     * Implementation of lenient comparisons.
+     * Implementation of lenient comparisons between non-null instances of arbitrary temporal or date types.
      * Temporal objects have complex conversion rules. We take Instant as the most accurate and unambiguous type.
      * So if at least one value is an Instant, try to unconditionally promote the other value to an Instant too.
      * This conversion will fail if the other object has some undefined fields. For example {@link java.sql.Date}
@@ -328,12 +333,13 @@ public class TimeMethods<T> implements Serializable {
      * @param  test   the test to apply (before, after and/or equal).
      * @param  self   the object on which to invoke the method identified by {@code test}.
      * @param  other  the argument to give to the test method call.
-     * @return the comparison result, or {@code null} if the given objects were not recognized as temporal.
+     * @return the result of performing the comparison identified by {@code test}.
      * @throws DateTimeException if the two objects cannot be compared.
      */
-    private static Boolean compareAny(final Test test, Object self, Object other) {
+    @SuppressWarnings("unchecked")
+    private static boolean compareTemporalOrDate(final Test test, Object self, Object other) {
         Class<?> type = self.getClass();
-adapt:  if (self != other.getClass()) {
+adapt:  if (type != other.getClass()) {
             Temporal converted;
             /*
              * OffsetTime and OffsetDateTime are final classes that do not implement a java.time.chrono interface.
@@ -390,7 +396,7 @@ adapt:  if (self != other.getClass()) {
                     break adapt;
                 }
             }
-            // No else, we want this as a fallback.
+            // No else, we want this fallback.
             if (self instanceof ChronoLocalDate) {
                 converted = toLocalDate(other);
                 if (converted != null) {
@@ -406,7 +412,7 @@ adapt:  if (self != other.getClass()) {
                     break adapt;
                 }
             }
-            // No else, we want this as a fallback.
+            // No else, we want this fallback.
             if (self instanceof LocalTime) {
                 converted = toLocalTime(other);
                 if (converted != null) {
@@ -422,74 +428,28 @@ adapt:  if (self != other.getClass()) {
                     break adapt;
                 }
             }
-            // No else, we want this as a fallback.
-            if (self instanceof Temporal && other instanceof Temporal) {
-                type  = Classes.findCommonClass(self.getClass(), other.getClass());
-            } else {
-                return null;
+            // No else, we want this fallback.
+            final TimeMethods<?> methods = forTypes(self.getClass(), other.getClass(), false);
+            if (methods != null && !methods.isDynamic) {
+                assert methods.type.isInstance(self) : self;
+                return ((TimeMethods) methods).convertAndCompareObject(test, self, other);
             }
+            throw new DateTimeException(Errors.format(Errors.Keys.CannotCompareInstanceOf_2, self.getClass(), other.getClass()));
         }
-        return castAndCompare(test, type, self, other);
-    }
-
-    /**
-     * Delegates to {@link #compare(int, Class, Object, Object)} after verification of the type.
-     *
-     * @param  test   the test to apply (before, after and/or equal).
-     * @param  type   base class of the {@code self} and {@code other} arguments.
-     * @param  self   the object on which to invoke the method identified by {@code test}.
-     * @param  other  the argument to give to the test method call.
-     * @return the result of performing the comparison identified by {@code test}.
-     * @throws ClassCastException if {@code self} or {@code other} is not an instance of {@code type}.
-     * @throws DateTimeException if the two objects cannot be compared.
-     */
-    private static <T> boolean castAndCompare(Test test, Class<T> type, Object self, Object other) {
-        return compare(test, type, type.cast(self), type.cast(other));
-    }
-
-    /**
-     * Compares two temporal objects of unknown class. This method needs to check for specialized implementations
-     * before to delegate to {@link Comparable#compareTo(Object)}, because the comparison methods on the timeline
-     * are not always the same as {@code compareTo(…)}.
-     *
-     * @param  <T>    base class of the objects to compare.
-     * @param  test   the test to apply (before, after and/or equal).
-     * @param  type   base class of the {@code self} and {@code other} arguments.
-     * @param  self   the object on which to invoke the method identified by {@code test}.
-     * @param  other  the argument to give to the test method call.
-     * @return the result of performing the comparison identified by {@code test}.
-     * @throws DateTimeException if the two objects cannot be compared.
-     */
-    public static <T> boolean compare(final Test test, final Class<T> type, final T self, final T other) {
         /*
-         * The following cast is not strictly true, it should be `<? extends T>`.
-         * However, because of the `isInstance(…)` check and because <T> is used
-         * only as parameter type (no collection), it is okay to use it that way.
+         * The implementation of `TimeMethods.before/equals/after` functions delegate to this method in the
+         * most generic cases (the `Object` and `Temporal` types declared in the `FOR_EXACT_TYPES` map).
+         * Therefore, we must exclude the following block when `isDynamic` is true for avoiding infinite
+         * recursive calls.
          */
-        final TimeMethods<? super T> tc = findSpecialized(type);
-        /*
-         * The implementation of `TimeMethods.before/equals/after` methods delegate to this method in the
-         * most generic case. In such cases, this block must be excluded for avoiding a never-ending loop.
-         */
-        if (tc != null && !tc.isDynamic()) {
-            /*
-             * Found one of the special cases listed in `INTERFACES` or `FINAL_TYPE`.
-             * If the other type is compatible, the comparison is executed directly.
-             */
-            if (tc.type.isInstance(other)) {
-                assert tc.type.isAssignableFrom(type) : tc;     // Those types are not necessarily equal.
-                return test.compare(tc, self, other);
-            }
+        final TimeMethods<?> methods = forType(type, false);
+        if (methods != null && !methods.isDynamic) {
+            assert methods.type.isInstance(self)  : self;
+            assert methods.type.isInstance(other) : other;
+            return test.compare((TimeMethods) methods, self, other);
         } else if (self instanceof Comparable<?> && self.getClass().isInstance(other)) {
-            /*
-             * The type of the first operand is not a special case, but the second operand is compatible
-             * for a call to the generic `compareTo(…)` method. This case does not happen often, because
-             * not many `java.time` classes have no "is before" or "is after" operations.
-             * Some examples are `Month` and `DayOfWeek`.
-             */
-            @SuppressWarnings("unchecked")          // Safe because verification done by `isInstance(…)`.
-            final int c = ((Comparable) self).compareTo(other);
-            return test.fromCompareTo(c);
+            // Case of `Month` and `DayOfWeek` which have no "is before" or "is after" operations.
+            return test.fromCompareTo(((Comparable) self).compareTo(other));
         }
         /*
          * If we reach this point, the two operands are of different classes and we cannot compare them directly.
@@ -499,7 +459,49 @@ adapt:  if (self != other.getClass()) {
     }
 
     /**
+     * Compares an object of class {@code <T>} with a temporal object of arbitrary class.
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @param  self   the object on which to invoke the method identified by {@code test}.
+     * @param  other  the argument to give to the test method call.
+     * @return the result of performing the comparison identified by {@code test}.
+     * @throws ClassCastException if {@code self} or {@code other} is not an instance of {@code type}.
+     * @throws DateTimeException if the two objects cannot be compared.
+     */
+    @SuppressWarnings("unchecked")
+    private boolean convertAndCompareObject(final Test test, final T self, final Object other) {
+        if (converter != null) {
+            final T converted = converter.apply(other);
+            if (converted != null) {
+                return test.compare(this, self, converted);
+            }
+        } else if (type.isInstance(other)) {
+            return test.compare(this, self, (T) other);     // Safe because of above `isInstance(…)` check.
+        } else if (other instanceof TemporalAccessor) {
+            return compareAsInstants(test, accessor(self), (TemporalAccessor) other);
+        }
+        throw new DateTimeException(Errors.format(Errors.Keys.CannotCompareInstanceOf_2, self.getClass(), other.getClass()));
+    }
+
+    /**
+     * Compares an object of class {@code <T>} with a temporal object of arbitrary class.
+     * The other object is typically the beginning or ending instant of a period and may
+     * be converted to the {@code <T>} type before comparison.
+     *
+     * @param  test   the test to apply (before, after and/or equal).
+     * @param  self   the object on which to invoke the method identified by {@code test}.
+     * @param  other  the argument to give to the test method call.
+     * @return the result of performing the comparison identified by {@code test}.
+     * @throws DateTimeException if the two objects cannot be compared.
+     */
+    public final boolean convertAndCompare(final Test test, final T self, final TemporalAccessor other) {
+        return convertAndCompareObject(test, self, other);
+    }
+
+    /**
      * Returns the given object as a temporal accessor.
+     *
+     * @throws DateTimeException if the object cannot be converted.
      */
     private static TemporalAccessor accessor(final Object value) {
         if (value instanceof TemporalAccessor) {
@@ -533,80 +535,128 @@ adapt:  if (self != other.getClass()) {
     }
 
     /**
-     * Returns the set of methods that can be invoked on instances of the given type, or {@code null} if none.
-     * This method returns only one of the methods defined in {@link #FINAL_TYPES} or {@link #INTERFACES}.
-     * It shall not try to create fallbacks.
+     * Returns the set of methods that can be invoked on instances of the given types.
+     * If the types are too generic, then this method returns a fallback which will check
+     * for a more specific type during filter execution.
      *
-     * @param  <T>   compile-time value of the {@code type} argument.
-     * @param  type  the type of temporal object for which to get specialized methods.
+     * <p>It is guaranteed that {@code self} will be assignable to the {@link #type} of the returned value.
+     * However, {@code other} will be assignable to {@link #type} only on a best-effort basis.
+     * The {@link #convertAndCompare(Test, Object, TemporalAccessor)} method can be used when
+     * {@code other} is not of that type.</p>
+     *
+     * @param  self   the type of the first operand in comparisons.
+     * @param  other  the type of the second operand in comparisons.
+     * @return set of comparison methods for operands of the given types, or {@code null} if not found.
+     */
+    public static TimeMethods<?> forTypes(final Class<?> self, final Class<?> other) {
+        return forTypes(self, other, true);
+    }
+
+    /**
+     * Returns the set of methods that can be invoked on instances of the given types.
+     * The {@code fallback} argument control whether to create a fallback if the types are too generic.
+     * Fallback must be disabled when this method is invoked from {@link #compareTemporalOrDate(Test, Object, Object)},
+     * otherwise never-ending recursive calls may happen.
+     *
+     * <p>It is guaranteed that {@code self} will be assignable to the {@link #type} of the returned value.
+     * However, {@code other} will be assignable to {@link #type} only on a best-effort basis.</p>
+     *
+     * @param  self      the type of the first operand in comparisons.
+     * @param  other     the type of the second operand in comparisons.
+     * @param  fallback  whether fallback is allowed.
+     * @return set of comparison methods for operands of the given types, or {@code null} if not found.
+     */
+    private static TimeMethods<?> forTypes(final Class<?> self, final Class<?> other, final boolean fallback) {
+        if (self.isAssignableFrom(other)) return forType(self,  fallback);
+        if (other.isAssignableFrom(self)) return forType(other, fallback);
+        for (final Class<?> type : Classes.findCommonInterfaces(self, other)) {
+            final TimeMethods<?> methods = forType(type, false);   // Fallback not wanted here.
+            if (methods != null) {
+                return methods;
+            }
+        }
+        Class<?> type = Classes.findCommonClass(self, other);
+        if (type == Object.class) {
+            type = self.getClass();     // See method javadoc.
+        }
+        return forType(type, fallback);
+    }
+
+    /**
+     * Returns the set of methods that can be invoked on instances of the given type, or {@code null} if none.
+     * If {@code fallback} is {@code false}, then this method returns only one of the methods defined in
+     * {@link #FOR_EXACT_TYPES} or {@link #FOR_PARENT_TYPES} without trying to create fallbacks.
+     *
+     * @param  <T>       compile-time value of the {@code type} argument.
+     * @param  type      the type of temporal object for which to get specialized methods.
+     * @param  fallback  whether to allow the creation of fallbacks.
      * @return set of specialized methods for the given object type, or {@code null} if none.
      */
     @SuppressWarnings("unchecked")
-    private static <T> TimeMethods<? super T> findSpecialized(final Class<T> type) {
-        {   // Block for keeping `tc` in local scope.
-            TimeMethods<?> tc = FINAL_TYPES.get(type);
-            if (tc != null) {
-                assert tc.type == type : tc;
-                return (TimeMethods<T>) tc;             // Safe because of `==` checks.
+    private static <T> TimeMethods<? super T> forType(final Class<T> type, final boolean fallback) {
+        {   // Block for keeping `methods` in local scope.
+            TimeMethods<?> methods = FOR_EXACT_TYPES.get(type);
+            if (methods != null) {
+                assert methods.type == type : methods;
+                return (TimeMethods<T>) methods;             // Safe because of `==` checks.
             }
         }
-        for (TimeMethods<?> tc : INTERFACES) {
-            if (tc.type.isAssignableFrom(type)) {
-                return (TimeMethods<? super T>) tc;     // Safe because of `isAssignableFrom(…)` checks.
+        for (TimeMethods<?> methods : FOR_PARENT_TYPES) {
+            if (methods.type.isAssignableFrom(type)) {
+                return (TimeMethods<? super T>) methods;     // Safe because of `isAssignableFrom(…)` checks.
+            }
+        }
+        if (fallback) {
+            if (!Modifier.isFinal(type.getModifiers())) {
+                return fallback(type);
+            }
+            if (Comparable.class.isAssignableFrom(type)) {
+                return new TimeMethods<>(type, null,
+                        (self, other) -> ((Comparable<T>) self).compareTo(other) < 0,
+                        (self, other) -> ((Comparable<T>) self).compareTo(other) > 0,
+                        (self, other) -> ((Comparable<T>) self).compareTo(other) == 0,
+                        null, null, false, false);
             }
         }
         return null;
     }
 
     /**
-     * Returns the set of methods that can be invoked on instances of the given type.
-     *
-     * @param  <T>   compile-time value of the {@code type} argument.
-     * @param  type  the type of temporal object for which to get specialized methods.
-     * @return set of comparison methods for the given object type.
-     */
-    @SuppressWarnings("unchecked")          // For (Comparable) casts.
-    public static <T> TimeMethods<? super T> find(final Class<T> type) {
-        final TimeMethods<? super T> tc = findSpecialized(type);
-        if (tc != null) {
-            return tc;
-        }
-        if (Modifier.isFinal(type.getModifiers())) {
-            if (Comparable.class.isAssignableFrom(type)) {
-                return new TimeMethods<>(type,
-                        (self, other) -> ((Comparable) self).compareTo(other) < 0,
-                        (self, other) -> ((Comparable) self).compareTo(other) > 0,
-                        (self, other) -> ((Comparable) self).compareTo(other) == 0,
-                        null, null, false);
-            } else {
-                throw new DateTimeException(Errors.format(Errors.Keys.CannotCompareInstanceOf_2, type, type));
-            }
-        } else {
-            return fallback(type);
-        }
-    }
-
-    /**
      * Returns the last-resort fallback when the type of temporal objects cannot be determined in advance.
+     * All methods delegate (indirectly) to {@link #compareIfTemporal(Test, Object, Object)}, which will
+     * check the type at runtime.
      *
      * @param  <T>   compile-time value of the {@code type} argument.
      * @param  type  the type of temporal object for which to get the last-resource fallback methods.
      * @return set of last-resort comparison methods for the given object type.
      */
     private static <T> TimeMethods<? super T> fallback(final Class<T> type) {
-        return new TimeMethods<>(type,
-                (self, other) -> compare(Test.BEFORE, type, self, other),
-                (self, other) -> compare(Test.AFTER,  type, self, other),
-                (self, other) -> compare(Test.EQUAL,  type, self, other),
-                null, null, false)
-        {
-            @Override public boolean isDynamic() {
-                return true;
-            }
-            @Override boolean delegate(final Test test, final T self, final T other) {
-                return compare(test, type, self, other);
-            }
-        };
+        return new TimeMethods<>(type, null,
+                (self, other) -> compareIfTemporalElseFalse(Test.BEFORE, self, other),
+                (self, other) -> compareIfTemporalElseFalse(Test.AFTER,  self, other),
+                (self, other) -> compareIfTemporalElseFalse(Test.EQUAL,  self, other),
+                null, null, false, true);
+    }
+
+    /**
+     * Returns the set of methods that can be invoked on instances of the given type.
+     * If the type is too generic, then this method returns a fallback which will check
+     * for a more specific type during filter execution.
+     *
+     * <p>The {@links Test tests} (is before, is after, is equal, <i>etc.</i>) expect
+     * the first operand to be of type {@code <T>}. However, the second operand may be of
+     * a different type if the {@link #convertAndCompare(Test, Object, TemporalAccessor)}
+     * method is used.</p>
+     *
+     * @param  <T>   compile-time value of the {@code type} argument.
+     * @param  type  the type of temporal object for which to get specialized methods.
+     * @return set of comparison methods for the given object type.
+     * @throws DateTimeException if it is known in advance that comparisons will not be possible.
+     */
+    public static <T> TimeMethods<? super T> forType(final Class<T> type) {
+        final TimeMethods<? super T> methods = forType(type, true);
+        if (methods != null) return methods;
+        throw new DateTimeException(Errors.format(Errors.Keys.CannotCompareInstanceOf_2, type, type));
     }
 
     /**
@@ -617,7 +667,7 @@ adapt:  if (self != other.getClass()) {
      * @throws ObjectStreamException if the serialized object contains invalid data.
      */
     private Object readResolve() throws ObjectStreamException {
-        return find(type);
+        return forType(type);
     }
 
     /**
@@ -663,10 +713,10 @@ adapt:  if (self != other.getClass()) {
      * @param  allowAdd  whether to allow the addition of a time zone in an object that initially had none.
      * @return a temporal object with the specified timezone, if it was possible to apply a timezone.
      */
-    public static <T> Optional<Temporal> withZone(final T time, final ZoneId timezone, final boolean allowAdd) {
+    public static <T extends Temporal> Optional<Temporal> withZone(final T time, final ZoneId timezone, final boolean allowAdd) {
         if (time != null) {
-            final TimeMethods<? super T> methods = find(Classes.getClass(time));
-            if ((methods.hasZone | allowAdd) && methods.withZone != null) {
+            final TimeMethods<? super T> methods = forType(Classes.getClass(time), false);
+            if (methods != null && (methods.hasZone | allowAdd) && methods.withZone != null) {
                 return Optional.ofNullable(methods.withZone.apply(time, timezone));
             }
         }
@@ -678,11 +728,11 @@ adapt:  if (self != other.getClass()) {
      * Those types need to be checked with {@link Class#isAssignableFrom(Class)} in iteration order.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})            // For `Chrono*` interfaces, because they are parameterized.
-    private static final TimeMethods<?>[] INTERFACES = {
-        new TimeMethods<>(ChronoZonedDateTime.class, ChronoZonedDateTime::isBefore, ChronoZonedDateTime::isAfter, ChronoZonedDateTime::isEqual, ZonedDateTime::now, ChronoZonedDateTime::withZoneSameInstant, true),
-        new TimeMethods<>(ChronoLocalDateTime.class, ChronoLocalDateTime::isBefore, ChronoLocalDateTime::isAfter, ChronoLocalDateTime::isEqual, LocalDateTime::now, ChronoLocalDateTime::atZone, false),
-        new TimeMethods<>(    ChronoLocalDate.class,     ChronoLocalDate::isBefore,     ChronoLocalDate::isAfter,     ChronoLocalDate::isEqual,     LocalDate::now, null, false),
-        new TimeMethods<>(               Date.class,                Date::  before,                Date::  after,                Date::equals,           Date::new, TimeMethods::atZone, true)
+    private static final TimeMethods<?>[] FOR_PARENT_TYPES = {
+        new TimeMethods<>(ChronoZonedDateTime.class,                         null, ChronoZonedDateTime::isBefore, ChronoZonedDateTime::isAfter, ChronoZonedDateTime::isEqual, ZonedDateTime::now, ChronoZonedDateTime::withZoneSameInstant, true, false),
+        new TimeMethods<>(ChronoLocalDateTime.class, TimeMethods::toLocalDateTime, ChronoLocalDateTime::isBefore, ChronoLocalDateTime::isAfter, ChronoLocalDateTime::isEqual, LocalDateTime::now, ChronoLocalDateTime::atZone, false, false),
+        new TimeMethods<>(    ChronoLocalDate.class,     TimeMethods::toLocalDate,     ChronoLocalDate::isBefore,     ChronoLocalDate::isAfter,     ChronoLocalDate::isEqual,     LocalDate::now, null, false, false),
+        new TimeMethods<>(               Date.class,                         null,                Date::  before,                Date::  after,                Date::equals,           Date::new, TimeMethods::atZone, true, false)
     };
 
     /*
@@ -694,7 +744,7 @@ adapt:  if (self != other.getClass()) {
      * Operators for all supported temporal types for which there is no need to check for subclasses.
      * Those classes should be final because they are compared by equality instead of "instance of".
      * The two last entries are not final, but we really want to ignore all their subtypes.
-     * All those types should be tested before {@link #INTERFACES} because this check is quick.
+     * All those types should be tested before {@link #FOR_PARENT_TYPES} because this check is quick.
      *
      * <h4>Implementation note</h4>
      * {@link Year}, {@link YearMonth}, {@link MonthDay}, {@link LocalTime} and {@link Instant}
@@ -702,22 +752,22 @@ adapt:  if (self != other.getClass()) {
      * case the implementations change in the future, and also for performance reason, because
      * the code working on generic {@link Comparable} needs to check for special cases again.
      */
-    private static final Map<Class<?>, TimeMethods<?>> FINAL_TYPES = Map.ofEntries(
-        entry(new TimeMethods<>(OffsetDateTime.class, OffsetDateTime::isBefore, OffsetDateTime::isAfter, OffsetDateTime::isEqual, OffsetDateTime::now, TimeMethods::withZoneSameInstant, true)),
-        entry(new TimeMethods<>( ZonedDateTime.class,  ZonedDateTime::isBefore,  ZonedDateTime::isAfter,  ZonedDateTime::isEqual,  ZonedDateTime::now, ZonedDateTime::withZoneSameInstant, true)),
-        entry(new TimeMethods<>( LocalDateTime.class,  LocalDateTime::isBefore,  LocalDateTime::isAfter,  LocalDateTime::isEqual,  LocalDateTime::now, LocalDateTime::atZone, false)),
-        entry(new TimeMethods<>(     LocalDate.class,      LocalDate::isBefore,      LocalDate::isAfter,      LocalDate::isEqual,      LocalDate::now, null, false)),
-        entry(new TimeMethods<>(    OffsetTime.class,     OffsetTime::isBefore,     OffsetTime::isAfter,     OffsetTime::isEqual,     OffsetTime::now, TimeMethods::withOffsetSameInstant, true)),
-        entry(new TimeMethods<>(     LocalTime.class,      LocalTime::isBefore,      LocalTime::isAfter,      LocalTime::equals,       LocalTime::now, TimeMethods::atOffset, false)),
-        entry(new TimeMethods<>(          Year.class,           Year::isBefore,           Year::isAfter,           Year::equals,            Year::now, null, false)),
-        entry(new TimeMethods<>(     YearMonth.class,      YearMonth::isBefore,      YearMonth::isAfter,      YearMonth::equals,       YearMonth::now, null, false)),
-        entry(new TimeMethods<>(      MonthDay.class,       MonthDay::isBefore,       MonthDay::isAfter,       MonthDay::equals,        MonthDay::now, null, false)),
-        entry(new TimeMethods<>(       Instant.class,        Instant::isBefore,        Instant::isAfter,        Instant::equals,         Instant::now, Instant::atZone, true)),
+    private static final Map<Class<?>, TimeMethods<?>> FOR_EXACT_TYPES = Map.ofEntries(
+        entry(new TimeMethods<>(OffsetDateTime.class, TimeMethods::toOffsetDateTime, OffsetDateTime::isBefore, OffsetDateTime::isAfter, OffsetDateTime::isEqual, OffsetDateTime::now, TimeMethods::withZoneSameInstant, true, false)),
+        entry(new TimeMethods<>( ZonedDateTime.class,                          null,  ZonedDateTime::isBefore,  ZonedDateTime::isAfter,  ZonedDateTime::isEqual,  ZonedDateTime::now, ZonedDateTime::withZoneSameInstant, true, false)),
+        entry(new TimeMethods<>( LocalDateTime.class,                          null,  LocalDateTime::isBefore,  LocalDateTime::isAfter,  LocalDateTime::isEqual,  LocalDateTime::now, LocalDateTime::atZone, false, false)),
+        entry(new TimeMethods<>(     LocalDate.class,                          null,      LocalDate::isBefore,      LocalDate::isAfter,      LocalDate::isEqual,      LocalDate::now, null, false, false)),
+        entry(new TimeMethods<>(    OffsetTime.class,                          null,     OffsetTime::isBefore,     OffsetTime::isAfter,     OffsetTime::isEqual,     OffsetTime::now, TimeMethods::withOffsetSameInstant, true, false)),
+        entry(new TimeMethods<>(     LocalTime.class,      TimeMethods::toLocalTime,      LocalTime::isBefore,      LocalTime::isAfter,      LocalTime::equals,       LocalTime::now, TimeMethods::atOffset, false, false)),
+        entry(new TimeMethods<>(          Year.class,                          null,           Year::isBefore,           Year::isAfter,           Year::equals,            Year::now, null, false, false)),
+        entry(new TimeMethods<>(     YearMonth.class,                          null,      YearMonth::isBefore,      YearMonth::isAfter,      YearMonth::equals,       YearMonth::now, null, false, false)),
+        entry(new TimeMethods<>(      MonthDay.class,                          null,       MonthDay::isBefore,       MonthDay::isAfter,       MonthDay::equals,        MonthDay::now, null, false, false)),
+        entry(new TimeMethods<>(       Instant.class,        TimeMethods::toInstant,        Instant::isBefore,        Instant::isAfter,        Instant::equals,         Instant::now, Instant::atZone, true, false)),
         entry(fallback(Temporal.class)),    // Frequently declared type. Intentionally no "instance of" checks.
         entry(fallback(Object.class)));     // Not a final class, but to be used when the declared type is Object.
 
     /**
-     * Helper method for adding entries to the {@link #FINAL_TYPES} map.
+     * Helper method for adding entries to the {@link #FOR_EXACT_TYPES} map.
      * Shall be used only for final classes.
      */
     private static Map.Entry<Class<?>, TimeMethods<?>> entry(final TimeMethods<?> op) {

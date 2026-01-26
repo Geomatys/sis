@@ -123,6 +123,18 @@ public abstract class Node implements Serializable {
     }
 
     /**
+     * Returns the type of values computed by the given expression.
+     *
+     * @param  <V>         compile-time type of values.
+     * @param  expression  the expression for which to get the runtime type of values.
+     * @return the type of values computed by the given expression.
+     */
+    protected static <V> Class<? extends V> getResultClass(final Expression<?,V> expression) {
+        return (expression instanceof FeatureExpression<?,?>)
+                ? ((FeatureExpression<?,V>) expression).getResultClass() : null;
+    }
+
+    /**
      * Returns the mathematical symbol for this binary function.
      * For comparison operators, the symbol should be one of {@literal < > ≤ ≥ = ≠}.
      * For arithmetic operators, the symbol should be one of {@literal + − × ÷}.

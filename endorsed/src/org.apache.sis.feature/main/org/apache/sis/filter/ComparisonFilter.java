@@ -19,9 +19,13 @@ package org.apache.sis.filter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.DateTimeException;
+import java.time.temporal.Temporal;
+import java.util.Date;
 import java.util.List;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.function.BiPredicate;
+import org.opengis.util.CodeList;
 import org.apache.sis.math.Fraction;
 import org.apache.sis.filter.base.Node;
 import org.apache.sis.filter.base.BinaryFunctionWidening;
@@ -153,6 +157,102 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
     }
 
     /**
+     * Tries to optimize this filter. Fist, this method applies the optimization documented
+     * in the {@linkplain Optimization.OnFilter#optimize default method impmementation}.
+     * Then, if it is possible to avoid to inspect the number types every time that the
+     * filter is evaluated, this method returns a more direct implementation.
+     *
+     * @param  optimization  the simplifications or optimizations to apply on this filter.
+     * @return the simplified or optimized filter, or {@code this} if no optimization has been applied.
+     */
+    @Override
+    public final Filter<R> optimize(final Optimization optimization) {
+        final Filter<R> result = Optimization.OnFilter.super.optimize(optimization);
+        if (result instanceof ComparisonFilter<?>) {
+            final var optimized = (ComparisonFilter<R>) result;
+            final var numeric = optimized.new Numeric();
+            if (numeric.evaluator != null) {
+                return numeric;
+            }
+            final Class<?> type1, type2;
+            if (isTemporal(type1 = getResultClass(expression1)) && isTemporal(type2 = getResultClass(expression2))) {
+                final TimeMethods<?> methods = TimeMethods.forTypes(type1, type2);
+                if (methods != null) {
+                    return optimized.new Time(methods.predicate(temporalTest(), type2));
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns whether the given type is considered temporal for the purpose of the comparison filter.
+     * This is necessary for avoiding the comparable objects such as {@link String} are wrongly handled
+     * by {@link TimeMethods}.
+     */
+    private static boolean isTemporal(final Class<?> type) {
+        return (type != null) && (Temporal.class.isAssignableFrom(type) || Date.class.isAssignableFrom(type));
+    }
+
+    /**
+     * An optimized versions of this filter for the case where the operands are numeric.
+     */
+    private final class Numeric extends Node implements Filter<R> {
+        /** For cross-version compatibility during (de)serialization. */
+        private static final long serialVersionUID = 4969425622445580192L;
+
+        /** The expression which performs the comparison and returns the result as an integer. */
+        @SuppressWarnings("serial") final Expression<R, ? extends Number> evaluator;
+
+        /** Creates a new filter. Callers must verifies that {@link #evaluator} is non-null. */
+        Numeric() {evaluator = specialize();}
+
+        /** Delegates to the enclosing class.*/
+        @Override public    CodeList<?>           getOperatorType()  {return ComparisonFilter.this.getOperatorType();}
+        @Override public    Class<? super R>      getResourceClass() {return ComparisonFilter.this.getResourceClass();}
+        @Override public    List<Expression<R,?>> getExpressions()   {return ComparisonFilter.this.getExpressions();}
+        @Override protected Collection<?>         getChildren()      {return ComparisonFilter.this.getChildren();}
+
+        /** Determines if the test represented by this filter passes with the given operands. */
+        @Override public boolean test(final R candidate) {
+            return ((Integer) evaluator.apply(candidate)) != 0;
+        }
+    }
+
+    /**
+     * An optimized versions of this filter for the case where the operands are temporal.
+     */
+    private final class Time extends Node implements Filter<R> {
+        /** For cross-version compatibility during (de)serialization. */
+        private static final long serialVersionUID = -5132906457258846016L;
+
+        /** The function which performs the comparisons. */
+        @SuppressWarnings("serial") final BiPredicate<?,?> evaluator;
+
+        /** Creates a new filter. */
+        Time(final BiPredicate<?,?> evaluator) {this.evaluator = evaluator;}
+
+        /** Delegates to the enclosing class.*/
+        @Override public    CodeList<?>           getOperatorType()  {return ComparisonFilter.this.getOperatorType();}
+        @Override public    Class<? super R>      getResourceClass() {return ComparisonFilter.this.getResourceClass();}
+        @Override public    List<Expression<R,?>> getExpressions()   {return ComparisonFilter.this.getExpressions();}
+        @Override protected Collection<?>         getChildren()      {return ComparisonFilter.this.getChildren();}
+
+        /** Determines if the test represented by this filter passes with the given operands. */
+        @SuppressWarnings("unchecked")
+        @Override public boolean test(final R candidate) {
+            final Object left = expression1.apply(candidate);
+            if (left != null) {
+                final Object right = expression2.apply(candidate);
+                if (right != null) {
+                    return ((BiPredicate) evaluator).test(left, right);
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
      * Determines if the test(s) represented by this filter passes with the given operands.
      * Values of {@link #expression1} and {@link #expression2} can be two single values,
      * or at most one expression can produce a collection.
@@ -240,8 +340,8 @@ abstract class ComparisonFilter<R> extends BinaryFunctionWidening<R, Object, Obj
             if (r != null) return r.intValue() != 0;
         }
         try {
-            Boolean t = TimeMethods.compareIfTemporal(temporalTest(), left, right);
-            if (t != null) return t;
+            Boolean c = TimeMethods.compareIfTemporal(temporalTest(), left, right);
+            if (c != null) return c;
         } catch (DateTimeException e) {
             warning(e);
             return false;

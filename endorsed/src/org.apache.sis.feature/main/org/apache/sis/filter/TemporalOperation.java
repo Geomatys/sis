@@ -205,7 +205,7 @@ abstract class TemporalOperation<T> implements Serializable {
                 position = other.getPosition();
             }
             if (position != null) {
-                return comparators.compare(test, self, position);
+                return comparators.convertAndCompare(test, self, position);
             }
         }
         return false;
