@@ -19,14 +19,14 @@ package org.apache.sis.filter;
 import java.util.List;
 import java.util.Map;
 import java.util.IdentityHashMap;
-import org.opengis.util.CodeList;
+import org.opengis.util.ScopedName;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
+import org.opengis.util.CodeList;
 import org.opengis.filter.Filter;
 import org.opengis.filter.Expression;
 import org.opengis.feature.Feature;
 import org.opengis.feature.FeatureType;
-import org.opengis.util.ScopedName;
 
 
 /**

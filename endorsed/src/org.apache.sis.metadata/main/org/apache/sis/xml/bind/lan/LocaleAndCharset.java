@@ -27,10 +27,10 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.nio.charset.Charset;
 import org.apache.sis.util.collection.Containers;
-import org.apache.sis.util.internal.shared.Bag;
-import org.apache.sis.util.internal.shared.Unsafe;
 import org.apache.sis.util.collection.TableColumn;
 import org.apache.sis.util.collection.TreeTable.Node;
+import org.apache.sis.util.internal.shared.Bag;
+import org.apache.sis.util.internal.shared.Unsafe;
 
 
 /**

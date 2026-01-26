@@ -18,10 +18,10 @@ package org.apache.sis.referencing.operation;
 
 import java.util.Set;
 import java.util.Collections;
-import org.apache.sis.referencing.internal.shared.AxisDirections;
 import org.opengis.referencing.cs.AxisDirection;
 import org.opengis.referencing.cs.CoordinateSystem;
 import org.opengis.referencing.operation.OperationNotFoundException;
+import org.apache.sis.referencing.internal.shared.AxisDirections;
 import org.apache.sis.referencing.operation.matrix.UnderdeterminedMatrixException;
 import org.apache.sis.util.collection.CodeListSet;
 

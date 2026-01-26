@@ -33,7 +33,6 @@ import org.opengis.metadata.Identifier;
 import org.opengis.metadata.extent.GeographicBoundingBox;
 import org.opengis.geometry.Envelope;
 import org.opengis.geometry.DirectPosition;
-import org.opengis.coordinate.CoordinateMetadata;
 import org.opengis.referencing.operation.Matrix;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
@@ -93,6 +92,7 @@ import static org.apache.sis.referencing.CRS.findOperation;
 import static org.apache.sis.referencing.CRS.SeparationMode;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
+import org.opengis.coordinate.CoordinateMetadata;
 import org.opengis.coordinate.MismatchedDimensionException;
 
 

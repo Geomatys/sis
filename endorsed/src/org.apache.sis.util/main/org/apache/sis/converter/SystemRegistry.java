@@ -18,8 +18,8 @@ package org.apache.sis.converter;
 
 import java.util.Date;
 import java.util.ServiceLoader;
-import org.apache.sis.math.NumberType;
 import org.opengis.util.CodeList;
+import org.apache.sis.math.NumberType;
 import org.apache.sis.util.ObjectConverter;
 import org.apache.sis.util.UnconvertibleObjectException;
 import org.apache.sis.system.SystemListener;

@@ -31,8 +31,8 @@ import java.text.ParseException;
 import ucar.nc2.constants.CF;       // String constants are copied by the compiler with no UCAR reference left.
 import ucar.nc2.constants.ACDD;     // idem
 import javax.measure.Unit;
-import javax.measure.quantity.Length;
 import javax.measure.IncommensurableException;
+import javax.measure.quantity.Length;
 import org.opengis.util.FactoryException;
 import org.opengis.metadata.Identifier;
 import org.opengis.parameter.ParameterValue;
