@@ -48,11 +48,11 @@ import org.apache.sis.setup.OptionKey;
 import org.apache.sis.util.Version;
 import org.apache.sis.util.CharSequences;
 import org.apache.sis.util.collection.Containers;
-import org.apache.sis.util.internal.shared.Strings;
-import org.apache.sis.util.internal.shared.Constants;
 import org.apache.sis.util.collection.DefaultTreeTable;
 import org.apache.sis.util.collection.TableColumn;
 import org.apache.sis.util.collection.TreeTable;
+import org.apache.sis.util.internal.shared.Strings;
+import org.apache.sis.util.internal.shared.Constants;
 
 
 /**

@@ -66,7 +66,6 @@ import org.apache.sis.referencing.internal.shared.AxisDirections;
 import org.apache.sis.system.Configuration;
 import org.apache.sis.util.CharSequences;
 import org.apache.sis.util.iso.Types;
-import org.apache.sis.util.collection.Containers;
 import org.apache.sis.util.internal.shared.Constants;
 import org.apache.sis.util.internal.shared.CodeLists;
 import org.apache.sis.util.internal.shared.Strings;
@@ -77,6 +76,7 @@ import static org.apache.sis.storage.netcdf.AttributeNames.*;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
 import org.opengis.util.NameFactory;
+import org.apache.sis.util.collection.Containers;
 
 
 /**

@@ -23,13 +23,13 @@ import java.util.List;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.function.BiPredicate;
-import org.opengis.util.CodeList;
 import org.apache.sis.math.Fraction;
 import org.apache.sis.filter.base.Node;
 import org.apache.sis.filter.base.BinaryFunctionWidening;
 import org.apache.sis.temporal.TimeMethods;
 
 // Specific to the geoapi-3.1 and geoapi-4.0 branches:
+import org.opengis.util.CodeList;
 import org.opengis.filter.Filter;
 import org.opengis.filter.Expression;
 import org.opengis.filter.MatchAction;

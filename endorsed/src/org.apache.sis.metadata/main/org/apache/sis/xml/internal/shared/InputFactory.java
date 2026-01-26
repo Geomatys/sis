@@ -28,10 +28,10 @@ import javax.xml.stream.util.StreamReaderDelegate;
 import javax.xml.transform.Source;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXSource;
-import org.apache.sis.system.Loggers;
-import org.apache.sis.util.logging.Logging;
 import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
+import org.apache.sis.system.Loggers;
+import org.apache.sis.util.logging.Logging;
 
 
 /**

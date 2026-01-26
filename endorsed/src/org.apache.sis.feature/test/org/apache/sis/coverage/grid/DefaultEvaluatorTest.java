@@ -34,17 +34,17 @@ import org.apache.sis.geometry.GeneralDirectPosition;
 import org.apache.sis.referencing.cs.CoordinateSystems;
 import org.apache.sis.referencing.operation.transform.MathTransforms;
 
-// Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.coverage.PointOutsideCoverageException;
-
 // Test dependencies
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import static org.junit.jupiter.api.Assertions.*;
 import org.apache.sis.test.TestCase;
 import org.apache.sis.test.TestUtilities;
 import org.apache.sis.image.TiledImageMock;
 import org.apache.sis.referencing.crs.HardCodedCRS;
-import org.junit.jupiter.api.TestInstance;
+
+// Specific to the geoapi-3.1 and geoapi-4.0 branches:
+import org.opengis.coverage.PointOutsideCoverageException;
 
 
 /**

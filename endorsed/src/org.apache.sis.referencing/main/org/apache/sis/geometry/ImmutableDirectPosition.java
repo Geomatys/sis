@@ -20,10 +20,12 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.io.Serializable;
 import org.opengis.geometry.DirectPosition;
-import org.opengis.coordinate.MismatchedDimensionException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.apache.sis.util.ArgumentChecks;
 import org.apache.sis.util.ArraysExt;
+
+// Specific to the geoapi-3.1 and geoapi-4.0 branches:
+import org.opengis.coordinate.MismatchedDimensionException;
 
 
 /**
