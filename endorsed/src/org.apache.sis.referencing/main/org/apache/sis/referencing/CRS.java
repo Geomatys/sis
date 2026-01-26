@@ -96,6 +96,7 @@ import org.apache.sis.util.Utilities;
 import org.apache.sis.util.internal.shared.Constants;
 import org.apache.sis.util.resources.Errors;
 import org.apache.sis.util.logging.Logging;
+import org.apache.sis.coordinate.DefaultCoordinateMetadata;
 
 // Specific to the main and geoapi-3.1 branches:
 import org.opengis.referencing.crs.GeneralDerivedCRS;
@@ -105,7 +106,6 @@ import org.apache.sis.referencing.DefaultObjectDomain;
 import org.apache.sis.referencing.crs.AbstractCRS;
 import org.apache.sis.referencing.datum.DefaultGeodeticDatum;
 import org.apache.sis.referencing.datum.DefaultVerticalDatum;
-import org.apache.sis.coordinate.DefaultCoordinateMetadata;
 import static org.apache.sis.pending.geoapi.referencing.MissingMethods.getDatumEnsemble;
 
 

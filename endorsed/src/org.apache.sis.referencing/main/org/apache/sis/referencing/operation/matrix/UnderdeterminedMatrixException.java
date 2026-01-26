@@ -18,8 +18,8 @@ package org.apache.sis.referencing.operation.matrix;
 
 import java.util.Set;
 import java.util.Collections;
-import org.apache.sis.util.collection.CodeListSet;
 import org.opengis.referencing.cs.AxisDirection;
+import org.apache.sis.util.collection.CodeListSet;
 
 
 /**

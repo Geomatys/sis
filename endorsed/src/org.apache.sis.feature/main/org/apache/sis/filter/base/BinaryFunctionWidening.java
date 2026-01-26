@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Collection;
 import java.math.BigInteger;
 import java.math.BigDecimal;
+import org.opengis.util.ScopedName;
 import org.apache.sis.util.ConditionallySafe;
 import org.apache.sis.math.Fraction;
 import org.apache.sis.math.NumberType;
@@ -27,9 +28,6 @@ import org.apache.sis.math.DecimalFunctions;
 import org.apache.sis.feature.internal.shared.FeatureExpression;
 import org.apache.sis.feature.internal.shared.FeatureProjectionBuilder;
 import org.apache.sis.filter.Optimization;
-
-// Specific to the geoapi-3.1 and geoapi-4.0 branches:
-import org.opengis.util.ScopedName;
 
 // Specific to the main branch:
 import org.apache.sis.filter.Expression;

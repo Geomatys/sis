@@ -16,6 +16,7 @@
  */
 package org.apache.sis.pending.jdk;
 
+
 /**
  * Place-holder for a class added in JDK25.
  */

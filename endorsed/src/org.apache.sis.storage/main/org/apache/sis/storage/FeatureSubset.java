@@ -26,9 +26,9 @@ import org.apache.sis.storage.base.StoreUtilities;
 import org.apache.sis.storage.internal.Resources;
 
 // Specific to the main branch:
+import org.apache.sis.filter.Filter;
 import org.apache.sis.feature.AbstractFeature;
 import org.apache.sis.feature.DefaultFeatureType;
-import org.apache.sis.filter.Filter;
 import org.apache.sis.pending.geoapi.filter.SortBy;
 
 

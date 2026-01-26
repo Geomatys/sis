@@ -31,8 +31,8 @@ import java.text.ParseException;
 import ucar.nc2.constants.CF;       // String constants are copied by the compiler with no UCAR reference left.
 import ucar.nc2.constants.ACDD;     // idem
 import javax.measure.Unit;
-import javax.measure.quantity.Length;
 import javax.measure.IncommensurableException;
+import javax.measure.quantity.Length;
 import org.opengis.util.FactoryException;
 import org.opengis.metadata.Identifier;
 import org.opengis.parameter.ParameterValue;
@@ -59,6 +59,7 @@ import org.apache.sis.referencing.cs.AxesConvention;
 import org.apache.sis.referencing.cs.CoordinateSystems;
 import org.apache.sis.referencing.datum.BursaWolfParameters;
 import org.apache.sis.referencing.datum.DefaultGeodeticDatum;
+import org.apache.sis.referencing.datum.DatumOrEnsemble;
 import org.apache.sis.referencing.operation.matrix.Matrix3;
 import org.apache.sis.referencing.operation.matrix.Matrices;
 import org.apache.sis.referencing.operation.matrix.MatrixSIS;
@@ -86,9 +87,6 @@ import org.apache.sis.io.wkt.WKTFormat;
 import org.apache.sis.io.wkt.Warnings;
 import org.apache.sis.math.NumberType;
 import org.apache.sis.measure.Units;
-
-// Specific to the main branch:
-import org.apache.sis.referencing.datum.DatumOrEnsemble;
 
 
 /**
