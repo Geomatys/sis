@@ -60,9 +60,12 @@ export NON_FREE_DIR=$PWD
 
 cd _<path to SIS project directory>_
 gradle clean test jar
-export CLASSPATH=~/.m2/repository/org/apache/derby/derby/10.14.2.0/derby-10.14.2.0.jar
+export CLASSPATH=~/.m2/repository/org/apache/derby/derby/10.15.2.0/derby-10.15.2.0.jar
+export CLASSPATH=~/.m2/repository/org/apache/derby/derbyshared/10.15.2.0/derbyshared-10.15.2.0.jar:$CLASSPATH
+export CLASSPATH=~/.m2/repository/org/apache/derby/derbytools/10.15.2.0/derbytools-10.15.2.0.jar:$CLASSPATH
 export CLASSPATH=~/.m2/repository/org/postgresql/postgresql/42.7.7/postgresql-42.7.7.jar:$CLASSPATH
 export CLASSPATH=~/.m2/repository/javax/measure/unit-api/2.1.3/unit-api-2.1.3.jar:$CLASSPATH
+export CLASSPATH=~/.m2/repository/jakarta/xml/bind/jakarta.xml.bind-api/4.0.4/jakarta.xml.bind-api-4.0.4.jar:$CLASSPATH
 export CLASSPATH=$PWD/geoapi/snapshot/geoapi/target/geoapi-4.0-SNAPSHOT.jar:$CLASSPATH
 export CLASSPATH=$PWD/endorsed/build/libs/org.apache.sis.referencing.jar:$CLASSPATH
 export CLASSPATH=$PWD/endorsed/build/libs/org.apache.sis.metadata.jar:$CLASSPATH
@@ -85,8 +88,8 @@ Then the whole Apache SIS project should be [tested extensively](https://sis.apa
 preferably with a PostgreSQL server ready to accept local connections to `SpatialMetadataTest` database:
 
 ```bash
-EXPORT SIS_TEST_OPTIONS=epsg,extensive,postgresql
-gradle test
+export SIS_TEST_OPTIONS=epsg,extensive,postgresql
+gradle clean test
 ```
 
 Regenerate the HTML pages listing available CRS and coordinate operation methods.
@@ -95,13 +98,12 @@ Those pages will be copied into the
 directory during the [release process](https://sis.apache.org/release-management.html#update-crs-list),
 but for now the purpose is only to check if there is errors:
 
-* Upgrade the `FACTORY.VERSION` value defined in the
-  `org.apache.sis.referencing.report.CoordinateReferenceSystems` class, then execute that class.
-  It can be executed from the IDE since the `main` method takes no argument.
-  This class will write a `CoordinateReferenceSystems.html` file in current directory
-  (the full path will be printed in the standard output).
-* Execute the `org.apache.sis.referencing.report.CoordinateOperationMethods` class.
-  It can be executed from the IDE since the `main` method takes no argument.
-  This class will write a `CoordinateOperationMethods.html` file in current directory.
+```bash
+java org.apache.sis.referencing.report.CoordinateReferenceSystems
+mv CoordinateReferenceSystems.html ../site/main/static/tables/
+
+java org.apache.sis.referencing.report.CoordinateOperationMethods
+mv CoordinateOperationMethods.html ../site/main/static/tables/
+```
 
 Open those generated HTML files in a web browser and verify the result.
