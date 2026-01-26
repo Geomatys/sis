@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.UnaryOperator;
@@ -785,14 +784,14 @@ valid:  if (i >= 0 && i < steps.size()) {
      * (depending on the second argument) equals to {@link BitSet#cardinality()}, or {@code null}
      * if the reducer cannot build the transform.
      *
-     * @param  inputDimensions   dimensions of coordinates used by the main transform.
-     * @param  outputDimensions  dimensions of coordinates with a value modified by the transform.
+     * @param  inputDimensions   dimensions of input coordinates of the main transform that are not pass-through.
+     * @param  outputDimensions  dimensions of output coordinates of the main transform that are not pass-through.
      * @param  reducer  a constructor accepting selected dimension and returning the new transform.
      * @return whether  the transform chain has been modified as a result of this method call.
      * @throws FactoryException if the concatenation is not a valid replacement.
      */
-    final boolean reduceDimension(final Set<Integer> inputDimensions,
-                                  final Set<Integer> outputDimensions,
+    final boolean reduceDimension(final BitSet inputDimensions,
+                                  final BitSet outputDimensions,
                                   final BiFunction<BitSet, Integer, MathTransform> reducer)
             throws FactoryException
     {
@@ -820,7 +819,7 @@ prepare:    if (relativeIndex < 0) {
                  * We will try to move `matrix` after the main transform for making that transform smaller.
                  * We only need to keep the rows which modify the input coordinates of the main transform.
                  */
-                inputDimensions.forEach(rowsToKeep::set);
+                rowsToKeep.or(inputDimensions);
                 if (rowsToKeep.length() >= numCol) continue;
             } else {
                 /*
@@ -828,13 +827,13 @@ prepare:    if (relativeIndex < 0) {
                  * We will try to move `matrix` before the main transform for making that transform smaller.
                  * But we cannot move the rows which depend on the output coordinates of the main transform.
                  */
-                for (int i : outputDimensions) {
+                outputDimensions.stream().forEach((i) -> {
                     for (int j=0; j<numRow; j++) {
                         if (move.getElement(j, i) != 0) {
                             rowsToKeep.set(j);
                         }
                     }
-                }
+                });
                 if (rowsToKeep.isEmpty()) {
                     if (replace(0, factory.createAffineTransform(createDiagonalMatrix(0)))) {
                         return true;
@@ -865,7 +864,7 @@ prepare:    if (relativeIndex < 0) {
              * the coordinates modified by `move` will not impact or will not be impacted (depending on
              * whether `move` will be moved to the right or to the left) by the main transform.
              */
-            (relativeIndex < 0 ? outputDimensions : inputDimensions).forEach(rowsToKeep::set);
+            rowsToKeep.or(relativeIndex < 0 ? outputDimensions : inputDimensions);
             // Check input coordinates (columns) because `move` is still a step after `keep`.
             for (int i=0; (i = rowsToKeep.nextSetBit(i)) >= 0; i++) {
                 for (int j=0; j<numRow; j++) {

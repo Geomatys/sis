@@ -16,7 +16,7 @@
  */
 package org.apache.sis.referencing.operation.transform;
 
-import java.util.Set;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Function;
@@ -495,7 +495,8 @@ public class WraparoundTransform extends AbstractMathTransform implements Serial
             return;
         }
         if (getClass() == WraparoundTransform.class) {      // Because we did not defined an overrideable `redimension` method yet.
-            final var workOn = Set.of(wraparoundDimension);
+            final var workOn = new BitSet();
+            workOn.set(wraparoundDimension);
             if (context.reduceDimension(workOn, workOn,
                     (selected, ignored) -> new WraparoundTransform(
                             selected.cardinality(),
