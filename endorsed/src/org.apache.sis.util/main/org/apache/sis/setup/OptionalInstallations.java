@@ -108,7 +108,7 @@ public abstract class OptionalInstallations extends InstallationResources implem
      * Path to the <abbr>EPSG</abbr> scripts relative to the selected repository.
      * This is where to download the database after user has approved the terms of use.
      */
-    private static final String EPSG_DOWNLOAD_PATH = "/org/apache/sis/non-free/sis-epsg/1.5/sis-epsg-1.5.jar";
+    private static final String EPSG_DOWNLOAD_PATH = "/org/apache/sis/non-free/sis-epsg/1.6/sis-epsg-1.6.jar";
 
     /**
      * Estimation of the EPSG database size after installation, in megabytes.
