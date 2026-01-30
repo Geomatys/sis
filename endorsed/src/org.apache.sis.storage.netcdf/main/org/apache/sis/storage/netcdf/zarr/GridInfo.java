@@ -179,52 +179,54 @@ next:       for (final String name : axisNames) {
     @Override
     protected Axis[] createAxes(final Decoder decoder) throws IOException, DataStoreException {
         /*
-         * Process the variables in the order the appear in the sequence of bytes that make the netCDF files.
-         * This is often the reverse order of range indices, but not necessarily. The intent is to reduce the
-         * number of disk seek operations. Data loading may happen in this method through Axis constructor.
+         * We wrap variables in a TreeMap to ensure a consistent processing order.
+         * In Zarr, this aligns with the sequence variables were discovered in the group metadata.
+         * The targetDim preserves the original 'range' index for the final output array.
          */
-        final var variables = new TreeMap<VariableInfo,Integer>();
-        for (int i=0; i<range.length; i++) {
+        final var variables = new TreeMap<VariableInfo, Integer>();
+        for (int i = 0; i < range.length; i++) {
             final VariableInfo v = range[i];
             if (variables.put(v, i) != null) {
                 throw new DataStoreContentException(decoder.resources().getString(
                         Resources.Keys.DuplicatedAxis_2, getFilename(), v.getName()));
             }
         }
-        /*
-         * In this method, `sourceDim` and `targetDim` are relative to "grid to CRS" conversion.
-         * So `sourceDim` is the grid (domain) dimension and `targetDim` is the CRS (range) dimension.
-         */
+
         final Axis[] axes = new Axis[range.length];
-        for (final Map.Entry<VariableInfo,Integer> entry : variables.entrySet()) {
-            final int targetDim = entry.getValue();
+        final int lastIndex = range.length - 1;
+
+        for (final Map.Entry<VariableInfo, Integer> entry : variables.entrySet()) {
             final VariableInfo axis = entry.getKey();
+            final int storageIndex = entry.getValue();
+
             /*
-             * Get the grid dimensions (part of the "domain" in UCAR terminology) used for computing
-             * the coordinate values along the current axis. There is exactly 1 such grid dimension in
-             * straightforward netCDF files. However, some more complex files may have 2 dimensions.
-             *
-             * An axis may have two-dimensions but be conceptually one-dimensional if the coordinate values
-             * are given as character strings. While rare, this is sometime observed in practice for dates.
-             * In such case, the dimension used for indexing the characters in each value should not appear
-             * in the `domain` field of this grid. Therefore, that artificial dimension should be discarded
-             * by the loop below. This is okay because either the strings are automatically parsed as numbers
-             * by `org.apache.sis.math.ArrayVector.ASCII`, or either that variable have already been converted
-             * to a one-dimensional vector of numbers by `VariableTransformer`.
+             * Reversal Logic:
+             * To transform (Time, Lat, Lon) into (Lon, Lat, Time):
+             * storageIndex 0 (Time) -> targetIndex 2
+             * storageIndex 1 (Lat)  -> targetIndex 1
+             * storageIndex 2 (Lon)  -> targetIndex 0
              */
+            final int targetDim = lastIndex - storageIndex;
+
             int i = 0;
             final DimensionInfo[] axisDomain = axis.dimensions;
             final int[] indices = new int[axisDomain.length];
             final int[] sizes   = new int[axisDomain.length];
+
             for (final DimensionInfo dimension : axisDomain) {
                 for (int sourceDim = 0; sourceDim < domain.length; sourceDim++) {
                     if (domain[sourceDim] == dimension) {
                         indices[i] = sourceDim;
-                        sizes[i++] = dimension.length;              // Handled as unsigned intengers.
+                        sizes[i++] = dimension.length;
                         break;
                     }
                 }
             }
+
+            /*
+             * The abbreviation is determined by the CF-conventions (if present) or variable name.
+             * The 'axes' array is populated using targetDim to maintain the 'natural' Zarr order.
+             */
             final char abbreviation = AxisType.abbreviation(axis, true);
             axes[targetDim] = new Axis(abbreviation, axis.getAttributeAsString(CF.POSITIVE), indices, sizes, i, axis);
         }

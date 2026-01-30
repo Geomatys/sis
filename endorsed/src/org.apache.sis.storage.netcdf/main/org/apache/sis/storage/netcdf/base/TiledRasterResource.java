@@ -258,6 +258,10 @@ public final class TiledRasterResource extends TiledGridResource implements Stor
             if (!VariableRole.isCoverage(variable)) {
                 continue;
             }
+            if (variable.getTileShape() == null) {
+                // Variable is not chunked/tiled - cannot be used in TiledRasterResource
+                continue;
+            }
 
             final GridGeometry grid = variable.getGridGeometry();
             if (grid == null) continue;

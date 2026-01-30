@@ -139,6 +139,19 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      */
     boolean isCoordinateSystemAxis;
 
+    /**
+     * Constructs a new variable.
+     * @param encoder encoder of the zarr structure where this variable is defined.
+     * @param name the variable name.
+     * @param dimensions the dimensions of this variable. /!\ Needs to be in the correct order (inverse of crs order) (ex : depth, time, lat, lon)
+     * @param attributes attributes associated to this variable, or an empty map if none.
+     * @param attributeNames names of attributes associated to this variable, or an empty set if none.
+     * @param dataType the type of data, or {@code null} if unknown.
+     * @param metadata zarr metadata node for the array containing this variable.
+     * @param data the data associated to this variable, or {@code null} if not yet read.
+     * @param sampleDimensionIndex index of the sample dimension in the data array, or {@code null} if none.
+     * @throws DataStoreContentException
+     */
     VariableInfo(final Encoder encoder,
                  final String  name,
                  final DimensionInfo[] dimensions,
@@ -188,7 +201,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      *
      * @param decoder the zarr structure where this variable is defined.
      * @param name the variable name.
-     * @param dimensions the dimensions of this variable.
+     * @param dimensions the dimensions of this variable. /!\ Needs to be in the correct order (inverse of crs order) (ex : depth, time, lat, lon)
      * @param attributes attributes associated to this variable, or an empty map if none.
      * @param attributeNames names of attributes associated to this variable, or an empty set if none.
      * @param dataType the type of data, or {@code null} if unknown.
@@ -308,7 +321,9 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      */
     @Override
     public int[] getTileShape() {
-        return metadata.chunkGrid().configuration().chunkShape();
+        int[] chunkShape = metadata.chunkGrid().configuration().chunkShape();
+        reverse(chunkShape);
+        return  chunkShape;
     }
 
     public void setName(final String name) {
@@ -480,7 +495,6 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     @Override
     public List<Dimension> getGridDimensions() {
         List<Dimension> result = new ArrayList<>(Arrays.asList(dimensions));
-        Collections.reverse(result);
         return result;
     }
 
@@ -494,9 +508,6 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      */
     @Override
     public Object readTile(int[] tileIndex) throws IOException, DataStoreException {
-        // Invert row/column for ordinal to Zarr mapping
-        tileIndex = swapIndices(tileIndex);
-
         // Get chunk path
         Path chunkPath = this.metadata.getChunkPath(tileIndex);
 
@@ -525,15 +536,31 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
     }
 
     /**
-     * Swap the first two indices in the given array.
-     * @param indices the indices to swap.
-     * @return the swapped indices.
+     * Reverse indices in the given array.
+     *
+     * @param array the indices to reverse.
      */
-    private int[] swapIndices(int[] indices) {
-        int temp = indices[0];
-        indices[0] = indices[1];
-        indices[1] = temp;
-        return indices;
+    private void reverse(int[] array) {
+        int n = array.length;
+        for (int i = 0; i < n / 2; i++) {
+            int temp = array[i];
+            array[i] = array[n - 1 - i];
+            array[n - 1 - i] = temp;
+        }
+    }
+
+    /**
+     * Reverse indices in the given array.
+     *
+     * @param array the indices to reverse.
+     */
+    private void reverse(long[] array) {
+        int n = array.length;
+        for (int i = 0; i < n / 2; i++) {
+            long temp = array[i];
+            array[i] = array[n - 1 - i];
+            array[n - 1 - i] = temp;
+        }
     }
 
     /**
@@ -637,8 +664,8 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         final DataType dataType = this.dataType;
         final Object fillValue = this.metadata.fillValue();
 
-        final long[] lower  = new long[nDim];
-        final long[] upper  = new long[nDim];
+        long[] lower  = new long[nDim];
+        long[] upper  = new long[nDim];
 
         for (int i = 0; i < nDim; i++) {
             if (area != null) {
@@ -648,6 +675,16 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
                 lower[i] = 0;
                 upper[i] = arrayShape[i];
             }
+        }
+
+        if (area != null) {
+            //Reverse lower/upper to match Zarr order
+            reverse(lower);
+            reverse(upper);
+        }
+        if (subsampling != null) {
+            //Reverse subsampling to match Zarr order
+            reverse(subsampling);
         }
 
         if (subsampling == null) {

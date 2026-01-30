@@ -638,13 +638,20 @@ public final class ZarrDecoder extends Decoder {
             final Map<String, Object> attributeMap = CollectionsExt.toCaseInsensitiveNameMap(attributes,
                     Decoder.DATA_LOCALE);
 
-            int i = 0;
-            for (DimensionInfo d : allDimensions) {
-                if (d.isDimensionUsedInArray(metadata.zarrPath())) {
-                    dimensions[i] = d;
-                    i++;
+            for (int i = 0; i < array.dimensionNames().length; i++) {
+                String nameToFind = array.dimensionNames()[i];
+
+                for (DimensionInfo d : allDimensions) {
+                    if (d.getName().equals(nameToFind)) {
+                        // Only add it if it's actually used in this array
+                        if (d.isDimensionUsedInArray(metadata.zarrPath())) {
+                            dimensions[i] = d;
+                        }
+                        break; // Found the match, move to the next seat in the chart
+                    }
                 }
             }
+
             variables.add(new VariableInfo(this, name, dimensions, attributeMap,
                     attributeNamesWithMapEntries(attributes, attributeMap), array.dataType(), array));
 
@@ -1124,20 +1131,13 @@ public final class ZarrDecoder extends Decoder {
                     }
                 }
 
-                DimensionInfo[] reversed = Arrays.copyOf(variable.dimensions, variable.dimensions.length);
-                for (int i = 0, j = reversed.length - 1; i < j; i++, j--) {
-                    DimensionInfo tmp = reversed[i];
-                    reversed[i] = reversed[j];
-                    reversed[j] = tmp;
-                }
-
                 /*
                  * Creates the grid geometry using the given domain and range, reusing existing instance if one exists.
                  * We usually try to preserve axis order as declared in the netCDF file. But if we mixed axes inferred
                  * from the "coordinates" attribute and axes inferred from variable names matching dimension names, we
                  * use axes from "coordinates" attribute first followed by other axes.
                  */
-                GridInfo grid = new GridInfo(reversed, axes.toArray(VariableInfo[]::new));
+                GridInfo grid = new GridInfo(variable.dimensions, axes.toArray(VariableInfo[]::new));
                 GridInfo existing = shared.putIfAbsent(grid, grid);
                 if (existing != null) {
                     grid = existing;
@@ -1299,6 +1299,9 @@ public final class ZarrDecoder extends Decoder {
         // The Grid Mapping variable (such as spatial_ref) may be shared by multiple data variables.
         // This spatial_ref variable may be defined in the same group as the data variable.
         for (GridMapping mapping : mappings) {
+            if (mapping == null) {
+                continue;
+            }
             if (variable == null) {
                 return mapping;
             }
