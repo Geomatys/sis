@@ -46,7 +46,7 @@ import org.apache.sis.storage.Resource;
 import org.apache.sis.storage.base.MetadataBuilder;
 import org.apache.sis.storage.base.StoreResource;
 import org.apache.sis.storage.tiling.TiledGridCoverage;
-import org.apache.sis.storage.tiling.TiledGridResource;
+import org.apache.sis.storage.tiling.TiledGridCoverageResource;
 import org.apache.sis.storage.netcdf.internal.Resources;
 import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
 import org.apache.sis.util.CharSequences;
@@ -100,7 +100,7 @@ import static org.apache.sis.storage.netcdf.base.Encoder.getPositions;
  *
  * @author  Quentin Bialota (Geomatys)
  */
-public final class TiledRasterResource extends TiledGridResource implements StoreResource {
+public final class TiledRasterResource extends TiledGridCoverageResource implements StoreResource {
 
     /**
      * Logger for the TiledRasterResource class.

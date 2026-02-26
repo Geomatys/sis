@@ -24,17 +24,16 @@ import java.util.List;
 import org.apache.sis.setup.GeometryLibrary;
 import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.event.StoreListeners;
+import org.apache.sis.storage.netcdf.base.TestCase;
 import org.apache.sis.storage.netcdf.base.Variable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import static org.apache.sis.storage.netcdf.base.TestCase.createListeners;
-
 /**
  * Tests for Zarr multiscale variable discovery.
  */
-public class ZarrMultiResolutionTest {
+public class ZarrMultiResolutionTest extends TestCase {
 
     @TempDir
     Path tempDir;

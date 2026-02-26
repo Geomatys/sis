@@ -20,7 +20,7 @@ import org.apache.sis.coverage.grid.GridGeometry;
 import org.apache.sis.image.internal.shared.RasterFactory;
 import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.tiling.TiledGridCoverage;
-import org.apache.sis.storage.tiling.TiledGridResource;
+import org.apache.sis.storage.tiling.TiledGridCoverageResource;
 import org.opengis.util.GenericName;
 
 import java.awt.Point;
@@ -56,7 +56,7 @@ final class TiledRaster extends TiledGridCoverage {
      * @param  resource    the resource from which to read tiles.
      * @param  subset      the subset of grid data to load.
      */
-    TiledRaster(TiledRasterResource resource, TiledGridResource.Subset subset)
+    TiledRaster(TiledRasterResource resource, TiledGridCoverageResource.Subset subset)
     {
         super(subset);
         this.resource = resource;

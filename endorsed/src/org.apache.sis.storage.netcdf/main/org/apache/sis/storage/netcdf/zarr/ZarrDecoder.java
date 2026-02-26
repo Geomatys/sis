@@ -23,7 +23,6 @@ import org.apache.sis.temporal.TemporalDate;
 import org.apache.sis.util.collection.TreeTable;
 import org.apache.sis.util.resources.Errors;
 
-import javax.annotation.Nullable;
 import javax.measure.IncommensurableException;
 import javax.measure.UnitConverter;
 import javax.measure.format.MeasurementParseException;
@@ -362,7 +361,7 @@ public final class ZarrDecoder extends Decoder {
 
     /**
      * Checks if a dimension name is already used with a different size.
-     * 
+     *
      * @param name       the name of the dimension to check.
      * @param size       the size of the dimension to check.
      * @param dimensions the list of existing dimensions to check against.
@@ -379,7 +378,7 @@ public final class ZarrDecoder extends Decoder {
 
     /**
      * Recursively extracts dimensions from the Zarr metadata tree.
-     * 
+     *
      * @param node             the current Zarr node metadata to process.
      * @param dimensions       the list to which found dimensions will be added.
      * @param parentPath       the path of the parent node, used to build the full path of the current node.
@@ -465,7 +464,7 @@ public final class ZarrDecoder extends Decoder {
 
         /**
          * Converts this attribute entry to a map entry.
-         * 
+         *
          * @return a map entry with the attribute name as key and the value as value.
          */
         public Map.Entry<String, Object> toMapEntry() {
@@ -853,7 +852,7 @@ public final class ZarrDecoder extends Decoder {
      * @param groupMap the map of groups to search in, or {@code null} for searching globally.
      * @return the attribute entry found, or {@code null} if none.
      */
-    private AttributeEntry findAttributeInGroups(final String name, @Nullable final Map<String, ZarrGroupMetadata> groupMap) {
+    private AttributeEntry findAttributeInGroups(final String name, final Map<String, ZarrGroupMetadata> groupMap) {
         if (groupMap == null || groupMap.isEmpty()) {
             // No search path defined, search everywhere.
             return findAttribute(name, null);
@@ -1284,7 +1283,7 @@ public final class ZarrDecoder extends Decoder {
      * @param groupMap the map of groups to search in, or {@code null} for searching globally.
      * @return the variable of the given name, or {@code null} if none.
      */
-    private VariableInfo findVariableInGroup(final String name, @Nullable Map<String, ZarrGroupMetadata> groupMap) {
+    private VariableInfo findVariableInGroup(final String name, Map<String, ZarrGroupMetadata> groupMap) {
         if (groupMap == null || groupMap.isEmpty()) {
             // No search path defined, search everywhere.
             return findVariableInfo(name, null);
