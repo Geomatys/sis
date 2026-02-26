@@ -35,7 +35,6 @@ import org.apache.sis.storage.netcdf.base.Encoder;
 import org.apache.sis.storage.netcdf.base.TiledRasterResource;
 import org.apache.sis.storage.netcdf.base.MultiResolutionResource;
 import org.apache.sis.storage.netcdf.base.Variable;
-import org.apache.sis.storage.netcdf.zarr.ZarrDecoder;
 import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
 import ucar.nc2.constants.ACDD; // String constants are copied by the compiler with no UCAR reference left.
 import ucar.nc2.constants.CDM; // idem
@@ -49,7 +48,6 @@ import org.apache.sis.storage.DataStoreProvider;
 import org.apache.sis.storage.DataStoreException;
 import org.apache.sis.storage.UnsupportedStorageException;
 import org.apache.sis.storage.StorageConnector;
-import org.apache.sis.storage.Aggregate;
 import org.apache.sis.storage.DataStoreClosedException;
 import org.apache.sis.storage.GridCoverageResource;
 import org.apache.sis.storage.Resource;

@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.sis.storage.netcdf.zarr;
 
 import org.apache.sis.storage.DataStoreContentException;
@@ -27,7 +43,7 @@ final class VlenUtf8Codec extends AbstractZarrCodec {
 
     /**
      * Constructor for VlenUtf8Codec.
-     * 
+     *
      * @param configuration the configuration parameters for the codec, which may include "endian" to specify byte order
      */
     public VlenUtf8Codec(Map<String, Object> configuration) {
@@ -36,7 +52,7 @@ final class VlenUtf8Codec extends AbstractZarrCodec {
 
     /**
      * Computes the encoded type for the VLEN_UTF8 codec.
-     * 
+     *
      * @param decodedType Array info: shape, data type, etc. (you may want a struct for this!)
      * @return the output type after encoding, which is always bytes for VLEN_UTF8 codec
      */
@@ -228,7 +244,7 @@ final class VlenUtf8Codec extends AbstractZarrCodec {
 
     /**
      * Encodes an array of strings into VLen-UTF8 byte representation.
-     * 
+     *
      * @param strings the array of strings to encode
      * @return the encoded byte array in VLen-UTF8 format
      */
@@ -252,7 +268,7 @@ final class VlenUtf8Codec extends AbstractZarrCodec {
 
     /**
      * Decodes VLen-UTF8 byte representation into an array of strings.
-     * 
+     *
      * @param buf   the ByteBuffer containing VLen-UTF8 encoded data
      * @param count the number of strings to decode
      * @return the decoded array of strings

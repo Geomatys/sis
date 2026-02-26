@@ -43,7 +43,7 @@ import java.util.List;
  * The rendered image is usually mono-banded, but may be multi-banded in some special cases
  * handled by {@link TiledRasterResource#read(GridGeometry, int...)}.
  *
- * @author  Quentin Bialota
+ * @author  Quentin Bialota (Geomatys)
  */
 final class TiledRaster extends TiledGridCoverage {
 

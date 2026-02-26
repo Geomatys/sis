@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.sis.storage.netcdf.zarr;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -43,7 +59,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Finds a child node metadata by its name.
-     * 
+     *
      * @param name the name of the child node to find
      * @return the ZarrNodeMetadata of the child node, or null if not found
      */
@@ -53,7 +69,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Adds a child node metadata to the group.
-     * 
+     *
      * @param name the name of the child node to add
      * @param node the ZarrNodeMetadata of the child node to add
      */
@@ -66,7 +82,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Returns the map of child node metadata.
-     * 
+     *
      * @return a map where keys are child node names and values are their
      *         corresponding ZarrNodeMetadata
      */
@@ -77,7 +93,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Returns the consolidated metadata for the group.
-     * 
+     *
      * @return a map of consolidated metadata, or null if not available
      */
     public Map<String, Object> getConsolidatedMetadata() {
@@ -92,7 +108,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Returns the multiscale metadata for the group.
-     * 
+     *
      * @return a list of ZarrMultiscale objects, or null if not available
      */
     public List<ZarrMultiscale> getMultiscales() {
@@ -101,7 +117,7 @@ final class ZarrGroupMetadata extends ZarrNodeMetadata {
 
     /**
      * Sets the multiscale metadata for the group.
-     * 
+     *
      * @param multiscales the list of ZarrMultiscale objects
      */
     public void setMultiscales(List<ZarrMultiscale> multiscales) {

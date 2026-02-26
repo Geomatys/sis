@@ -16,7 +16,6 @@
  */
 package org.apache.sis.storage.netcdf.base;
 
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -29,9 +28,7 @@ import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.file.Path;
 import java.awt.image.DataBuffer;
-import java.util.Set;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 import org.apache.sis.coverage.grid.PixelInCell;
 import org.apache.sis.referencing.CRS;
@@ -41,7 +38,6 @@ import org.apache.sis.storage.GridCoverageResource;
 import org.apache.sis.storage.netcdf.zarr.ZarrEncoder;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.GeodeticCRS;
-import org.opengis.referencing.crs.GeographicCRS;
 import org.opengis.referencing.crs.SingleCRS;
 import org.opengis.referencing.crs.TemporalCRS;
 import org.opengis.referencing.datum.Ellipsoid;

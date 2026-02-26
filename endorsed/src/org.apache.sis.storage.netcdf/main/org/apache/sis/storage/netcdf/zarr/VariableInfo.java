@@ -33,7 +33,6 @@ import org.apache.sis.storage.netcdf.classic.ChannelDecoder;
 import org.apache.sis.temporal.LenientDateFormat;
 import org.apache.sis.util.CharSequences;
 import org.apache.sis.util.Classes;
-import org.apache.sis.util.Numbers;
 import org.apache.sis.util.resources.Errors;
 import ucar.nc2.constants.CDM;
 import ucar.nc2.constants.CF;
@@ -948,7 +947,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
 
     /**
      * Fills the given array with the given value. Only if the value is non-null and non-zero.
-     * 
+     *
      * @param array the array to fill
      * @param value the value to fill the array with
      */
@@ -1138,7 +1137,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
 
     /**
      * Writes the data of this variable.
-     * 
+     *
      * @throws IOException        if an I/O error occurred.
      * @throws DataStoreException if the data cannot be written.
      */
