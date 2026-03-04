@@ -114,7 +114,9 @@ public final class ZarrEncoder extends Encoder {
             String varName = varInfo.getName();
 
             boolean isDimensionVar = dimensionsNames.contains(varInfo.getName()); // Variable is a dimensions variable
-            boolean isAuxiliaryVar = !isDimensionVar && varInfo.getNumDimensions() == 0; // Variable is an auxiliary variable (no dimensions) (GeoZarr convention)
+            final int[] varShape = varInfo.metadata.shape();
+            boolean isAuxiliaryVar = !isDimensionVar && varInfo.getNumDimensions() == 0
+                    && (varShape == null || varShape.length == 0); // Variable is an auxiliary variable (no dimensions and no shape) (GeoZarr convention)
 
             // Check for existing variable in group metadata:
             VariableInfo existingVar = null;
@@ -169,7 +171,12 @@ public final class ZarrEncoder extends Encoder {
             }
             VariableInfo variableInfo = (VariableInfo) variable;
             DimensionInfo[] dims = variableInfo.dimensions;
-            dimensionsNames.addAll(Arrays.stream(dims).map(Dimension::getName).collect(Collectors.toList()));
+            if (dims == null || dims.length == 0) {
+                continue; // No dimensions for this variable
+            }
+            dimensionsNames.addAll(Arrays.stream(dims).map(Dimension::getName)
+                    .filter(n -> n != null) // Skip unnamed dimensions (null entries per Zarr v3 spec)
+                    .collect(Collectors.toList()));
         }
         return dimensionsNames;
     }
@@ -198,12 +205,14 @@ public final class ZarrEncoder extends Encoder {
 
     @Override
     public Variable buildVariable(String name, Dimension[] dimensions, Map<String, Object> attributes, DataType dataType, int[] shape, int[] chunkShape, Object data, Integer smIndex) throws DataStoreContentException {
-        String[] dimensionNames = Arrays.stream(dimensions)
-                .map(Dimension::getName)
-                .toArray(String[]::new);
+        String[] dimensionNames = null;
+        if (dimensions != null && dimensions.length > 0) {
+            dimensionNames = Arrays.stream(dimensions)
+                    .map(Dimension::getName)
+                    .toArray(String[]::new);
+        }
 
         //TODO : improve chunk shape handling
-
         if (shape.length == 1) {
             chunkShape = shape;
         }
@@ -220,9 +229,12 @@ public final class ZarrEncoder extends Encoder {
                 shape, chunkShape, dimensionNames, fillValue);
 
         // Explicit cast
-        DimensionInfo[] dimInfos = Arrays.stream(dimensions)
-                .map(d -> (DimensionInfo) d)
-                .toArray(DimensionInfo[]::new);
+        DimensionInfo[] dimInfos = null;
+        if (dimensions != null && dimensions.length > 0) {
+            dimInfos = Arrays.stream(dimensions)
+                    .map(d -> (DimensionInfo) d)
+                    .toArray(DimensionInfo[]::new);
+        }
 
         return new VariableInfo(this, name, dimInfos, attributes, attributes.keySet(), dataType, arrayMetadata, data, smIndex);
     }

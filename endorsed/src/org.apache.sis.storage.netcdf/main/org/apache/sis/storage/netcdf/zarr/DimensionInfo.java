@@ -166,6 +166,6 @@ final class DimensionInfo extends Dimension {
 
     @Override
     public String toString() {
-        return name + "[" + Integer.toUnsignedLong(length) + "] (" + zarrPath + ")";
+        return (name == null ? "unnamed" : name) + "[" + Integer.toUnsignedLong(length) + "] (" + zarrPath + ")";
     }
 }

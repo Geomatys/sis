@@ -180,7 +180,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
          * as its dimension. But the "_CoordinateAxisType" attribute is often used for making explicit that a
          * variable is an axis. We check that case before to check variable name.
          */
-        if (dimensions.length == 1 || dimensions.length == 2) {
+        if (dimensions != null && (dimensions.length == 1 || dimensions.length == 2)) {
             isCoordinateSystemAxis = (getAxisType() != null);
             if (!isCoordinateSystemAxis && (dimensions.length == 1 || dataType == DataType.CHAR)) {
                 /*
@@ -195,7 +195,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
                         value = name;
                     }
                 }
-                isCoordinateSystemAxis = dimensions[0].name.equals(value);
+                isCoordinateSystemAxis = dimensions[0].name != null && dimensions[0].name.equals(value);
             }
         }
 
@@ -249,7 +249,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
                         value = name;
                     }
                 }
-                isCoordinateSystemAxis = dimensions[0].name.equals(value);
+                isCoordinateSystemAxis = dimensions[0].name != null && dimensions[0].name.equals(value);
             }
         }
     }
@@ -501,6 +501,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
      */
     @Override
     public List<Dimension> getGridDimensions() {
+        if (dimensions == null) return Collections.emptyList();
         List<Dimension> result = new ArrayList<>(Arrays.asList(dimensions));
         return result;
     }
@@ -1288,7 +1289,7 @@ final class VariableInfo extends Variable implements Comparable<VariableInfo> {
         final int[] arrayShape = this.metadata.shape();
         final int[] chunkShape = this.metadata.chunkGrid().configuration().chunkShape();
         final int[] gridShape  = this.metadata.getChunksGridShape();
-        final int nDim         = dimensions.length;
+        final int nDim         = arrayShape.length;
 
         List<AbstractZarrCodec> codecs = this.metadata.codecs();
         List<ZarrRepresentationType> reprTypes = this.metadata.representationTypes();
