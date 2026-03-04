@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
+ * Zarr encoder that writes variables and metadata to a Zarr dataset on the filesystem.
  *
  * @author  Quentin Bialota (Geomatys)
  */
@@ -118,9 +119,13 @@ public final class ZarrEncoder extends Encoder {
             boolean isAuxiliaryVar = !isDimensionVar && varInfo.getNumDimensions() == 0
                     && (varShape == null || varShape.length == 0); // Variable is an auxiliary variable (no dimensions and no shape) (GeoZarr convention)
 
-            // Check for existing variable in group metadata:
+            // Resolve the target group for this variable from its path relative to the output root
+            Path relativeGroupPath = outputPath.relativize(varInfo.metadata.path().getParent());
+            ZarrGroupMetadata targetGroup = getOrCreateGroup(relativeGroupPath);
+
+            // Check for existing variable in the target group:
             VariableInfo existingVar = null;
-            ZarrNodeMetadata existingMeta = this.metadata.findChildNodeMetadata(varName);
+            ZarrNodeMetadata existingMeta = targetGroup.findChildNodeMetadata(varName);
             if (existingMeta != null) {
                 // Try to find full VariableInfo by matching meta
                 for (VariableInfo v : this.variables) {
@@ -145,7 +150,7 @@ public final class ZarrEncoder extends Encoder {
                     String newName;
                     do {
                         newName = baseName + suffix++;
-                    } while (this.metadata.findChildNodeMetadata(newName) != null);
+                    } while (targetGroup.findChildNodeMetadata(newName) != null);
                     varInfo.setName(newName);
                     varName = newName;
                 }
@@ -156,10 +161,37 @@ public final class ZarrEncoder extends Encoder {
             }
 
             this.variables.add(varInfo);
-            this.metadata.addChildNodeMetadata(varInfo.metadata.name, varInfo.metadata);
+            targetGroup.addChildNodeMetadata(varInfo.metadata.name, varInfo.metadata);
         }
 
         this.writeMetadata();
+    }
+
+    /**
+     * Walks the given relative path from the root group, creating intermediate {@link ZarrGroupMetadata}
+     * nodes on the fly when they do not already exist.
+     *
+     * @param relativePath path relative to the output root (e.g. {@code "depth1/zone1"} or an empty path).
+     * @return the group node at the end of the path, which may be the root group if the path is empty.
+     * @throws IllegalStateException if a segment of the path already exists as an array node.
+     */
+    private ZarrGroupMetadata getOrCreateGroup(Path relativePath) {
+        ZarrGroupMetadata current = this.metadata;
+        for (Path segment : relativePath) {
+            String segName = segment.toString();
+            if (segName.isEmpty()) continue;
+            ZarrNodeMetadata child = current.findChildNodeMetadata(segName);
+            if (child == null) {
+                ZarrGroupMetadata newGroup = new ZarrGroupMetadata(segName, current.path().resolve(segName), Map.of());
+                current.addChildNodeMetadata(segName, newGroup);
+                current = newGroup;
+            } else if (child instanceof ZarrGroupMetadata) {
+                current = (ZarrGroupMetadata) child;
+            } else {
+                throw new IllegalStateException("Expected a group at '" + segName + "' but found an array node.");
+            }
+        }
+        return current;
     }
 
     private List<String> getDimensionsNames(List<Variable> variables) {
@@ -226,7 +258,7 @@ public final class ZarrEncoder extends Encoder {
             }
         }
 
-        // Get separator from configuration if provided, otherwise use null (default seperator used by Zarr is '/')
+        // Get separator from configuration if provided, otherwise use null (default separator used by Zarr is '/')
         Character separator = null;
         if (configuration != null && configuration.containsKey("separator")) {
             Object sepObj = configuration.get("separator");
@@ -239,7 +271,16 @@ public final class ZarrEncoder extends Encoder {
             }
         }
 
-        ZarrArrayMetadata arrayMetadata = new ZarrArrayMetadata(name, outputPath.resolve(name), attributes, dataType,
+        // Get group path from configuration (e.g. "depth1" or "depth1/zone1"), defaults to root
+        Path varBasePath = outputPath;
+        if (configuration != null && configuration.containsKey("group")) {
+            String groupPath = configuration.get("group").toString();
+            if (!groupPath.isEmpty()) {
+                varBasePath = outputPath.resolve(groupPath);
+            }
+        }
+
+        ZarrArrayMetadata arrayMetadata = new ZarrArrayMetadata(name, varBasePath.resolve(name), attributes, dataType,
                 shape, chunkShape, dimensionNames, fillValue, separator);
 
         // Explicit cast

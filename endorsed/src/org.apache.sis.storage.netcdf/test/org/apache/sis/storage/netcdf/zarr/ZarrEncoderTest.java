@@ -251,44 +251,37 @@ public class ZarrEncoderTest extends EncoderTest {
         double[] subzoneData_Depth2_zone1 = new double[]{6.0, 7.0, 8.0, 9.0, 10.0};
         double[] subzoneData_Depth2_zone2 = new double[]{40.0, 50.0, 60.0};
 
-        Map<String, Object> configuration = Map.of("separator", '_');
+        // depth1 group: zone1 (5 values) and zone2 (3 values), flat chunk key layout
+        Map<String, Object> depth1Conf = Map.of("separator", '_', "group", "depth1");
+        Map<String, Object> depth2Conf = Map.of("separator", '_', "group", "depth2");
 
-        Variable zone1_depth1_var = encoder.buildVariable("zone1_depth1", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth1_zone1.length}, new int[]{subzoneData_Depth1_zone1.length}, subzoneData_Depth1_zone1, null, configuration);
+        Variable zone1_depth1_var = encoder.buildVariable("zone1", null, Map.of("test_attribute", "data attribute"),
+                DataType.FLOAT, new int[]{subzoneData_Depth1_zone1.length}, new int[]{subzoneData_Depth1_zone1.length}, subzoneData_Depth1_zone1, null, depth1Conf);
 
-        Variable zone2_depth1_var = encoder.buildVariable("zone2_depth1", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth1_zone2.length}, new int[]{subzoneData_Depth1_zone2.length}, subzoneData_Depth1_zone2, null, configuration);
+        Variable zone2_depth1_var = encoder.buildVariable("zone2", null, Map.of("test_attribute", "data attribute"),
+                DataType.FLOAT, new int[]{subzoneData_Depth1_zone2.length}, new int[]{subzoneData_Depth1_zone2.length}, subzoneData_Depth1_zone2, null, depth1Conf);
 
-        Variable zone1_depth2_var = encoder.buildVariable("zone1_depth2", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth2_zone1.length}, new int[]{subzoneData_Depth2_zone1.length}, subzoneData_Depth2_zone1, null, configuration);
+        Variable zone1_depth2_var = encoder.buildVariable("zone1", null, Map.of("test_attribute", "data attribute"),
+                DataType.FLOAT, new int[]{subzoneData_Depth2_zone1.length}, new int[]{subzoneData_Depth2_zone1.length}, subzoneData_Depth2_zone1, null, depth2Conf);
 
-        Variable zone2_depth2_var = encoder.buildVariable("zone2_depth2", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth2_zone2.length}, new int[]{subzoneData_Depth2_zone2.length}, subzoneData_Depth2_zone2, null, configuration);
+        Variable zone2_depth2_var = encoder.buildVariable("zone2", null, Map.of("test_attribute", "data attribute"),
+                DataType.FLOAT, new int[]{subzoneData_Depth2_zone2.length}, new int[]{subzoneData_Depth2_zone2.length}, subzoneData_Depth2_zone2, null, depth2Conf);
 
         encoder.writeVariables(List.of(zone1_depth1_var, zone2_depth1_var, zone1_depth2_var, zone2_depth2_var));
 
-//        ZarrDecoder decoder = (ZarrDecoder) ZarrDecoderTest.createZarrDecoder(rootWrite);
-//        assertEquals(3,    decoder.getVariables().length);
-//
-//        Variable var = decoder.getVariables()[0];
-//        assertEquals("data", var.getName());
-//        assertEquals(2, var.getGridDimensions().size());
-//        assertEquals("y", var.getGridDimensions().getFirst().getName());
-//        assertEquals("x", var.getGridDimensions().getLast().getName());
-//        assertArrayEquals(data, var.read().floatValues());
-//
-//        var = decoder.getVariables()[1];
-//        assertEquals("x", var.getName());
-//        assertEquals(1, var.getGridDimensions().size());
-//        assertArrayEquals(xData, var.read().doubleValues());
-//
-//        var = decoder.getVariables()[2];
-//        assertEquals("y", var.getName());
-//        assertArrayEquals(yData, var.read().doubleValues());
-//
-//        // Cleanup after test
-//        if (rootWrite != null && Files.exists(rootWrite)) {
-//            deleteRecursively(rootWrite);
-//        }
+        // Verify the group directories and zarr.json files exist on disk
+        assertTrue(Files.isDirectory(rootWrite.resolve("depth1")),        "depth1 group directory should exist");
+        assertTrue(Files.isDirectory(rootWrite.resolve("depth2")),        "depth2 group directory should exist");
+        assertTrue(Files.exists(rootWrite.resolve("depth1/zarr.json")),   "depth1 group metadata should exist");
+        assertTrue(Files.exists(rootWrite.resolve("depth2/zarr.json")),   "depth2 group metadata should exist");
+        assertTrue(Files.isDirectory(rootWrite.resolve("depth1/zone1")),  "depth1/zone1 array directory should exist");
+        assertTrue(Files.isDirectory(rootWrite.resolve("depth1/zone2")),  "depth1/zone2 array directory should exist");
+        assertTrue(Files.isDirectory(rootWrite.resolve("depth2/zone1")),  "depth2/zone1 array directory should exist");
+        assertTrue(Files.isDirectory(rootWrite.resolve("depth2/zone2")),  "depth2/zone2 array directory should exist");
+        // Flat chunk key: c_0 (not c/0)
+        assertTrue(Files.exists(rootWrite.resolve("depth1/zone1/c_0")),   "depth1/zone1 chunk file c_0 should exist");
+
+        // Cleanup
+        deleteRecursively(rootWrite);
     }
 }
