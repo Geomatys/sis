@@ -204,7 +204,8 @@ public final class ZarrEncoder extends Encoder {
     }
 
     @Override
-    public Variable buildVariable(String name, Dimension[] dimensions, Map<String, Object> attributes, DataType dataType, int[] shape, int[] chunkShape, Object data, Integer smIndex) throws DataStoreContentException {
+    public Variable buildVariable(String name, Dimension[] dimensions, Map<String, Object> attributes, DataType dataType,
+                                  int[] shape, int[] chunkShape, Object data, Integer smIndex, Map<String, Object> configuration) throws DataStoreContentException {
         String[] dimensionNames = null;
         if (dimensions != null && dimensions.length > 0) {
             dimensionNames = Arrays.stream(dimensions)
@@ -225,8 +226,21 @@ public final class ZarrEncoder extends Encoder {
             }
         }
 
+        // Get separator from configuration if provided, otherwise use null (default seperator used by Zarr is '/')
+        Character separator = null;
+        if (configuration != null && configuration.containsKey("separator")) {
+            Object sepObj = configuration.get("separator");
+            if (sepObj instanceof Character) {
+                separator = (Character) sepObj;
+            } else if (sepObj instanceof String && ((String) sepObj).length() == 1) {
+                separator = ((String) sepObj).charAt(0);
+            } else {
+                throw new IllegalArgumentException("Invalid separator value in configuration: " + sepObj);
+            }
+        }
+
         ZarrArrayMetadata arrayMetadata = new ZarrArrayMetadata(name, outputPath.resolve(name), attributes, dataType,
-                shape, chunkShape, dimensionNames, fillValue);
+                shape, chunkShape, dimensionNames, fillValue, separator);
 
         // Explicit cast
         DimensionInfo[] dimInfos = null;

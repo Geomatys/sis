@@ -80,9 +80,9 @@ public class ZarrEncoderTest extends EncoderTest {
         double[] yData = new double[]{10.0, 20.0, 30.0};
 
         Variable xVar = encoder.buildVariable("x", new Dimension[]{xDim}, Map.of("test_attribute", "x attribute"),
-                DataType.DOUBLE, new int[]{Math.toIntExact(xDim.length())}, new int[]{Math.toIntExact(xDim.length())}, xData, null);
+                DataType.DOUBLE, new int[]{Math.toIntExact(xDim.length())}, new int[]{Math.toIntExact(xDim.length())}, xData, null, null);
         Variable yVar = encoder.buildVariable("y", new Dimension[]{yDim}, Map.of("test_attribute", "y attribute"),
-                DataType.DOUBLE, new int[]{Math.toIntExact(yDim.length())}, new int[]{Math.toIntExact(yDim.length())}, yData, null);
+                DataType.DOUBLE, new int[]{Math.toIntExact(yDim.length())}, new int[]{Math.toIntExact(yDim.length())}, yData, null, null);
 
         float[] data = new float[]{
                 1.0f, 2.0f, 3.0f, 4.0f, 5.0f,
@@ -92,7 +92,7 @@ public class ZarrEncoderTest extends EncoderTest {
 
         Variable dataVar = encoder.buildVariable("data", new Dimension[]{yDim, xDim}, Map.of("test_attribute", "data attribute"),
                 DataType.FLOAT, new int[]{Math.toIntExact(yDim.length()), Math.toIntExact(xDim.length())},
-                new int[]{3, 3}, data, null);
+                new int[]{3, 3}, data, null, null);
 
         encoder.writeVariables(List.of(xVar, yVar, dataVar));
 
@@ -138,7 +138,7 @@ public class ZarrEncoderTest extends EncoderTest {
         String[] sData = new String[]{"hello", "world", "this", "is", "zarr_test_string"};
 
         Variable sVar = encoder.buildVariable("s", new Dimension[]{sDim}, Map.of("test_attribute", "x attribute"),
-                DataType.STRING, new int[]{Math.toIntExact(sDim.length())}, new int[]{Math.toIntExact(sDim.length())}, sData, null);
+                DataType.STRING, new int[]{Math.toIntExact(sDim.length())}, new int[]{Math.toIntExact(sDim.length())}, sData, null, null);
 
         float[] data = new float[]{
                 1.0f, 2.0f, 3.0f, 4.0f, 5.0f
@@ -146,7 +146,7 @@ public class ZarrEncoderTest extends EncoderTest {
 
         Variable dataVar = encoder.buildVariable("data", new Dimension[]{sDim}, Map.of("test_attribute", "data attribute"),
                 DataType.FLOAT, new int[]{Math.toIntExact(sDim.length())},
-                new int[]{5}, data, null);
+                new int[]{5}, data, null, null);
 
         encoder.writeVariables(List.of(sVar, dataVar));
 
@@ -192,7 +192,7 @@ public class ZarrEncoderTest extends EncoderTest {
         float[] data1 = new float[]{1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
         Variable var1 = encoder.buildVariable("unnamed_1d", new Dimension[]{unnamedDim},
                 Map.of(), DataType.FLOAT,
-                new int[]{5}, new int[]{5}, data1, null);
+                new int[]{5}, new int[]{5}, data1, null, null);
 
         // Case 2: mixed named + unnamed  →  dimension_names: ["x", null]
         Dimension xDim      = encoder.buildDimension("x", 3);
@@ -200,7 +200,7 @@ public class ZarrEncoderTest extends EncoderTest {
         float[] data2 = new float[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
         Variable var2 = encoder.buildVariable("mixed_2d", new Dimension[]{xDim, unnamed2},
                 Map.of(), DataType.FLOAT,
-                new int[]{3, 4}, new int[]{3, 4}, data2, null);
+                new int[]{3, 4}, new int[]{3, 4}, data2, null, null);
 
         encoder.writeVariables(List.of(var1, var2));
 
@@ -251,17 +251,19 @@ public class ZarrEncoderTest extends EncoderTest {
         double[] subzoneData_Depth2_zone1 = new double[]{6.0, 7.0, 8.0, 9.0, 10.0};
         double[] subzoneData_Depth2_zone2 = new double[]{40.0, 50.0, 60.0};
 
+        Map<String, Object> configuration = Map.of("separator", '_');
+
         Variable zone1_depth1_var = encoder.buildVariable("zone1_depth1", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth1_zone1.length}, new int[]{subzoneData_Depth1_zone1.length}, subzoneData_Depth1_zone1, null);
+                DataType.FLOAT, new int[]{subzoneData_Depth1_zone1.length}, new int[]{subzoneData_Depth1_zone1.length}, subzoneData_Depth1_zone1, null, configuration);
 
         Variable zone2_depth1_var = encoder.buildVariable("zone2_depth1", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth1_zone2.length}, new int[]{subzoneData_Depth1_zone2.length}, subzoneData_Depth1_zone2, null);
+                DataType.FLOAT, new int[]{subzoneData_Depth1_zone2.length}, new int[]{subzoneData_Depth1_zone2.length}, subzoneData_Depth1_zone2, null, configuration);
 
         Variable zone1_depth2_var = encoder.buildVariable("zone1_depth2", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth2_zone1.length}, new int[]{subzoneData_Depth2_zone1.length}, subzoneData_Depth2_zone1, null);
+                DataType.FLOAT, new int[]{subzoneData_Depth2_zone1.length}, new int[]{subzoneData_Depth2_zone1.length}, subzoneData_Depth2_zone1, null, configuration);
 
         Variable zone2_depth2_var = encoder.buildVariable("zone2_depth2", null, Map.of("test_attribute", "data attribute"),
-                DataType.FLOAT, new int[]{subzoneData_Depth2_zone2.length}, new int[]{subzoneData_Depth2_zone2.length}, subzoneData_Depth2_zone2, null);
+                DataType.FLOAT, new int[]{subzoneData_Depth2_zone2.length}, new int[]{subzoneData_Depth2_zone2.length}, subzoneData_Depth2_zone2, null, configuration);
 
         encoder.writeVariables(List.of(zone1_depth1_var, zone2_depth1_var, zone1_depth2_var, zone2_depth2_var));
 

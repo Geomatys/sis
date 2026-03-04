@@ -38,14 +38,15 @@ final class ZarrArrayMetadata extends ZarrNodeMetadata {
     }
 
     public ZarrArrayMetadata(String name, Path path, Map<String, Object> attributes, DataType dataType,
-                             int[] shape, int[] chunkShape, String[] dimensionNames, Object fillValue) {
+                             int[] shape, int[] chunkShape, String[] dimensionNames, Object fillValue,
+                             Character separator) {
         super(name, path, attributes);
         this.nodeType = "array";
         this.setDataType(dataType);
 
         this.chunkKeyEncoding = new ChunkKeyEncoding();
         this.chunkKeyEncoding.setName("default");
-        this.chunkKeyEncoding.setConfiguration(Map.of("separator", "/"));
+        this.chunkKeyEncoding.setConfiguration(Map.of("separator", (separator == null ? '/' : separator)));
 
         this.chunkGrid = new ChunkGrid();
         this.chunkGrid.setName("regular");
@@ -142,6 +143,7 @@ final class ZarrArrayMetadata extends ZarrNodeMetadata {
      * Example:
      * If the array data path is "/data/my_array", the chunk key (indices) is [0, 1, 2], and the encoding use '/' as a separator,
      * the resulting path will be : /data/my_array/c/0/1/2
+     * If the encoding use '_' as a separator, the resulting path will be : /data/my_array/c_0_1_2
      *
      * @param chunkKey the chunk key as an array of integers, representing the indices of the chunk in the grid.
      * @return the path to the chunk data.
@@ -156,12 +158,23 @@ final class ZarrArrayMetadata extends ZarrNodeMetadata {
 
         String separator = chunkKeyEncoding.configuration().getOrDefault("separator", "/").toString();
 
-        StringBuilder pathBuilder = new StringBuilder();
-        for (int key : chunkKey) {
-            pathBuilder.append(key).append(separator);
+        if ("/".equals(separator)) {
+            // Hierarchical layout: array_dir/c/0/1/2
+            // arrayDataPath already points to array_dir/c
+            Path p = arrayDataPath;
+            for (int key : chunkKey) {
+                p = p.resolve(String.valueOf(key));
+            }
+            return p;
+        } else {
+            // Flat layout: array_dir/c_0_1_2  (c prefix + separator + indices joined by separator)
+            // arrayDataPath.getParent() is the array directory
+            StringBuilder nameBuilder = new StringBuilder("c");
+            for (int key : chunkKey) {
+                nameBuilder.append(separator).append(key);
+            }
+            return arrayDataPath.getParent().resolve(nameBuilder.toString());
         }
-
-        return arrayDataPath.resolve(pathBuilder.toString());
     }
 
     /**

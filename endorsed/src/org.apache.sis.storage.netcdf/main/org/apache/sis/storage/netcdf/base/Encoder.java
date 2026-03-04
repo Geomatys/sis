@@ -195,11 +195,12 @@ public abstract class Encoder extends ReferencingFactoryContainer {
      * @param chunkShape the chunk shape of the variable, or {@code null} if unknown
      * @param data the data of the variable, or {@code null} if none
      * @param smIndex the index sample dimension in the data or {@code null} if not applicable (only used when data is a Resource)
+     * @param configuration more configuration parameters, or {@code null} if none. The content of this map is implementation-specific and may be ignored by some implementations.
      * @return an array containing a single {@link Variable} object
      */
     public abstract Variable buildVariable(final String name, Dimension[] dimensions,
                                            final Map<String,Object> attributes, DataType dataType, int[] shape, int[] chunkShape,
-                                           Object data, Integer smIndex)
+                                           Object data, Integer smIndex, Map<String, Object> configuration)
             throws DataStoreContentException;
 
     /**

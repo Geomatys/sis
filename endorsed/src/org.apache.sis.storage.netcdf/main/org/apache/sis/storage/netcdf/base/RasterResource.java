@@ -312,7 +312,7 @@ public final class RasterResource extends AbstractGridCoverageResource implement
                     DataType dimType = DataType.DOUBLE; // or infer from values if all integers
                     int[] shape = new int[]{dimLen};
                     Dimension[] dims = new Dimension[]{dimensions[i]};
-                    Variable dimVar = encoder.buildVariable(name, dims, dimAttrs, dimType, shape, null, values, null);
+                    Variable dimVar = encoder.buildVariable(name, dims, dimAttrs, dimType, shape, null, values, null, null);
                     variables.add(dimVar);
                     processedDims++;
                 }
@@ -343,7 +343,7 @@ public final class RasterResource extends AbstractGridCoverageResource implement
                         dimensions,
                         attrs,
                         DataType.UNKNOWN,
-                        shape, null, resource, b
+                        shape, null, resource, b, null
                 );
                 variables.add(smVar);
             }
@@ -429,7 +429,7 @@ public final class RasterResource extends AbstractGridCoverageResource implement
                             DataType.UNKNOWN,
                             new int[] {1},
                             null,
-                            null, null
+                            null, null, null
                     );
                     variables.add(crsVar);
                 }
