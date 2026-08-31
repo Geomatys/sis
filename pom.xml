@@ -831,7 +831,7 @@
       <!-- Compile -->
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>4.0.0-beta-4-SNAPSHOT</version>
+        <version>4.0.0-beta-5</version>
         <configuration>
           <incrementalCompilation>options,dependencies,sources</incrementalCompilation>
           <!-- compilerArgs>
@@ -1030,7 +1030,16 @@
         </configuration>
       </plugin>
 
-      <!-- Deploy -->
+      <!-- Install and deploy -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>4.0.0-beta-3-SNAPSHOT</version>
+        <configuration>
+          <!-- TODO: this option needs to be removed -->
+          <allowIncompleteProjects>true</allowIncompleteProjects>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-deploy-plugin</artifactId>
