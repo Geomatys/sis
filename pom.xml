@@ -860,7 +860,7 @@
       <!-- Package in JAR files -->
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>4.0.0-beta-2-SNAPSHOT</version>
+        <version>4.0.0-beta-2</version>
         <configuration>
           <archive>
             <addMavenDescriptor>false</addMavenDescriptor>
@@ -1034,11 +1034,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-install-plugin</artifactId>
-        <version>4.0.0-beta-3-SNAPSHOT</version>
-        <configuration>
-          <!-- TODO: this option needs to be removed -->
-          <allowIncompleteProjects>true</allowIncompleteProjects>
-        </configuration>
+        <version>4.0.0-beta-3</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
